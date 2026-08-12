@@ -35,6 +35,52 @@ dependencies:
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
 
+  # Состояние/DI
+  flutter_riverpod: ^3.4.2
+
+  # Навигация (вкладки + мини-плеер поверх + полноэкранный плеер)
+  go_router: ^17.5.0
+
+  # Аудиодвижок (libmpv). Только аудио — без media_kit_video, обложки рендерятся Image-виджетом.
+  media_kit: ^1.2.6
+  media_kit_libs_audio: ^1.0.7
+
+  # Lockscreen/уведомления/Bluetooth-кнопки на Android
+  audio_service: ^0.18.19
+
+  # Чтение/запись тегов (title/artist/album/genre/обложка). Заменяет id3 из ТЗ:
+  # пакет id3 discontinued с 2021 года, см. docs/adr/0007-audiotags-instead-of-id3.md
+  audiotags: ^1.4.5
+
+  # CRDT-слой (метаданные): tracks/favorites/playlists/devices
+  crdt: ^5.1.3
+  sql_crdt: ^3.0.3
+  sqlite_crdt: ^3.0.4
+
+  # P2P-синхронизация CRDT-дельт между узлами (WebSocket)
+  crdt_sync: ^1.0.10
+  web_socket_channel: ^3.0.1
+
+  # mDNS/Bonjour discovery устройств в LAN
+  bonsoir: ^7.1.5
+
+  # REST-клиент к локальному Syncthing API (localhost:8384)
+  dio: ^5.11.0
+
+  # Безопасное хранение ключа устройства и Syncthing API-key
+  flutter_secure_storage: ^10.3.1
+
+  # Импорт: выбор папки/файлов музыки
+  file_picker: ^11.0.3
+
+  # Пути к директориям приложения (БД, кеш обложек)
+  path_provider: ^2.1.6
+
+  # QR-код с публичным ID устройства для добавления нового узла
+  qr_flutter: ^4.1.0
+
+  uuid: ^4.6.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -45,6 +91,12 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
+
+  # Моки в unit/widget-тестах (PlayerService, discovery, HTTP)
+  mocktail: ^1.0.5
+
+  # Лёгкий HTTP-сервер для тестов SyncthingClient (мокаем REST API Syncthing)
+  shelf: ^1.4.2
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
