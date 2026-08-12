@@ -81,6 +81,10 @@ dependencies:
 
   uuid: ^4.6.0
 
+  # Хеш файла как id трека (дедуп/идемпотентный повторный импорт) + пути
+  crypto: ^3.0.6
+  path: ^1.9.1
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
