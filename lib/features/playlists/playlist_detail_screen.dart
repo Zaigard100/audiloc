@@ -83,37 +83,116 @@ class PlaylistDetailScreen extends ConsumerWidget {
         .moveEntry(moved.entryId, beforePosition: before, afterPosition: after);
   }
 
-  Future<void> _showAddTrackSheet(BuildContext context, WidgetRef ref) async {
-    final allTracks = ref.read(libraryTracksProvider).value ?? const [];
-    final currentIds = (ref.read(playlistItemsProvider(playlistId)).value ?? const [])
-        .map((e) => e.track.id)
-        .toSet();
-    final available = allTracks.where((t) => !currentIds.contains(t.id)).toList();
-
-    await showModalBottomSheet(
+  Future<void> _showAddTrackSheet(BuildContext context, WidgetRef ref) {
+    return showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.7,
-        expand: false,
-        builder: (context, scrollController) => available.isEmpty
-            ? const Center(child: Text('Все треки уже в плейлисте', style: TextStyle(color: AppTheme.onSurfaceMuted)))
-            : ListView.builder(
-                controller: scrollController,
-                itemCount: available.length,
-                itemBuilder: (context, index) {
-                  final track = available[index];
-                  return TrackTile(
-                    track: track,
-                    trailing: const Icon(Icons.add, color: AppTheme.accent),
-                    onTap: () async {
-                      await ref.read(playlistsRepositoryProvider).addTrack(playlistId, track.id);
-                      if (context.mounted) Navigator.of(context).pop();
-                    },
-                  );
-                },
+      builder: (context) => _AddTracksSheet(playlistId: playlistId),
+    );
+  }
+}
+
+/// Multi-select + search for adding tracks to a playlist. Replaces the
+/// old "tap a track, it's added, the sheet closes" flow — picking more
+/// than one track used to mean reopening the sheet from scratch for
+/// every single one.
+class _AddTracksSheet extends ConsumerStatefulWidget {
+  const _AddTracksSheet({required this.playlistId});
+
+  final String playlistId;
+
+  @override
+  ConsumerState<_AddTracksSheet> createState() => _AddTracksSheetState();
+}
+
+class _AddTracksSheetState extends ConsumerState<_AddTracksSheet> {
+  final _searchController = TextEditingController();
+  final _selectedIds = <String>{};
+  var _query = '';
+  var _adding = false;
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final allTracks = ref.watch(libraryTracksProvider).value ?? const [];
+    final currentIds =
+        (ref.watch(playlistItemsProvider(widget.playlistId)).value ?? const []).map((e) => e.track.id).toSet();
+    final query = _query.trim().toLowerCase();
+    final available = allTracks.where((t) => !currentIds.contains(t.id)).where((t) {
+      if (query.isEmpty) return true;
+      return t.displayTitle.toLowerCase().contains(query) || t.displayArtist.toLowerCase().contains(query);
+    }).toList();
+
+    return DraggableScrollableSheet(
+      initialChildSize: 0.8,
+      expand: false,
+      builder: (context, scrollController) => SafeArea(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+              child: TextField(
+                controller: _searchController,
+                decoration: const InputDecoration(
+                  hintText: 'Поиск трека',
+                  prefixIcon: Icon(Icons.search),
+                  isDense: true,
+                ),
+                onChanged: (value) => setState(() => _query = value),
               ),
+            ),
+            Expanded(
+              child: available.isEmpty
+                  ? Center(
+                      child: Text(
+                        query.isEmpty ? 'Все треки уже в плейлисте' : 'Ничего не найдено',
+                        style: const TextStyle(color: AppTheme.onSurfaceMuted),
+                      ),
+                    )
+                  : ListView.builder(
+                      controller: scrollController,
+                      itemCount: available.length,
+                      itemBuilder: (context, index) {
+                        final track = available[index];
+                        final selected = _selectedIds.contains(track.id);
+                        return TrackTile(
+                          track: track,
+                          trailing: Checkbox(value: selected, onChanged: (_) => _toggle(track.id)),
+                          onTap: () => _toggle(track.id),
+                        );
+                      },
+                    ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: FilledButton(
+                onPressed: _selectedIds.isEmpty || _adding ? null : _addSelected,
+                child: _adding
+                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                    : Text(_selectedIds.isEmpty ? 'Добавить' : 'Добавить (${_selectedIds.length})'),
+              ),
+            ),
+          ],
+        ),
       ),
     );
+  }
+
+  void _toggle(String trackId) => setState(() {
+        if (!_selectedIds.remove(trackId)) _selectedIds.add(trackId);
+      });
+
+  Future<void> _addSelected() async {
+    setState(() => _adding = true);
+    final repository = ref.read(playlistsRepositoryProvider);
+    for (final trackId in _selectedIds) {
+      await repository.addTrack(widget.playlistId, trackId);
+    }
+    if (mounted) Navigator.of(context).pop();
   }
 }

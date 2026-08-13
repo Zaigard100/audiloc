@@ -16,19 +16,62 @@ const _tabs = ['library', 'playlists', 'search', 'devices'];
 
 /// Bottom-tab shell (ТЗ п.6.2): Библиотека / Плейлисты / Поиск / Устройства,
 /// with the mini-player pinned above the tab bar so it's always reachable.
+/// Swiping left/right switches tabs too, not just tapping the bar — a
+/// `PageView` (not `.builder`, so every tab stays built and keeps its
+/// state exactly like the `IndexedStack` it replaced) driven by the same
+/// `tab` route param, kept in sync in both directions: tapping the bar
+/// animates the page, swiping the page updates the route (and so the
+/// bar's selection) via [_onPageChanged].
+///
 /// Also owns the incoming-pairing-request dialog (ТЗ +
 /// docs/adr/0011-mutual-pairing-confirmation.md) and the incoming
 /// "Поделиться" offer dialog (docs/adr/0017-forbid-cross-profile-pairing-and-sharing.md)
 /// — both need to show up no matter which tab the user is on.
-class AppShell extends ConsumerWidget {
+class AppShell extends ConsumerStatefulWidget {
   const AppShell({super.key, required this.tab});
 
   final String tab;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final index = _tabs.indexOf(tab).clamp(0, _tabs.length - 1);
+  ConsumerState<AppShell> createState() => _AppShellState();
+}
 
+class _AppShellState extends ConsumerState<AppShell> {
+  late final PageController _pageController;
+
+  int get _index => _tabs.indexOf(widget.tab).clamp(0, _tabs.length - 1);
+
+  @override
+  void initState() {
+    super.initState();
+    _pageController = PageController(initialPage: _index);
+  }
+
+  @override
+  void didUpdateWidget(covariant AppShell oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // The bar (or anything else navigating via go_router) changed the
+    // route's tab — animate the page to match, unless we're already
+    // there (e.g. because *this* update was itself triggered by
+    // [_onPageChanged] reacting to a swipe that just finished).
+    final target = _index;
+    if (_pageController.hasClients && _pageController.page?.round() != target) {
+      _pageController.animateToPage(target, duration: const Duration(milliseconds: 250), curve: Curves.easeOut);
+    }
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  void _onPageChanged(int index) {
+    if (index != _index) context.go('/${_tabs[index]}');
+  }
+
+  @override
+  Widget build(BuildContext context) {
     ref.listen(incomingPairingRequestsProvider, (previous, next) {
       final request = next.value;
       if (request != null) _showPairingRequestDialog(context, ref, request);
@@ -39,8 +82,9 @@ class AppShell extends ConsumerWidget {
     });
 
     return Scaffold(
-      body: IndexedStack(
-        index: index,
+      body: PageView(
+        controller: _pageController,
+        onPageChanged: _onPageChanged,
         children: const [
           LibraryScreen(),
           PlaylistsScreen(),
@@ -53,7 +97,7 @@ class AppShell extends ConsumerWidget {
         children: [
           const MiniPlayer(),
           NavigationBar(
-            selectedIndex: index,
+            selectedIndex: _index,
             onDestinationSelected: (i) => context.go('/${_tabs[i]}'),
             destinations: const [
               NavigationDestination(icon: Icon(Icons.library_music_outlined), selectedIcon: Icon(Icons.library_music), label: 'Библиотека'),
@@ -108,5 +152,4 @@ class AppShell extends ConsumerWidget {
       ),
     );
   }
-
 }
