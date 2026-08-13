@@ -46,8 +46,12 @@ Syncthing, дедупликация) — рабочий код, часть из 
   `sudo pacman -S clang cmake ninja pkgconf gtk3 mpv`; на
   Debian/Ubuntu — `sudo apt install clang cmake ninja-build
   pkg-config libgtk-3-dev libmpv-dev`.
-- **Android**: Android SDK/NDK (не проверялось в этом репозитории —
-  см. docs/roadmap.md).
+- **Android**: Android SDK/NDK — полная инструкция:
+  [`docs/building-android.md`](docs/building-android.md).
+- **Windows**: Visual Studio с C++ workload — полная инструкция:
+  [`docs/building-windows.md`](docs/building-windows.md) (сборка
+  возможна только на самой Windows, кросс-компиляция с Linux
+  недоступна).
 - Опционально: установленный [Syncthing](https://syncthing.net/) для
   передачи самих аудиофайлов (без него приложение всё равно
   полностью работоспособно локально и синхронизирует метаданные).
@@ -76,6 +80,11 @@ flutter run -d linux
 # Сборка Linux-бинаря
 flutter build linux
 ```
+
+Сборка под Android и Windows требует своей платформенной подготовки
+(SDK/NDK, Visual Studio) — подробные пошаговые инструкции:
+[`docs/building-android.md`](docs/building-android.md),
+[`docs/building-windows.md`](docs/building-windows.md).
 
 Android/Windows-сборки (`flutter build apk` / `flutter build
 windows`) не проверялись в среде, где писался этот код (нет Android

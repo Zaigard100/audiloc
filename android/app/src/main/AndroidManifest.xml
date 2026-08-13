@@ -1,4 +1,22 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Syncthing REST API (localhost) + general networking -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+    <!-- mDNS/Bonjour discovery in LAN (bonsoir) -->
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE"/>
+    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE"/>
+    <!-- Reading music files picked via the folder/file import screen.
+         READ_MEDIA_AUDIO (Android 13+) is a runtime-requested permission;
+         this app does not yet ask for it explicitly (see
+         docs/building-android.md, "Известные ограничения") — until that's
+         added, import may silently see zero files on Android 13+ unless
+         the permission was already granted some other way. -->
+    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO"/>
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32"/>
+    <!-- For the lockscreen/notification controls a future audio_service
+         integration would need (ТЗ п.3) — not wired up yet, see roadmap. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+
     <application
         android:label="audiloc"
         android:name="${applicationName}"
