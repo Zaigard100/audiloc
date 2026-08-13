@@ -10,6 +10,7 @@ import 'core/profile_session.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
 import 'data/profiles/profiles_store.dart';
+import 'features/profiles/initial_profile_name_screen.dart';
 import 'services/playback/audiloc_audio_handler.dart';
 import 'services/playback/media_kit_player_service.dart';
 
@@ -33,6 +34,7 @@ class _AudilocAppState extends State<AudilocApp> {
   late final MediaKitPlayerService _playerService;
   ProfilesStore? _profilesStore;
   ProfileSessionHandle? _session;
+  bool _needsInitialProfileName = false;
 
   @override
   void initState() {
@@ -61,10 +63,28 @@ class _AudilocAppState extends State<AudilocApp> {
 
     final appSupportDir = await getApplicationSupportDirectory();
     final store = ProfilesStore(appSupportDir);
-    final profileId = await store.resolveActiveProfileId();
     if (!mounted) return;
     setState(() => _profilesStore = store);
-    await _openProfile(profileId);
+
+    // A genuinely fresh install (nothing to migrate either) — ask for a
+    // name instead of silently calling it "Профиль 1". Anyone upgrading
+    // from before profiles existed skips this entirely: their library
+    // gets migrated and reopened with zero prompts, same as always.
+    if (await store.needsInitialSetup()) {
+      if (!mounted) return;
+      setState(() => _needsInitialProfileName = true);
+      return;
+    }
+
+    await _openProfile(await store.resolveActiveProfileId());
+  }
+
+  Future<void> _createInitialProfile(String name) async {
+    final profile = await _profilesStore!.create(name);
+    await _profilesStore!.setActiveProfileId(profile.id);
+    if (!mounted) return;
+    setState(() => _needsInitialProfileName = false);
+    await _openProfile(profile.id);
   }
 
   Future<void> _openProfile(String profileId) async {
@@ -101,6 +121,17 @@ class _AudilocAppState extends State<AudilocApp> {
 
   @override
   Widget build(BuildContext context) {
+    if (_needsInitialProfileName) {
+      return MaterialApp(
+        title: 'AudiLoc',
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.dark(),
+        darkTheme: AppTheme.dark(),
+        themeMode: ThemeMode.dark,
+        home: InitialProfileNameScreen(onSubmit: _createInitialProfile),
+      );
+    }
+
     final session = _session;
     if (session == null) {
       return MaterialApp(

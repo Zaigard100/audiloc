@@ -61,6 +61,19 @@ class ProfilesStore {
     ));
   }
 
+  /// True only for a genuinely fresh install: no profiles registered yet
+  /// and nothing to migrate from a pre-accounts install either. `AudilocApp`
+  /// checks this *before* calling [resolveActiveProfileId] so it can ask
+  /// for a name instead of silently defaulting to one — someone upgrading
+  /// from before profiles existed still gets their library back with zero
+  /// prompts (see [resolveActiveProfileId]), this is only for the case
+  /// where there's nothing to preserve either way.
+  Future<bool> needsInitialSetup() async {
+    final state = await _read();
+    if (state.profiles.isNotEmpty) return false;
+    return !await File(p.join(appSupportDir.path, 'audiloc.db')).exists();
+  }
+
   /// Always returns a real profile id — called once at startup so the
   /// rest of the app never has to handle "no profile chosen yet" as a
   /// UI state. In order:
@@ -70,9 +83,9 @@ class ProfilesStore {
   ///    `covers`/`synced_music` caches), if one exists — so upgrading
   ///    from a version before this feature never loses a library or its
   ///    paired devices.
-  /// 4. A fresh, silently-created default profile — a solo user sees no
-  ///    account screen at all, same zero-friction first run as before
-  ///    accounts existed.
+  /// 4. A fresh, silently-created default profile — a fallback for
+  ///    callers that skip the [needsInitialSetup] check; `AudilocApp`
+  ///    itself asks for a name instead of ever hitting this branch.
   Future<String> resolveActiveProfileId() async {
     final state = await _read();
     if (state.activeProfileId != null && state.profiles.any((p) => p.id == state.activeProfileId)) {

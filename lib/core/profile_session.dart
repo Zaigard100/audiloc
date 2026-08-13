@@ -39,18 +39,37 @@ class ProfileSessionHandle {
   /// awaiting whatever `Future` they return, so relying on it here would
   /// leave a race where the new session's `HttpServer.bind` could lose to
   /// the old one still closing.
+  ///
+  /// Every step is additionally bounded by [_step] — belt-and-braces on
+  /// top of `MetadataSyncService.dispose()` already internally bounding
+  /// its own risky part (waiting on a real peer's close handshake, see
+  /// its doc comment): switching profiles must never be able to hang the
+  /// UI forever no matter which step turns out to be the slow one.
   Future<void> close() async {
-    await _backgroundWork.catchError((_) {});
-    await container.read(pairingServiceProvider).dispose();
-    await container.read(pairingServerProvider).dispose();
-    await container.read(fileTransferServerProvider).dispose();
-    await (await container.read(fileSyncServiceProvider.future)).dispose();
-    await (await container.read(coverSyncServiceProvider.future)).dispose();
-    await container.read(syncOrchestratorProvider).dispose();
-    await container.read(metadataSyncServiceProvider).dispose();
-    await container.read(discoveryServiceProvider).dispose();
+    await _step('backgroundWork', () => _backgroundWork);
+    await _step('pairingService', () => container.read(pairingServiceProvider).dispose());
+    await _step('pairingServer', () => container.read(pairingServerProvider).dispose());
+    await _step('fileTransferServer', () => container.read(fileTransferServerProvider).dispose());
+    await _step(
+        'fileSyncService', () async => (await container.read(fileSyncServiceProvider.future)).dispose());
+    await _step('coverSyncService',
+        () async => (await container.read(coverSyncServiceProvider.future)).dispose());
+    await _step('syncOrchestrator', () => container.read(syncOrchestratorProvider).dispose());
+    await _step('metadataSyncService', () => container.read(metadataSyncServiceProvider).dispose());
+    await _step('discoveryService', () => container.read(discoveryServiceProvider).dispose());
     container.dispose();
     await _database.close();
+  }
+
+  Future<void> _step(String name, Future<void> Function() action) async {
+    try {
+      await action().timeout(const Duration(seconds: 3));
+    } catch (_) {
+      // A stuck step (typically a network teardown a peer never
+      // acknowledged) must never make switching profiles hang forever —
+      // better to move on, even if that step's resources leak until the
+      // OS reclaims them, than freeze the UI.
+    }
   }
 }
 

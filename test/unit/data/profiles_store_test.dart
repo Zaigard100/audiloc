@@ -70,6 +70,22 @@ void main() {
     expect(await store.activeProfileId(), isNull);
   });
 
+  group('needsInitialSetup', () {
+    test('true on a genuinely fresh install — nothing registered, nothing to migrate', () async {
+      expect(await store.needsInitialSetup(), isTrue);
+    });
+
+    test('false once any profile is registered', () async {
+      await store.create('A');
+      expect(await store.needsInitialSetup(), isFalse);
+    });
+
+    test('false when there is a pre-accounts flat audiloc.db to migrate instead of asking', () async {
+      await File(p.join(appSupportDir.path, 'audiloc.db')).writeAsBytes([1]);
+      expect(await store.needsInitialSetup(), isFalse);
+    });
+  });
+
   group('resolveActiveProfileId', () {
     test('returns the existing active profile unchanged', () async {
       final a = await store.create('A');

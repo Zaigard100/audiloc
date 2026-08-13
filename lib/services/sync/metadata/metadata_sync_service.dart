@@ -136,9 +136,17 @@ class MetadataSyncService {
   }
 
   Future<void> dispose() async {
-    for (final client in _clients.values) {
-      await client.disconnect();
-    }
+    // Each disconnect waits on `crdt_sync`'s own close handshake with that
+    // peer — if a peer is unreachable or just slow to acknowledge, that
+    // must never stop the port below from actually getting released
+    // (switching profiles closes and immediately reopens this on the same
+    // port — see docs/adr/0013-account-profiles.md). Bounded and run
+    // together rather than one after another, so N stuck peers cost one
+    // timeout, not N of them.
+    await Future.wait([
+      for (final client in _clients.values)
+        client.disconnect().timeout(const Duration(seconds: 2), onTimeout: () {}),
+    ]);
     _clients.clear();
     await _server?.close(force: true);
     _server = null;
