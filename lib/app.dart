@@ -102,21 +102,32 @@ class _AudilocAppState extends State<AudilocApp> {
   }
 
   /// "Это моё второе устройство" — creates an empty placeholder profile
-  /// and opens it, with `_awaitingProfileAdoption` set. That flag is what
-  /// makes `PairingService` let a mismatched-hash request through to the
-  /// UI at all (see `canJoinDifferentProfile` on [openProfileSession]) —
-  /// approving it then finds the placeholder's hash doesn't match the
+  /// and switches to it, with `_awaitingProfileAdoption` set. That flag is
+  /// what makes `PairingService` let a mismatched-hash request through to
+  /// the UI at all (see `canJoinDifferentProfile` on [openProfileSession])
+  /// — approving it then finds the placeholder's hash doesn't match the
   /// requester's, and switches this device onto (a fresh local copy of)
   /// the requester's profile — docs/adr/0017.
+  ///
+  /// Reachable two ways, handled by the same method since only the
+  /// "is there already a session to tear down first" part differs:
+  /// [InitialProfileNameScreen] on a genuinely fresh install (no session
+  /// yet — nothing to close), and the profile switcher at any later point
+  /// (`waitForPairingProvider`, when other profiles already exist and the
+  /// user wants to link a *new* device to one of them instead of creating
+  /// another empty profile by hand).
   Future<void> _waitForPairing() async {
     final profile = await _profilesStore!.create('Новое устройство');
-    await _profilesStore!.setActiveProfileId(profile.id);
+    if (_session != null) {
+      await _switchProfile(profile.id);
+    } else {
+      await _profilesStore!.setActiveProfileId(profile.id);
+      if (!mounted) return;
+      setState(() => _needsInitialProfileName = false);
+      await _openProfile(profile.id);
+    }
     if (!mounted) return;
-    setState(() {
-      _needsInitialProfileName = false;
-      _awaitingProfileAdoption = true;
-    });
-    await _openProfile(profile.id);
+    setState(() => _awaitingProfileAdoption = true);
   }
 
   /// Handed to [openProfileSession] as `joinProfileForPairing` — called
@@ -156,6 +167,7 @@ class _AudilocAppState extends State<AudilocApp> {
       switchProfile: _switchProfile,
       joinProfileForPairing: _joinProfileForPairing,
       canJoinDifferentProfile: () async => _awaitingProfileAdoption,
+      waitForPairing: _waitForPairing,
     );
     if (!mounted) {
       await session.close();

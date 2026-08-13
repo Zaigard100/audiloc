@@ -100,6 +100,16 @@ class _ProfileSwitcherSheetState extends ConsumerState<_ProfileSwitcherSheet> {
               title: const Text('Новый профиль'),
               onTap: () => _createDialog(context),
             ),
+            ListTile(
+              leading: const Icon(Icons.wifi_tethering),
+              title: const Text('Это моё второе устройство — ждать сопряжения'),
+              subtitle: const Text(
+                'Вместо пустого профиля — дождаться сопряжения с другим вашим '
+                'устройством и стать его копией',
+                style: TextStyle(fontSize: 12),
+              ),
+              onTap: () => _waitForPairing(context),
+            ),
           ],
         ),
       ),
@@ -109,6 +119,17 @@ class _ProfileSwitcherSheetState extends ConsumerState<_ProfileSwitcherSheet> {
   Future<void> _switchTo(BuildContext context, String profileId) async {
     Navigator.of(context).pop();
     await ref.read(switchProfileProvider)(profileId);
+  }
+
+  /// Same "second device, wait for pairing" flow `InitialProfileNameScreen`
+  /// offers on a fresh install (docs/adr/0013-account-profiles.md), but
+  /// reachable here too — for adding a new device to an *existing*
+  /// profile when other profiles are already registered on this device
+  /// (scenario B and A aren't mutually exclusive: one person's second
+  /// device, on a computer someone else already has a profile on).
+  Future<void> _waitForPairing(BuildContext context) async {
+    Navigator.of(context).pop();
+    await ref.read(waitForPairingProvider)();
   }
 
   Future<void> _createDialog(BuildContext context) async {

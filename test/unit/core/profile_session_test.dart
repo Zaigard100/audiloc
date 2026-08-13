@@ -48,6 +48,7 @@ Future<void> _noopSwitch(String profileId) async {}
 Future<void> _noopJoin(IncomingPairingRequest request) async {}
 Future<String> _testPlatformLabel() async => 'TestOS';
 Future<bool> _noopCanJoin() async => false;
+Future<void> _noopWaitForPairing() async {}
 
 void main() {
   test(
@@ -72,6 +73,7 @@ void main() {
       switchProfile: _noopSwitch,
       joinProfileForPairing: _noopJoin,
       canJoinDifferentProfile: _noopCanJoin,
+      waitForPairing: _noopWaitForPairing,
       platformLabel: _testPlatformLabel,
     );
     await first.close();
@@ -86,6 +88,7 @@ void main() {
       switchProfile: _noopSwitch,
       joinProfileForPairing: _noopJoin,
       canJoinDifferentProfile: _noopCanJoin,
+      waitForPairing: _noopWaitForPairing,
       platformLabel: _testPlatformLabel,
     );
     await second.close();
@@ -109,6 +112,7 @@ void main() {
       switchProfile: _noopSwitch,
       joinProfileForPairing: _noopJoin,
       canJoinDifferentProfile: _noopCanJoin,
+      waitForPairing: _noopWaitForPairing,
       platformLabel: _testPlatformLabel,
     );
     addTearDown(session.close);
@@ -132,6 +136,7 @@ void main() {
       switchProfile: _noopSwitch,
       joinProfileForPairing: _noopJoin,
       canJoinDifferentProfile: _noopCanJoin,
+      waitForPairing: _noopWaitForPairing,
       platformLabel: _testPlatformLabel,
     );
     await first.close();
@@ -145,6 +150,7 @@ void main() {
       switchProfile: _noopSwitch,
       joinProfileForPairing: _noopJoin,
       canJoinDifferentProfile: _noopCanJoin,
+      waitForPairing: _noopWaitForPairing,
       platformLabel: _testPlatformLabel,
     );
     addTearDown(second.close);
@@ -168,6 +174,7 @@ void main() {
       switchProfile: _noopSwitch,
       joinProfileForPairing: _noopJoin,
       canJoinDifferentProfile: _noopCanJoin,
+      waitForPairing: _noopWaitForPairing,
       platformLabel: _testPlatformLabel,
     );
     addTearDown(session.close);

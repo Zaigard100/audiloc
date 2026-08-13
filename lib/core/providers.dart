@@ -83,6 +83,16 @@ final switchProfileProvider = Provider<Future<void> Function(String profileId)>(
   (ref) => throw UnimplementedError('switchProfileProvider must be overridden by AudilocApp'),
 );
 
+/// "Это моё второе устройство — ждать сопряжения" (ADR 0013's scenario
+/// A), reachable from the profile switcher at any time — not just
+/// `InitialProfileNameScreen` on a fresh install. Creates a placeholder
+/// profile and switches to it, same as [switchProfileProvider] does for
+/// an existing one; `AudilocApp` supplies the real implementation for the
+/// same reason `switchProfileProvider` does.
+final waitForPairingProvider = Provider<Future<void> Function()>(
+  (ref) => throw UnimplementedError('waitForPairingProvider must be overridden by AudilocApp'),
+);
+
 /// Called by [PairingService.approve] when an incoming request's profile
 /// doesn't match this device's current one — see
 /// docs/adr/0017-forbid-cross-profile-pairing-and-sharing.md. `PairingService`

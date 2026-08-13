@@ -88,6 +88,7 @@ Future<ProfileSessionHandle> openProfileSession({
   required Future<void> Function(String profileId) switchProfile,
   required Future<void> Function(IncomingPairingRequest) joinProfileForPairing,
   required Future<bool> Function() canJoinDifferentProfile,
+  required Future<void> Function() waitForPairing,
   Future<String> Function() platformLabel = platformDeviceLabel,
 }) async {
   final profiles = await profilesStore.list();
@@ -118,6 +119,7 @@ Future<ProfileSessionHandle> openProfileSession({
     switchProfileProvider.overrideWithValue(switchProfile),
     joinProfileForPairingProvider.overrideWithValue(joinProfileForPairing),
     canJoinDifferentProfileProvider.overrideWithValue(canJoinDifferentProfile),
+    waitForPairingProvider.overrideWithValue(waitForPairing),
   ]);
 
   // The three fixed-port *bind* calls are awaited — deliberately *not*
