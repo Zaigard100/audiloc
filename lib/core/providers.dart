@@ -2,10 +2,11 @@ import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
 
 import '../data/db/audiloc_database.dart';
 import '../data/models/device.dart';
+import '../data/profiles/profile.dart';
+import '../data/profiles/profiles_store.dart';
 import '../data/repositories/devices_repository.dart';
 import '../data/repositories/favorites_repository.dart';
 import '../data/repositories/playlists_repository.dart';
@@ -29,17 +30,47 @@ import '../services/sync/sync_orchestrator.dart';
 
 /// Central dependency wiring.
 ///
-/// [databaseProvider] and [selfDeviceProvider] are placeholders overridden
-/// in `main()` once the async startup sequence (open DB, ensure this
-/// device's identity row) has actually completed — see
-/// docs/architecture.md for why the app waits on that before `runApp`
-/// instead of juggling `FutureProvider` loading states everywhere.
+/// [databaseProvider], [selfDeviceProvider], [profileDirProvider],
+/// [currentProfileProvider], [profilesStoreProvider] and
+/// [switchProfileProvider] are placeholders overridden once per profile
+/// session in `lib/core/profile_session.dart` (opened from `AudilocApp` —
+/// see docs/architecture.md and docs/adr/0013-account-profiles.md) rather
+/// than in `main()` directly, since which profile's database/identity to
+/// use isn't known until a profile is chosen, and can change at runtime
+/// when the user switches profiles.
 final databaseProvider = Provider<AudilocDatabase>(
-  (ref) => throw UnimplementedError('databaseProvider must be overridden in main()'),
+  (ref) => throw UnimplementedError('databaseProvider must be overridden by profile_session.dart'),
 );
 
 final selfDeviceProvider = Provider<Device>(
-  (ref) => throw UnimplementedError('selfDeviceProvider must be overridden in main()'),
+  (ref) => throw UnimplementedError('selfDeviceProvider must be overridden by profile_session.dart'),
+);
+
+/// This profile's own data directory
+/// (`<appSupportDir>/profiles/<id>/`) — everything specific to this
+/// profile (cover cache, downloaded audio) is stored under it, kept
+/// separate from other profiles sharing the same device.
+final profileDirProvider = Provider<Directory>(
+  (ref) => throw UnimplementedError('profileDirProvider must be overridden by profile_session.dart'),
+);
+
+final currentProfileProvider = Provider<Profile>(
+  (ref) => throw UnimplementedError('currentProfileProvider must be overridden by profile_session.dart'),
+);
+
+/// The local (non-CRDT) registry of all profiles on this device — for
+/// listing/creating/renaming profiles in the switcher UI. Not scoped to
+/// the current profile like everything else here; it's the same instance
+/// regardless of which profile is active.
+final profilesStoreProvider = Provider<ProfilesStore>(
+  (ref) => throw UnimplementedError('profilesStoreProvider must be overridden by profile_session.dart'),
+);
+
+/// Tears down the current profile session and opens another one —
+/// `AudilocApp` supplies the actual implementation, since it's the widget
+/// that owns the `ProviderContainer` lifecycle this has to replace.
+final switchProfileProvider = Provider<Future<void> Function(String profileId)>(
+  (ref) => throw UnimplementedError('switchProfileProvider must be overridden by AudilocApp'),
 );
 
 final tracksRepositoryProvider =
@@ -67,7 +98,7 @@ final playerServiceProvider = Provider<PlayerService>((ref) {
 final dedupeServiceProvider = Provider<DedupeService>((ref) => DedupeService());
 
 final coverCacheDirProvider = FutureProvider<Directory>((ref) async {
-  final base = await getApplicationSupportDirectory();
+  final base = ref.watch(profileDirProvider);
   final dir = Directory(p.join(base.path, 'covers'));
   if (!await dir.exists()) await dir.create(recursive: true);
   return dir;
@@ -115,13 +146,14 @@ final syncOrchestratorProvider = Provider<SyncOrchestrator>((ref) {
   return orchestrator;
 });
 
-/// Where files fetched from peers land — kept inside the app's own
+/// Where files fetched from peers land — kept inside this profile's own
 /// storage so no platform-specific public-storage/SAF permissions are
-/// needed on Android (ТЗ: приложение должно быть самодостаточным).
+/// needed on Android (ТЗ: приложение должно быть самодостаточным), and so
+/// different profiles sharing a device never mix downloaded files.
 /// Manually imported files (via the folder picker) are untouched and stay
 /// wherever the user pointed at — this is only for P2P-downloaded copies.
 final syncedMusicDirProvider = FutureProvider<Directory>((ref) async {
-  final base = await getApplicationSupportDirectory();
+  final base = ref.watch(profileDirProvider);
   final dir = Directory(p.join(base.path, 'synced_music'));
   if (!await dir.exists()) await dir.create(recursive: true);
   return dir;

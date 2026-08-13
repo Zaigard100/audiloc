@@ -1,7 +1,12 @@
 # Модель данных
 
 Хранилище — `sqlite_crdt` (см. [ADR 0003](adr/0003-cachapa-crdt-suite-for-local-storage.md)).
-Схема создаётся в `lib/data/db/audiloc_database.dart`.
+Схема создаётся в `lib/data/db/audiloc_database.dart`. Файл БД живёт
+по адресу `<appSupportDir>/profiles/<profileId>/audiloc.db` — своя
+база (и свой `nodeId`, см. [ADR 0006](adr/0006-device-identity-without-asymmetric-crypto.md))
+на каждый профиль устройства, см. [ADR 0013](adr/0013-account-profiles.md).
+Всё описанное ниже (таблицы, CRDT-поля) — про содержимое ровно одной
+такой базы, то есть ровно одного профиля.
 
 Каждая таблица ниже **автоматически** получает от `sql_crdt` четыре
 служебных столбца — их не нужно объявлять и не нужно писать руками:

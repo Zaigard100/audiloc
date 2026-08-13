@@ -4,13 +4,20 @@
 
 ```
 lib/
-  main.dart, app.dart        — запуск: асинхронная инициализация до runApp
+  main.dart                  — запуск: только runApp(AudilocApp())
+  app.dart                   — AudilocApp: stateful-корень, владеет
+                                текущей сессией профиля и плеером
+                                (docs/adr/0013-account-profiles.md)
   core/
     theme/                   — тёмная тема (без брендинга, ТЗ п.1)
     router/                  — go_router: вкладки + деталка плейлиста
     providers.dart           — граф зависимостей (Riverpod)
+    profile_session.dart     — открыть БД+сервисы для профиля / закрыть
+                                в правильном порядке при переключении
   data/
     models/                  — Track, Playlist, PlaylistTrack/Item, Device
+    profiles/                — Profile, ProfilesStore — не-CRDT реестр
+                                профилей на устройстве (docs/adr/0013)
     db/                      — схема sqlite_crdt (docs/data-model.md)
     repositories/            — CRUD + watch() поверх CRDT-таблиц
   services/
@@ -34,7 +41,7 @@ lib/
       sync_orchestrator       — клей: discovery → metadata sync → devices,
                                  но только для уже сопряжённых (docs/adr/0011)
   features/
-    library/ playlists/ search/ devices/ player/ shell/
+    library/ playlists/ search/ devices/ player/ shell/ profiles/
                               — экраны, виджеты, feature-провайдеры
 ```
 
@@ -44,24 +51,38 @@ lib/
 
 ## Поток запуска
 
-`main()` делает асинхронную инициализацию **до** `runApp`, а не через
-`FutureProvider` с состояниями загрузки по всему дереву виджетов:
+`main()` — три строчки (`ensureInitialized` + `runApp(AudilocApp())`).
+Вся асинхронная инициализация происходит **внутри** `AudilocApp`, до
+того как оно отдаёт `UncontrolledProviderScope` вниз по дереву — не
+через `FutureProvider` с состояниями загрузки по всему дереву виджетов:
 
 ```mermaid
 sequenceDiagram
-    participant Main as main()
+    participant App as AudilocApp
+    participant Store as ProfilesStore
+    participant Session as openProfileSession
     participant DB as AudilocDatabase
-    participant Identity as DeviceIdentityService
     participant Container as ProviderContainer
-    participant Orchestrator as SyncOrchestrator
 
-    Main->>DB: open()
-    Main->>Identity: ensureSelfDevice()
-    Note over Identity,DB: первая запись в devices фиксирует<br/>стабильный nodeId (ADR 0006)
-    Main->>Container: overrides: databaseProvider, selfDeviceProvider
-    Main->>Orchestrator: start(metadataSyncPort) — без await
-    Main->>Main: runApp(UncontrolledProviderScope)
+    App->>Store: resolveActiveProfileId()
+    Note over Store: миграция старой audiloc.db или<br/>тихое создание профиля — id всегда есть
+    App->>Session: openProfileSession(profileId, ...)
+    Session->>DB: open(path: profiles/<id>/audiloc.db)
+    Session->>Session: DeviceIdentityService.ensureSelfDevice()
+    Note over Session: первая запись в devices фиксирует<br/>стабильный nodeId (ADR 0006), свой на профиль
+    Session->>Container: overrides: databaseProvider, selfDeviceProvider, profileDirProvider, ...
+    Session->>Session: await запуск серверов на фикс. портах,<br/>остальное (backfill, discovery) фоном
+    Session-->>App: ProfileSessionHandle
+    App->>App: setState → UncontrolledProviderScope(container)
 ```
+
+Переключение профиля (docs/adr/0013-account-profiles.md) — тот же
+`openProfileSession`, но сначала `ProfileSessionHandle.close()` у
+старой сессии: она дожидается своей фоновой стартовой работы, затем
+явно и по порядку останавливает сетевые сервисы на фиксированных
+портах (`await`, не полагаясь на `ProviderContainer.dispose()`), и
+только потом закрывает БД — иначе новая сессия может не успеть
+занять те же порты.
 
 Синхронизация запускается фоново и никогда не блокирует первый кадр
 UI — офлайн-first в буквальном смысле (ТЗ п.7).
@@ -104,6 +125,8 @@ HTTP-каналом ([ADR 0010](adr/0010-built-in-file-transfer.md)):
 - Репозитории принимают `SqliteCrdt`, а не путь к файлу →
   `SqliteCrdt.openInMemory()` даёт быстрые изолированные unit-тесты
   без диска.
-- `databaseProvider`/`selfDeviceProvider` — плейсхолдеры,
-  переопределяемые через `overrideWithValue` — виджет-тесты подставляют
-  свою in-memory БД тем же способом, что и `main()`.
+- `databaseProvider`/`selfDeviceProvider`/`profileDirProvider`/
+  `currentProfileProvider`/`profilesStoreProvider`/`switchProfileProvider`
+  — плейсхолдеры, переопределяемые через `overrideWithValue` — виджет-тесты
+  подставляют свою in-memory БД тем же способом, что и
+  `openProfileSession`.

@@ -1,0 +1,81 @@
+import 'dart:async';
+import 'dart:io';
+
+import 'package:audiloc/core/profile_session.dart';
+import 'package:audiloc/data/models/track.dart';
+import 'package:audiloc/data/profiles/profiles_store.dart';
+import 'package:audiloc/services/playback/player_service.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+/// `openProfileSession` doesn't touch playback beyond clearing the queue
+/// on switch — these tests are about port teardown, not playback, so a
+/// no-op stands in fine.
+class _NoopPlayerService implements PlayerService {
+  @override
+  Stream<bool> get playingStream => const Stream.empty();
+  @override
+  Stream<PlaybackPositionState> get positionStream => const Stream.empty();
+  @override
+  Stream<Track?> get currentTrackStream => const Stream.empty();
+  @override
+  Stream<bool> get completedStream => const Stream.empty();
+  @override
+  bool get isPlaying => false;
+  @override
+  Track? get currentTrack => null;
+  @override
+  Future<void> setQueue(List<Track> tracks, {int startIndex = 0}) async {}
+  @override
+  Future<void> play() async {}
+  @override
+  Future<void> pause() async {}
+  @override
+  Future<void> playOrPause() async {}
+  @override
+  Future<void> seek(Duration position) async {}
+  @override
+  Future<void> next() async {}
+  @override
+  Future<void> previous() async {}
+  @override
+  Future<void> dispose() async {}
+}
+
+Future<void> _noopSwitch(String profileId) async {}
+
+void main() {
+  test(
+      'closing a profile session fully releases its network ports before returning, so a '
+      'second session can immediately rebind them (regression: ProviderContainer.dispose() '
+      'alone does not await the Futures returned by async ref.onDispose callbacks — see '
+      'docs/adr/0013-account-profiles.md)', () async {
+    // Deliberately uses the app's *real* metadataSyncPort/fileTransferPort/
+    // pairingPort (unlike other test files, which pick distinct ports to
+    // avoid colliding with a real running app) — the whole point here is
+    // proving those exact ports get released, not just "some" ports.
+    final appSupportDir = await Directory.systemTemp.createTemp('audiloc_session_');
+    addTearDown(() => appSupportDir.delete(recursive: true));
+    final store = ProfilesStore(appSupportDir);
+    final profile = await store.create('Test Profile');
+    final player = _NoopPlayerService();
+
+    final first = await openProfileSession(
+      profileId: profile.id,
+      playerService: player,
+      profilesStore: store,
+      switchProfile: _noopSwitch,
+    );
+    await first.close();
+
+    // If teardown weren't properly sequential/awaited, this would throw
+    // (address already in use) on whichever port didn't actually free up
+    // in time.
+    final second = await openProfileSession(
+      profileId: profile.id,
+      playerService: player,
+      profilesStore: store,
+      switchProfile: _noopSwitch,
+    );
+    await second.close();
+  });
+}

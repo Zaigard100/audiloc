@@ -43,8 +43,16 @@ class SyncOrchestrator {
 
   Future<void> start(int metadataSyncPort) async {
     await _metadataSyncService.startServer();
-    await _discoveryService.startAdvertising(metadataSyncPort);
-    await _discoveryService.startDiscovery();
+    try {
+      await _discoveryService.startAdvertising(metadataSyncPort);
+      await _discoveryService.startDiscovery();
+    } catch (_) {
+      // mDNS goes through a platform plugin (bonsoir) — a flaky
+      // environment there (missing multicast permissions, no plugin
+      // binding in a test harness, whatever) shouldn't stop the rest of
+      // the app from working. Sync is a bonus, not a gate (ТЗ п.7); the
+      // metadata sync server above is already up regardless.
+    }
   }
 
   Future<void> _handleDiscoveryEvent(DiscoveryEvent event) async {

@@ -6,6 +6,7 @@ import '../../core/providers.dart';
 import '../../core/theme/app_theme.dart';
 import '../../data/models/track.dart';
 import '../library/providers/library_providers.dart';
+import '../profiles/profile_switcher_sheet.dart';
 import 'providers/devices_providers.dart';
 import 'widgets/device_tile.dart';
 import 'widgets/sync_badge.dart';
@@ -20,6 +21,7 @@ class DevicesScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final self = ref.watch(selfDeviceProvider);
+    final currentProfile = ref.watch(currentProfileProvider);
     final knownDevicesAsync = ref.watch(knownDevicesProvider);
     final onlineIds = ref.watch(onlineDeviceIdsProvider).value ?? const {};
 
@@ -27,6 +29,19 @@ class DevicesScreen extends ConsumerWidget {
       appBar: AppBar(title: const Text('Устройства')),
       body: ListView(
         children: [
+          ListTile(
+            leading: const CircleAvatar(
+              backgroundColor: AppTheme.accent,
+              child: Icon(Icons.person, color: Colors.white),
+            ),
+            title: Text('Профиль: ${currentProfile.name}'),
+            subtitle: const Text('У каждого профиля своя библиотека и свои устройства'),
+            trailing: TextButton(
+              onPressed: () => showProfileSwitcherSheet(context),
+              child: const Text('Сменить'),
+            ),
+          ),
+          const Divider(height: 1),
           const SyncBadge(),
           Padding(
             padding: const EdgeInsets.all(24),
