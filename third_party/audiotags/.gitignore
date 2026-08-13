@@ -1,0 +1,7 @@
+# Build artifacts that can get generated in-place inside this vendored
+# copy while it's being used as a local path dependency.
+android/.cxx/
+android/build/
+android/.gradle/
+.dart_tool/
+build/
