@@ -12,6 +12,9 @@ import 'file_transfer_client.dart';
 /// whichever online peer has it, over the same LAN connectivity and the
 /// same server (`FileTransferServer`'s `/covers/<id>` route) — see
 /// docs/adr/0012-local-cover-paths.md.
+///
+/// Same concurrency cap and same claim-before-await fix as
+/// [FileSyncService] — see its class doc for why.
 class CoverSyncService {
   CoverSyncService({
     required TracksRepository tracksRepository,
@@ -19,6 +22,7 @@ class CoverSyncService {
     required FileTransferClient client,
     required Directory coverCacheDir,
     this.filePort = 8542,
+    this.maxConcurrentDownloads = 3,
   })  : _tracksRepository = tracksRepository,
         _discoveryService = discoveryService,
         _client = client,
@@ -31,6 +35,7 @@ class CoverSyncService {
   final FileTransferClient _client;
   final Directory _coverCacheDir;
   final int filePort;
+  final int maxConcurrentDownloads;
 
   final _onlineHosts = <String, String>{}; // deviceId -> LAN host
   final _inFlight = <String>{}; // trackIds currently downloading a cover
@@ -38,12 +43,14 @@ class CoverSyncService {
 
   StreamSubscription<DiscoveryEvent>? _discoverySub;
   StreamSubscription<List<Track>>? _missingSub;
+  Timer? _retryTimer;
 
   void start() {
     _missingSub = _tracksRepository.watchMissingCovers().listen((missing) {
       _lastMissing = missing;
-      unawaited(_tryDownloadMissing(missing));
+      _tryDownloadMissing(missing);
     });
+    _retryTimer = Timer.periodic(const Duration(seconds: 10), (_) => _tryDownloadMissing(_lastMissing));
   }
 
   void _handleDiscoveryEvent(DiscoveryEvent event) {
@@ -52,17 +59,26 @@ class CoverSyncService {
         _onlineHosts[peer.deviceId] = peer.host;
         // A peer just appeared — it might have a cover we've been
         // waiting for, so give the current missing list another pass.
-        unawaited(_tryDownloadMissing(_lastMissing));
+        _tryDownloadMissing(_lastMissing);
       case PeerLost(:final deviceId):
         _onlineHosts.remove(deviceId);
     }
   }
 
-  Future<void> _tryDownloadMissing(List<Track> missing) async {
+  /// Claims a slot in [_inFlight] synchronously, before any `await` —
+  /// see [FileSyncService._tryDownloadMissing] for why that matters.
+  void _tryDownloadMissing(List<Track> missing) {
     for (final track in missing) {
+      if (_inFlight.length >= maxConcurrentDownloads) break;
       if (_inFlight.contains(track.id)) continue;
+      _inFlight.add(track.id);
+      unawaited(_downloadOne(track.id).whenComplete(() => _inFlight.remove(track.id)));
+    }
+  }
 
-      final peers = await _tracksRepository.peersWithLocalCover(track.id);
+  Future<void> _downloadOne(String trackId) async {
+    try {
+      final peers = await _tracksRepository.peersWithLocalCover(trackId);
       String? host;
       for (final peerId in peers) {
         final peerHost = _onlineHosts[peerId];
@@ -71,15 +87,8 @@ class CoverSyncService {
           break;
         }
       }
-      if (host == null) continue;
+      if (host == null) return;
 
-      _inFlight.add(track.id);
-      unawaited(_downloadOne(track.id, host).whenComplete(() => _inFlight.remove(track.id)));
-    }
-  }
-
-  Future<void> _downloadOne(String trackId, String host) async {
-    try {
       if (!await _coverCacheDir.exists()) {
         await _coverCacheDir.create(recursive: true);
       }
@@ -92,11 +101,13 @@ class CoverSyncService {
       await _tracksRepository.recordLocalCover(trackId, path);
     } catch (_) {
       // Peer went offline mid-transfer, network hiccup, etc. — the next
-      // watchMissingCovers emission or peer-found event will retry.
+      // watchMissingCovers emission, peer-found event, or retry tick
+      // will try again.
     }
   }
 
   Future<void> dispose() async {
+    _retryTimer?.cancel();
     await _discoverySub?.cancel();
     await _missingSub?.cancel();
   }

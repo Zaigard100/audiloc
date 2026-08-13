@@ -18,6 +18,14 @@ import 'file_transfer_client.dart';
 /// app already has for metadata sync, rather than a second protocol/app
 /// — see docs/adr/0010-built-in-file-transfer.md for why this replaced
 /// the earlier Syncthing-based design.
+///
+/// Downloads at most [maxConcurrentDownloads] tracks at once rather than
+/// firing off every missing track in parallel: on a real Wi-Fi/LAN link,
+/// many simultaneous downloads compete for the same bandwidth, and the
+/// visible symptom of that (before this existed) was per-track progress
+/// jumping up and down in the UI — actually caused by a real race (see
+/// [_tryDownloadMissing]), not just bandwidth contention, but capping
+/// concurrency is the right fix either way.
 class FileSyncService {
   FileSyncService({
     required TracksRepository tracksRepository,
@@ -25,6 +33,7 @@ class FileSyncService {
     required FileTransferClient client,
     required Directory downloadsDir,
     this.filePort = 8542,
+    this.maxConcurrentDownloads = 3,
   })  : _tracksRepository = tracksRepository,
         _discoveryService = discoveryService,
         _client = client,
@@ -37,6 +46,7 @@ class FileSyncService {
   final FileTransferClient _client;
   final Directory _downloadsDir;
   final int filePort;
+  final int maxConcurrentDownloads;
 
   final _onlineHosts = <String, String>{}; // deviceId -> LAN host
   final _inFlight = <String>{}; // trackIds currently downloading
@@ -44,6 +54,7 @@ class FileSyncService {
 
   StreamSubscription<DiscoveryEvent>? _discoverySub;
   StreamSubscription<List<Track>>? _missingSub;
+  Timer? _retryTimer;
 
   final _events = StreamController<TransferEvent>.broadcast();
 
@@ -54,8 +65,14 @@ class FileSyncService {
   void start() {
     _missingSub = _tracksRepository.watchMissingFiles().listen((missing) {
       _lastMissing = missing;
-      unawaited(_tryDownloadMissing(missing));
+      _tryDownloadMissing(missing);
     });
+    // Belt-and-braces: `watchMissingFiles`/`PeerFound` cover the common
+    // cases, but a track whose only peer wasn't online on either of
+    // those triggers would otherwise sit stuck until something unrelated
+    // happens to fire one again. Cheap enough to just re-scan
+    // periodically instead of chasing every trigger precisely.
+    _retryTimer = Timer.periodic(const Duration(seconds: 10), (_) => _tryDownloadMissing(_lastMissing));
   }
 
   void _handleDiscoveryEvent(DiscoveryEvent event) {
@@ -65,17 +82,34 @@ class FileSyncService {
         // A peer just appeared — it might be the one holding a file we've
         // been waiting for, so give the current missing list another pass
         // instead of waiting for the track list to change again.
-        unawaited(_tryDownloadMissing(_lastMissing));
+        _tryDownloadMissing(_lastMissing);
       case PeerLost(:final deviceId):
         _onlineHosts.remove(deviceId);
     }
   }
 
-  Future<void> _tryDownloadMissing(List<Track> missing) async {
+  /// Claims a slot in [_inFlight] *synchronously*, with no `await`
+  /// between checking `contains` and adding — otherwise two calls to
+  /// this method (e.g. one from a `watchMissingFiles` emission racing
+  /// one from a `PeerFound` event, both entirely normal to happen close
+  /// together) could each see the track as "not yet downloading" and
+  /// both start a download for it. That used to be possible here, and it
+  /// meant two independent downloads writing the same `.part` file and
+  /// reporting independent, interleaved progress against the same
+  /// trackId — which is exactly what showed up as the percentage
+  /// jumping up and down instead of climbing steadily.
+  void _tryDownloadMissing(List<Track> missing) {
     for (final track in missing) {
+      if (_inFlight.length >= maxConcurrentDownloads) break;
       if (_inFlight.contains(track.id)) continue;
+      _inFlight.add(track.id);
+      unawaited(_downloadOne(track.id).whenComplete(() => _inFlight.remove(track.id)));
+    }
+  }
 
-      final peers = await _tracksRepository.peersWithLocalCopy(track.id);
+  Future<void> _downloadOne(String trackId) async {
+    try {
+      final peers = await _tracksRepository.peersWithLocalCopy(trackId);
       String? host;
       for (final peerId in peers) {
         final peerHost = _onlineHosts[peerId];
@@ -84,15 +118,8 @@ class FileSyncService {
           break;
         }
       }
-      if (host == null) continue;
+      if (host == null) return;
 
-      _inFlight.add(track.id);
-      unawaited(_downloadOne(track.id, host).whenComplete(() => _inFlight.remove(track.id)));
-    }
-  }
-
-  Future<void> _downloadOne(String trackId, String host) async {
-    try {
       if (!await _downloadsDir.exists()) {
         await _downloadsDir.create(recursive: true);
       }
@@ -107,13 +134,15 @@ class FileSyncService {
       await _tracksRepository.recordLocalFile(trackId, path);
     } catch (_) {
       // Peer went offline mid-transfer, network hiccup, etc. — the next
-      // watchMissingFiles emission or peer-found event will retry.
+      // watchMissingFiles emission, peer-found event, or retry tick will
+      // try again.
     } finally {
       _events.add(TransferFinished(trackId));
     }
   }
 
   Future<void> dispose() async {
+    _retryTimer?.cancel();
     await _discoverySub?.cancel();
     await _missingSub?.cancel();
     await _events.close();
