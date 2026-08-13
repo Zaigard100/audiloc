@@ -27,8 +27,11 @@ class PlaylistsScreen extends ConsumerWidget {
       body: playlistsAsync.when(
         data: (playlists) => GridView(
           padding: const EdgeInsets.all(12),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2,
+          // A fixed column count made tiles balloon to the width of the
+          // window on desktop — a max extent instead caps how big a tile
+          // can get and just adds more columns as the window widens.
+          gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+            maxCrossAxisExtent: 160,
             mainAxisSpacing: 12,
             crossAxisSpacing: 12,
             childAspectRatio: 1,
