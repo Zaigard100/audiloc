@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 
 import '../data/db/audiloc_database.dart';
+import '../data/profiles/profile.dart';
 import '../data/profiles/profiles_store.dart';
 import '../data/repositories/devices_repository.dart';
 import '../services/playback/player_service.dart';
@@ -91,14 +92,21 @@ Future<ProfileSessionHandle> openProfileSession({
   final database = await AudilocDatabase.open(path: p.join(profileDir.path, 'audiloc.db'));
   final devicesRepository = DevicesRepository(database.crdt);
   final identity = DeviceIdentityService(database, devicesRepository);
-  final selfDevice = await identity.ensureSelfDevice();
+  var selfDevice = await identity.ensureSelfDevice();
+  // The device name peers see is always this profile's name (see
+  // docs/adr/0013-account-profiles.md) — resynced on every open in case
+  // the profile was renamed while this device wasn't the active session.
+  if (selfDevice.name != profile.name) {
+    await identity.rename(profile.name);
+    selfDevice = (await devicesRepository.byId(identity.deviceId))!;
+  }
 
   final container = ProviderContainer(overrides: [
     databaseProvider.overrideWithValue(database),
     selfDeviceProvider.overrideWithValue(selfDevice),
     playerServiceProvider.overrideWithValue(playerService),
     profileDirProvider.overrideWithValue(profileDir),
-    currentProfileProvider.overrideWithValue(profile),
+    currentProfileProvider.overrideWith((ref) => profile),
     profilesStoreProvider.overrideWithValue(profilesStore),
     switchProfileProvider.overrideWithValue(switchProfile),
   ]);
@@ -149,4 +157,31 @@ Future<ProfileSessionHandle> openProfileSession({
   }();
 
   return ProfileSessionHandle._(container, database, backgroundWork);
+}
+
+/// Renames the *currently active* profile — its entry in [profilesStore],
+/// its self-device row (so the new name is what peers see, keeping the
+/// "device name = profile name" invariant — docs/adr/0013-account-profiles.md),
+/// and [currentProfileProvider]'s live state so the UI reflects it
+/// immediately without reopening the session. Used both for manual
+/// renames (the profile switcher) and for automatically adopting a
+/// peer's name after pairing (`AudilocApp`'s "Ждать сопряжения" flow).
+///
+/// Takes already-resolved dependencies rather than a `Ref`/`ProviderContainer`
+/// directly: callers reach this from both a `WidgetRef` (the switcher, a
+/// widget) and a raw `ProviderContainer` (`AudilocApp`, not a widget) —
+/// two different types with no common supertype worth introducing for
+/// four lines of logic.
+Future<Profile> applyActiveProfileRename({
+  required ProfilesStore profilesStore,
+  required DeviceIdentityService deviceIdentity,
+  required Profile current,
+  required void Function(Profile) setCurrentProfile,
+  required String name,
+}) async {
+  await profilesStore.rename(current.id, name);
+  await deviceIdentity.rename(name);
+  final renamed = current.copyWith(name: name);
+  setCurrentProfile(renamed);
+  return renamed;
 }

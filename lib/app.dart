@@ -7,9 +7,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 
 import 'core/profile_session.dart';
+import 'core/providers.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
+import 'data/models/device.dart';
 import 'data/profiles/profiles_store.dart';
+import 'features/devices/providers/devices_providers.dart';
 import 'features/profiles/initial_profile_name_screen.dart';
 import 'services/playback/audiloc_audio_handler.dart';
 import 'services/playback/media_kit_player_service.dart';
@@ -35,6 +38,14 @@ class _AudilocAppState extends State<AudilocApp> {
   ProfilesStore? _profilesStore;
   ProfileSessionHandle? _session;
   bool _needsInitialProfileName = false;
+
+  /// Set while this device is a placeholder profile waiting to adopt the
+  /// name of whichever device it gets paired with (the "Ждать сопряжения"
+  /// button — same-owner, second-device scenario, see
+  /// docs/adr/0013-account-profiles.md). Drives the banner in [build] and
+  /// gates the listener in [_watchForProfileAdoption].
+  bool _awaitingProfileAdoption = false;
+  ProviderSubscription<AsyncValue<List<Device>>>? _adoptionSubscription;
 
   @override
   void initState() {
@@ -87,6 +98,68 @@ class _AudilocAppState extends State<AudilocApp> {
     await _openProfile(profile.id);
   }
 
+  /// "Это моё второе устройство" (see `InitialProfileNameScreen`'s doc
+  /// comment for why this is a placeholder-that-adopts-a-name rather than
+  /// literally joining an existing profile). Opens a session normally,
+  /// then starts [_watchForProfileAdoption] to pick up the paired
+  /// device's name the moment pairing actually completes.
+  Future<void> _waitForPairing() async {
+    final profile = await _profilesStore!.create('Новое устройство');
+    await _profilesStore!.setActiveProfileId(profile.id);
+    if (!mounted) return;
+    setState(() {
+      _needsInitialProfileName = false;
+      _awaitingProfileAdoption = true;
+    });
+    await _openProfile(profile.id);
+    _watchForProfileAdoption();
+  }
+
+  /// Watches this (placeholder) profile's paired-devices list; the moment
+  /// it stops being empty, pairing succeeded (through the ordinary
+  /// confirm-on-both-sides flow — nothing here changes that, see
+  /// docs/adr/0011-mutual-pairing-confirmation.md) — adopt that peer's
+  /// name as this profile's own and stop waiting.
+  void _watchForProfileAdoption() {
+    final session = _session;
+    if (session == null) return;
+    final selfId = session.container.read(selfDeviceProvider).id;
+    _adoptionSubscription = session.container.listen<AsyncValue<List<Device>>>(
+      knownDevicesProvider,
+      (previous, next) {
+        final peer = _firstPeer(next.value, selfId);
+        if (peer != null) unawaited(_adoptProfileName(peer.name));
+      },
+      // Covers a pairing response that already arrived in the gap between
+      // the session becoming usable and this listener attaching.
+      fireImmediately: true,
+    );
+  }
+
+  Device? _firstPeer(List<Device>? devices, String selfId) {
+    if (devices == null) return null;
+    for (final device in devices) {
+      if (device.id != selfId) return device;
+    }
+    return null;
+  }
+
+  Future<void> _adoptProfileName(String name) async {
+    _adoptionSubscription?.close();
+    _adoptionSubscription = null;
+    final session = _session;
+    if (session == null) return;
+    await applyActiveProfileRename(
+      profilesStore: _profilesStore!,
+      deviceIdentity: session.container.read(deviceIdentityServiceProvider),
+      current: session.container.read(currentProfileProvider),
+      setCurrentProfile: (p) => session.container.read(currentProfileProvider.notifier).state = p,
+      name: name,
+    );
+    if (!mounted) return;
+    setState(() => _awaitingProfileAdoption = false);
+  }
+
   Future<void> _openProfile(String profileId) async {
     final session = await openProfileSession(
       profileId: profileId,
@@ -102,6 +175,9 @@ class _AudilocAppState extends State<AudilocApp> {
   }
 
   Future<void> _switchProfile(String profileId) async {
+    _adoptionSubscription?.close();
+    _adoptionSubscription = null;
+    if (_awaitingProfileAdoption) setState(() => _awaitingProfileAdoption = false);
     final old = _session;
     setState(() => _session = null); // brief loading state during the swap
     // The old profile's queue is meaningless once its library is gone —
@@ -114,6 +190,7 @@ class _AudilocAppState extends State<AudilocApp> {
 
   @override
   void dispose() {
+    _adoptionSubscription?.close();
     unawaited(_session?.close());
     unawaited(_playerService.dispose());
     super.dispose();
@@ -128,7 +205,7 @@ class _AudilocAppState extends State<AudilocApp> {
         theme: AppTheme.dark(),
         darkTheme: AppTheme.dark(),
         themeMode: ThemeMode.dark,
-        home: InitialProfileNameScreen(onSubmit: _createInitialProfile),
+        home: InitialProfileNameScreen(onSubmit: _createInitialProfile, onWaitForPairing: _waitForPairing),
       );
     }
 
@@ -153,6 +230,40 @@ class _AudilocAppState extends State<AudilocApp> {
         darkTheme: AppTheme.dark(),
         themeMode: ThemeMode.dark,
         routerConfig: appRouter,
+        builder: (context, child) {
+          if (!_awaitingProfileAdoption || child == null) return child ?? const SizedBox.shrink();
+          // The app underneath is fully usable while this shows — pairing
+          // just hasn't completed yet (docs/adr/0013-account-profiles.md).
+          return Column(
+            children: [
+              Material(
+                color: AppTheme.accent,
+                child: SafeArea(
+                  bottom: false,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    child: Row(
+                      children: [
+                        const Expanded(
+                          child: Text(
+                            'Ждём сопряжения со вторым устройством — подтвердите на вкладке «Устройства»',
+                            style: TextStyle(color: Colors.white, fontSize: 12),
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: () => appRouter.go('/devices'),
+                          style: TextButton.styleFrom(foregroundColor: Colors.white),
+                          child: const Text('Устройства'),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              Expanded(child: child),
+            ],
+          );
+        },
       ),
     );
   }

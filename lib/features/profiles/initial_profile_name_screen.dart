@@ -7,10 +7,20 @@ import '../../core/theme/app_theme.dart';
 /// device's first profile instead of silently calling it "Профиль 1".
 /// Anyone else can be added later from the profile switcher on the
 /// Устройства screen.
+///
+/// [onWaitForPairing] covers the other first-run case: this is *not* a
+/// new person, it's the same person's second device (ТЗ scenario —
+/// phone + laptop, one owner). AudiLoc's identity is always per-device
+/// (docs/adr/0013-account-profiles.md) — there's no way to literally
+/// share one profile's process/database across two machines — so
+/// instead this creates a placeholder profile that adopts the paired
+/// device's name the moment pairing is confirmed, which is what "one
+/// profile, two devices" looks like from the outside.
 class InitialProfileNameScreen extends StatefulWidget {
-  const InitialProfileNameScreen({super.key, required this.onSubmit});
+  const InitialProfileNameScreen({super.key, required this.onSubmit, required this.onWaitForPairing});
 
   final ValueChanged<String> onSubmit;
+  final VoidCallback onWaitForPairing;
 
   @override
   State<InitialProfileNameScreen> createState() => _InitialProfileNameScreenState();
@@ -31,6 +41,12 @@ class _InitialProfileNameScreenState extends State<InitialProfileNameScreen> {
     if (name.isEmpty || _submitting) return;
     setState(() => _submitting = true);
     widget.onSubmit(name);
+  }
+
+  void _waitForPairing() {
+    if (_submitting) return;
+    setState(() => _submitting = true);
+    widget.onWaitForPairing();
   }
 
   @override
@@ -78,6 +94,14 @@ class _InitialProfileNameScreenState extends State<InitialProfileNameScreen> {
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
                       : const Text('Начать'),
+                ),
+                const SizedBox(height: 12),
+                TextButton(
+                  onPressed: _submitting ? null : _waitForPairing,
+                  child: const Text(
+                    'Это моё второе устройство — ждать сопряжения',
+                    textAlign: TextAlign.center,
+                  ),
                 ),
               ],
             ),

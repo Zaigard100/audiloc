@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/profile_session.dart';
 import '../../core/providers.dart';
 import '../../core/theme/app_theme.dart';
 import '../../data/profiles/profile.dart';
@@ -145,7 +146,22 @@ class _ProfileSwitcherSheetState extends ConsumerState<_ProfileSwitcherSheet> {
     );
     if (name == null || name.isEmpty || name == profile.name) return;
 
-    await ref.read(profilesStoreProvider).rename(profile.id, name);
+    if (profile.id == ref.read(currentProfileProvider).id) {
+      // Renaming the profile actually running right now — also update
+      // this device's peer-visible name and the live UI, not just the
+      // registry entry. See docs/adr/0013-account-profiles.md.
+      await applyActiveProfileRename(
+        profilesStore: ref.read(profilesStoreProvider),
+        deviceIdentity: ref.read(deviceIdentityServiceProvider),
+        current: profile,
+        setCurrentProfile: (p) => ref.read(currentProfileProvider.notifier).state = p,
+        name: name,
+      );
+    } else {
+      // A different, not-currently-open profile — its device name will
+      // resync automatically the next time it's the active session.
+      await ref.read(profilesStoreProvider).rename(profile.id, name);
+    }
     _refresh();
   }
 }

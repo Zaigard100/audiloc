@@ -2,7 +2,9 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:audiloc/core/profile_session.dart';
+import 'package:audiloc/core/providers.dart';
 import 'package:audiloc/data/models/track.dart';
+import 'package:audiloc/data/profiles/profile.dart';
 import 'package:audiloc/data/profiles/profiles_store.dart';
 import 'package:audiloc/services/playback/player_service.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -77,5 +79,91 @@ void main() {
       switchProfile: _noopSwitch,
     );
     await second.close();
+  });
+
+  test(
+      "the self-device's name always matches the active profile's name "
+      "(docs/adr/0013-account-profiles.md — this is what makes the paired-device "
+      "name meaningful for name adoption/the switcher)", () async {
+    final appSupportDir = await Directory.systemTemp.createTemp('audiloc_session_name_');
+    addTearDown(() => appSupportDir.delete(recursive: true));
+    final store = ProfilesStore(appSupportDir);
+    final profile = await store.create('Мама');
+    final player = _NoopPlayerService();
+
+    final session = await openProfileSession(
+      profileId: profile.id,
+      playerService: player,
+      profilesStore: store,
+      switchProfile: _noopSwitch,
+    );
+    addTearDown(session.close);
+
+    expect(session.container.read(selfDeviceProvider).name, 'Мама');
+  });
+
+  test(
+      'a rename applied while a profile was not the active session is picked up the '
+      'next time that profile is opened', () async {
+    final appSupportDir = await Directory.systemTemp.createTemp('audiloc_session_rename_');
+    addTearDown(() => appSupportDir.delete(recursive: true));
+    final store = ProfilesStore(appSupportDir);
+    final profile = await store.create('Старое имя');
+    final player = _NoopPlayerService();
+
+    final first = await openProfileSession(
+      profileId: profile.id,
+      playerService: player,
+      profilesStore: store,
+      switchProfile: _noopSwitch,
+    );
+    await first.close();
+
+    await store.rename(profile.id, 'Новое имя');
+
+    final second = await openProfileSession(
+      profileId: profile.id,
+      playerService: player,
+      profilesStore: store,
+      switchProfile: _noopSwitch,
+    );
+    addTearDown(second.close);
+
+    expect(second.container.read(selfDeviceProvider).name, 'Новое имя');
+  });
+
+  test(
+      'applyActiveProfileRename updates the registry, the self-device row, and the live '
+      "state in one call — this is what backs both the switcher's rename and adopting a "
+      'peer\'s name after "Ждать сопряжения" pairing', () async {
+    final appSupportDir = await Directory.systemTemp.createTemp('audiloc_session_apply_rename_');
+    addTearDown(() => appSupportDir.delete(recursive: true));
+    final store = ProfilesStore(appSupportDir);
+    final profile = await store.create('Старое имя');
+    final player = _NoopPlayerService();
+
+    final session = await openProfileSession(
+      profileId: profile.id,
+      playerService: player,
+      profilesStore: store,
+      switchProfile: _noopSwitch,
+    );
+    addTearDown(session.close);
+
+    Profile? updatedState;
+    final renamed = await applyActiveProfileRename(
+      profilesStore: store,
+      deviceIdentity: session.container.read(deviceIdentityServiceProvider),
+      current: profile,
+      setCurrentProfile: (p) => updatedState = p,
+      name: 'Новое имя',
+    );
+
+    expect(renamed.name, 'Новое имя');
+    expect(updatedState?.name, 'Новое имя');
+    expect((await store.list()).single.name, 'Новое имя');
+    final selfId = session.container.read(selfDeviceProvider).id;
+    final selfDeviceRow = await session.container.read(devicesRepositoryProvider).byId(selfId);
+    expect(selfDeviceRow?.name, 'Новое имя');
   });
 }

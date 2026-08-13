@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/legacy.dart';
 import 'package:path/path.dart' as p;
 
 import '../data/db/audiloc_database.dart';
@@ -54,7 +55,12 @@ final profileDirProvider = Provider<Directory>(
   (ref) => throw UnimplementedError('profileDirProvider must be overridden by profile_session.dart'),
 );
 
-final currentProfileProvider = Provider<Profile>(
+/// A `StateProvider`, not a plain `Provider` — unlike `selfDeviceProvider`
+/// et al., this one's value can legitimately change *during* a session
+/// (renaming the active profile via the switcher, or "adopting" a peer's
+/// name after pairing — see docs/adr/0013-account-profiles.md) and the
+/// UI needs to react to that without reopening the whole session.
+final currentProfileProvider = StateProvider<Profile>(
   (ref) => throw UnimplementedError('currentProfileProvider must be overridden by profile_session.dart'),
 );
 
