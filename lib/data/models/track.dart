@@ -5,10 +5,15 @@ import 'package:path/path.dart' as p;
 /// [id] is the SHA-256 hash of the file contents (see
 /// `services/library_import`), so re-importing the same bytes from a
 /// different path or on a different device naturally deduplicates.
+///
+/// [path] is `null` when this device knows about the track (its metadata
+/// arrived via CRDT sync) but doesn't have the audio file itself yet — see
+/// [isAvailableLocally] and `services/sync/files` for how that gets
+/// resolved automatically.
 class Track {
   const Track({
     required this.id,
-    required this.path,
+    this.path,
     this.title,
     this.artist,
     this.album,
@@ -21,7 +26,7 @@ class Track {
   });
 
   final String id;
-  final String path;
+  final String? path;
   final String? title;
   final String? artist;
   final String? album;
@@ -34,11 +39,17 @@ class Track {
 
   Duration get duration => Duration(milliseconds: durationMs ?? 0);
 
-  /// Falls back to the file name when no tag title is available.
+  /// Whether this device has the actual audio file — as opposed to just
+  /// knowing the track exists from synced metadata. See the class doc.
+  bool get isAvailableLocally => path != null;
+
+  /// Falls back to the file name when no tag title is available (and, if
+  /// the file isn't even here yet, to a generic placeholder).
   String get displayTitle {
     final t = title?.trim();
     if (t != null && t.isNotEmpty) return t;
-    return p.basenameWithoutExtension(path);
+    final filePath = path;
+    return filePath == null ? 'Без названия' : p.basenameWithoutExtension(filePath);
   }
 
   String get displayArtist {
@@ -53,7 +64,7 @@ class Track {
 
   factory Track.fromRow(Map<String, Object?> row) => Track(
         id: row['id']! as String,
-        path: row['path']! as String,
+        path: row['path'] as String?,
         title: row['title'] as String?,
         artist: row['artist'] as String?,
         album: row['album'] as String?,

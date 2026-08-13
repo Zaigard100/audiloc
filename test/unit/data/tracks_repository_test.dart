@@ -141,4 +141,37 @@ void main() {
     expect(merged, isNotNull);
     expect(merged!.path, '/android/song.mp3', reason: 'must keep this device\'s own path, not the peer\'s');
   });
+
+  test('a track known only through sync (no local file) has a null path and shows up as missing', () async {
+    final peerDb = await AudilocDatabase.openInMemory();
+    addTearDown(peerDb.close);
+    final peerRepository = TracksRepository(peerDb.crdt);
+
+    await peerRepository.upsert(const Track(id: 'peer-only', path: '/linux/song.mp3', title: 'Song'));
+
+    final rawChangeset = await peerDb.crdt.getChangeset();
+    final changeset = {
+      for (final entry in rawChangeset.entries)
+        entry.key: [
+          for (final record in entry.value) {...record, 'hlc': (record['hlc']! as String).toHlc},
+        ],
+    };
+    await db.crdt.merge(changeset);
+
+    final track = await repository.byId('peer-only');
+    expect(track, isNotNull);
+    expect(track!.path, isNull);
+    expect(track.isAvailableLocally, isFalse);
+
+    final missing = await repository.watchMissingFiles().first;
+    expect(missing.map((t) => t.id), contains('peer-only'));
+
+    final peers = await repository.peersWithLocalCopy('peer-only');
+    expect(peers, [peerDb.nodeId]);
+  });
+
+  test('peersWithLocalCopy excludes this device even though it has the file', () async {
+    await repository.upsert(track);
+    expect(await repository.peersWithLocalCopy(track.id), isEmpty);
+  });
 }

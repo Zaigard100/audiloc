@@ -57,3 +57,10 @@ final tracksByGenreProvider = Provider.family<List<Track>, String>((ref, genre) 
 final deletedTracksProvider = StreamProvider<List<Track>>(
   (ref) => ref.watch(tracksRepositoryProvider).watchDeleted(),
 );
+
+/// Tracks known via synced metadata but not yet downloaded to this
+/// device — `services/sync/files` fetches these automatically once a
+/// peer with the file is online.
+final missingFilesProvider = StreamProvider<List<Track>>(
+  (ref) => ref.watch(tracksRepositoryProvider).watchMissingFiles(),
+);

@@ -57,7 +57,7 @@ class PlaylistsRepository {
   /// `TracksRepository` does — see its class doc for why `tracks.path`
   /// alone isn't safe to play from.
   Stream<List<Track>> watchTracks(String playlistId) => _crdt.watch('''
-        SELECT t.*, COALESCE(tl.path, t.path) AS path FROM playlist_tracks pt
+        SELECT t.*, tl.path AS path FROM playlist_tracks pt
         JOIN tracks t ON t.id = pt.track_id AND t.is_deleted = 0
         LEFT JOIN track_locations tl ON tl.id = t.id || ':' || ?2 AND tl.is_deleted = 0
         WHERE pt.playlist_id = ?1 AND pt.is_deleted = 0
@@ -67,7 +67,7 @@ class PlaylistsRepository {
   /// Like [watchTracks], but keeps each row's `playlist_tracks.id` so the
   /// UI can remove *this* occurrence of a track from the playlist.
   Stream<List<PlaylistItem>> watchItems(String playlistId) => _crdt.watch('''
-        SELECT pt.id AS entry_id, t.*, COALESCE(tl.path, t.path) AS path FROM playlist_tracks pt
+        SELECT pt.id AS entry_id, t.*, tl.path AS path FROM playlist_tracks pt
         JOIN tracks t ON t.id = pt.track_id AND t.is_deleted = 0
         LEFT JOIN track_locations tl ON tl.id = t.id || ':' || ?2 AND tl.is_deleted = 0
         WHERE pt.playlist_id = ?1 AND pt.is_deleted = 0

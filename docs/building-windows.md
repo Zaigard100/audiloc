@@ -78,19 +78,12 @@ engine-библиотеки при сборке).
   (нужен интернет на этот момент) и скомпилирует crate под Windows —
   из-за этого первый `flutter build windows` заметно дольше
   последующих. Отдельно устанавливать Rust/`rustup` не требуется.
-- **`flutter_secure_storage`** на Windows хранит секреты (Syncthing
-  API key, см. [ADR 0004](adr/0004-syncthing-external-process-for-file-sync.md))
-  через Windows Credential Manager — тоже без ручной настройки.
+## 4. Передача файлов
 
-## 4. Syncthing (опционально)
-
-Для передачи самих аудиофайлов между устройствами нужен установленный
-и запущенный [Syncthing](https://syncthing.net/downloads/) — обычный
-Windows-инсталлятор с оф. сайта, отдельный от AudiLoc процесс. AudiLoc
-только обращается к его локальному REST API (`localhost:8384`,
-[ADR 0004](adr/0004-syncthing-external-process-for-file-sync.md));
-без него приложение всё равно полностью работоспособно локально и
-синхронизирует метаданные между устройствами по LAN.
+Передача аудиофайлов между устройствами встроена в само приложение —
+HTTP-сервер/клиент AudiLoc на `dart:io`/`dio`
+([ADR 0010](adr/0010-built-in-file-transfer.md)). Ничего стороннего
+ставить не нужно.
 
 ## 5. Известные ограничения
 

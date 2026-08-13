@@ -21,13 +21,12 @@ class DevicesRepository {
   }
 
   Future<void> upsert(Device device) => _crdt.execute('''
-        INSERT INTO devices (id, name, host, sync_port, syncthing_device_id, last_online_at)
-          VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+        INSERT INTO devices (id, name, host, sync_port, last_online_at)
+          VALUES (?1, ?2, ?3, ?4, ?5)
         ON CONFLICT (id) DO UPDATE SET
           name = excluded.name,
           host = excluded.host,
           sync_port = excluded.sync_port,
-          syncthing_device_id = excluded.syncthing_device_id,
           last_online_at = excluded.last_online_at,
           is_deleted = 0
       ''', [
@@ -35,7 +34,6 @@ class DevicesRepository {
         device.name,
         device.host,
         device.syncPort,
-        device.syncthingDeviceId,
         device.lastOnlineAt,
       ]);
 

@@ -85,6 +85,10 @@ class AudilocDatabase {
         name TEXT NOT NULL,
         host TEXT,
         sync_port INTEGER,
+        -- Unused since docs/adr/0010-built-in-file-transfer.md replaced
+        -- the Syncthing-based design; kept rather than migrated away to
+        -- avoid a schema churn for a column that does no harm sitting
+        -- unused. No Dart-level field reads/writes it anymore.
         syncthing_device_id TEXT,
         last_online_at INTEGER,
         PRIMARY KEY (id)

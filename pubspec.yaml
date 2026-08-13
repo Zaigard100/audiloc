@@ -64,11 +64,9 @@ dependencies:
   # mDNS/Bonjour discovery устройств в LAN
   bonsoir: ^7.1.5
 
-  # REST-клиент к локальному Syncthing API (localhost:8384)
+  # Клиент передачи файлов между устройствами (docs/adr/0010) — резюмируемая
+  # HTTP-докачка (Range-заголовки)
   dio: ^5.11.0
-
-  # Безопасное хранение ключа устройства и Syncthing API-key
-  flutter_secure_storage: ^10.3.1
 
   # Импорт: выбор папки/файлов музыки
   file_picker: ^11.0.3

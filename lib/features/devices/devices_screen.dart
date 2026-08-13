@@ -4,6 +4,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 
 import '../../core/providers.dart';
 import '../../core/theme/app_theme.dart';
+import '../library/providers/library_providers.dart';
 import 'providers/devices_providers.dart';
 import 'widgets/device_tile.dart';
 import 'widgets/sync_badge.dart';
@@ -82,7 +83,7 @@ class DevicesScreen extends ConsumerWidget {
             ),
           ),
           const Divider(height: 32),
-          const _SyncthingSettings(),
+          const _FileSyncStatus(),
           const SizedBox(height: 24),
         ],
       ),
@@ -90,77 +91,31 @@ class DevicesScreen extends ConsumerWidget {
   }
 }
 
-class _SyncthingSettings extends ConsumerStatefulWidget {
-  const _SyncthingSettings();
+/// Файлы передаются напрямую между устройствами (без внешних программ —
+/// см. docs/adr/0010-built-in-file-transfer.md) автоматически, как только
+/// в сети окажется устройство с нужным файлом — здесь просто видно,
+/// сколько треков ещё в очереди на докачку.
+class _FileSyncStatus extends ConsumerWidget {
+  const _FileSyncStatus();
 
   @override
-  ConsumerState<_SyncthingSettings> createState() => _SyncthingSettingsState();
-}
-
-class _SyncthingSettingsState extends ConsumerState<_SyncthingSettings> {
-  final _controller = TextEditingController();
-  String? _status;
-
-  @override
-  void initState() {
-    super.initState();
-    ref.read(secureSettingsServiceProvider).getSyncthingApiKey().then((key) {
-      if (!mounted || key == null) return;
-      _controller.text = key;
-      ref.read(syncthingApiKeyProvider.notifier).state = key;
-    });
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final missing = ref.watch(missingFilesProvider).value ?? const [];
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Передача файлов через Syncthing', style: TextStyle(fontWeight: FontWeight.w600)),
+          const Text('Передача файлов', style: TextStyle(fontWeight: FontWeight.w600)),
           const SizedBox(height: 4),
-          const Text(
-            'AudiLoc сам файлы не передаёт — для этого используется локально запущенный Syncthing (localhost:8384). Вставьте его API-ключ, чтобы включить интеграцию.',
-            style: TextStyle(color: AppTheme.onSurfaceMuted, fontSize: 12),
+          Text(
+            missing.isEmpty
+                ? 'Все известные треки уже есть на этом устройстве'
+                : 'Ожидают докачки: ${missing.length} — появятся сами, как только в сети найдётся устройство с этими файлами',
+            style: const TextStyle(color: AppTheme.onSurfaceMuted, fontSize: 12),
           ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _controller,
-                  decoration: const InputDecoration(hintText: 'Syncthing API key', isDense: true),
-                  obscureText: true,
-                ),
-              ),
-              const SizedBox(width: 8),
-              FilledButton(onPressed: _save, child: const Text('Сохранить')),
-            ],
-          ),
-          if (_status != null) ...[
-            const SizedBox(height: 8),
-            Text(_status!, style: const TextStyle(color: AppTheme.onSurfaceMuted, fontSize: 12)),
-          ],
         ],
       ),
     );
-  }
-
-  Future<void> _save() async {
-    final key = _controller.text.trim();
-    if (key.isEmpty) return;
-    await ref.read(secureSettingsServiceProvider).setSyncthingApiKey(key);
-    ref.read(syncthingApiKeyProvider.notifier).state = key;
-
-    final client = ref.read(syncthingClientProvider);
-    final reachable = client != null && await client.ping();
-    setState(() => _status = reachable ? 'Syncthing найден и отвечает' : 'Не удалось связаться с Syncthing на localhost:8384');
   }
 }

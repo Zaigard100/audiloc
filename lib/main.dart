@@ -24,9 +24,15 @@ Future<void> main() async {
     selfDeviceProvider.overrideWithValue(selfDevice),
   ]);
 
-  // LAN discovery + metadata sync start in the background and never block
-  // the UI (ТЗ п.7: offline-first, sync is a bonus, not a gate).
+  // LAN discovery + metadata sync + file transfer all start in the
+  // background and never block the UI (ТЗ п.7: offline-first, sync is a
+  // bonus, not a gate).
   unawaited(container.read(syncOrchestratorProvider).start(metadataSyncPort));
+  unawaited(() async {
+    await container.read(fileTransferServerProvider).start();
+    final fileSync = await container.read(fileSyncServiceProvider.future);
+    fileSync.start();
+  }());
 
   runApp(UncontrolledProviderScope(container: container, child: const AudilocApp()));
 }

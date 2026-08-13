@@ -1,7 +1,6 @@
 import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_riverpod/legacy.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
@@ -16,11 +15,11 @@ import '../services/library_import/library_import_service.dart';
 import '../services/library_import/tag_reader.dart';
 import '../services/playback/media_kit_player_service.dart';
 import '../services/playback/player_service.dart';
-import '../services/settings/secure_settings_service.dart';
 import '../services/sync/device_identity_service.dart';
 import '../services/sync/discovery/discovery_service.dart';
-import '../services/sync/files/syncthing_client.dart';
-import '../services/sync/files/syncthing_process_manager.dart';
+import '../services/sync/files/file_sync_service.dart';
+import '../services/sync/files/file_transfer_client.dart';
+import '../services/sync/files/file_transfer_server.dart';
 import '../services/sync/metadata/metadata_sync_service.dart';
 import '../services/sync/sync_orchestrator.dart';
 
@@ -95,24 +94,8 @@ final metadataSyncServiceProvider = Provider<MetadataSyncService>((ref) {
   return service;
 });
 
-final secureSettingsServiceProvider =
-    Provider<SecureSettingsService>((ref) => SecureSettingsService());
-
-/// The Syncthing API key, seeded from secure storage at startup and kept
-/// editable from the Devices screen. Null means Syncthing hasn't been
-/// paired with AudiLoc's REST client yet.
-final syncthingApiKeyProvider = StateProvider<String?>((ref) => null);
-
-final syncthingClientProvider = Provider<SyncthingClient?>((ref) {
-  final apiKey = ref.watch(syncthingApiKeyProvider);
-  if (apiKey == null || apiKey.isEmpty) return null;
-  return SyncthingClient(baseUrl: 'http://127.0.0.1:8384', apiKey: apiKey);
-});
-
-final syncthingProcessManagerProvider =
-    Provider<SyncthingProcessManager>((ref) => SyncthingProcessManager());
-
 const metadataSyncPort = 8541;
+const fileTransferPort = 8542;
 
 final syncOrchestratorProvider = Provider<SyncOrchestrator>((ref) {
   final orchestrator = SyncOrchestrator(
@@ -122,4 +105,43 @@ final syncOrchestratorProvider = Provider<SyncOrchestrator>((ref) {
   );
   ref.onDispose(orchestrator.dispose);
   return orchestrator;
+});
+
+/// Where files fetched from peers land — kept inside the app's own
+/// storage so no platform-specific public-storage/SAF permissions are
+/// needed on Android (ТЗ: приложение должно быть самодостаточным).
+/// Manually imported files (via the folder picker) are untouched and stay
+/// wherever the user pointed at — this is only for P2P-downloaded copies.
+final syncedMusicDirProvider = FutureProvider<Directory>((ref) async {
+  final base = await getApplicationSupportDirectory();
+  final dir = Directory(p.join(base.path, 'synced_music'));
+  if (!await dir.exists()) await dir.create(recursive: true);
+  return dir;
+});
+
+final fileTransferServerProvider = Provider<FileTransferServer>((ref) {
+  final server = FileTransferServer(
+    tracksRepository: ref.watch(tracksRepositoryProvider),
+    port: fileTransferPort,
+  );
+  ref.onDispose(server.dispose);
+  return server;
+});
+
+final fileTransferClientProvider = Provider<FileTransferClient>((ref) => FileTransferClient());
+
+/// Watches for tracks known only through synced metadata and fetches them
+/// from whichever online peer has the file — see
+/// docs/adr/0010-built-in-file-transfer.md.
+final fileSyncServiceProvider = FutureProvider<FileSyncService>((ref) async {
+  final downloadsDir = await ref.watch(syncedMusicDirProvider.future);
+  final service = FileSyncService(
+    tracksRepository: ref.watch(tracksRepositoryProvider),
+    discoveryService: ref.watch(discoveryServiceProvider),
+    client: ref.watch(fileTransferClientProvider),
+    downloadsDir: downloadsDir,
+    filePort: fileTransferPort,
+  );
+  ref.onDispose(service.dispose);
+  return service;
 });

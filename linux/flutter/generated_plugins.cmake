@@ -4,7 +4,6 @@
 
 list(APPEND FLUTTER_PLUGIN_LIST
   audiotags
-  flutter_secure_storage_linux
   media_kit_libs_linux
 )
 

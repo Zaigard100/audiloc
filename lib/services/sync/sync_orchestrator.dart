@@ -44,13 +44,11 @@ class SyncOrchestrator {
   Future<void> _handleDiscoveryEvent(DiscoveryEvent event) async {
     switch (event) {
       case PeerFound(:final peer):
-        final existing = await _devicesRepository.byId(peer.deviceId);
         await _devicesRepository.upsert(Device(
           id: peer.deviceId,
           name: peer.name,
           host: peer.host,
           syncPort: peer.port,
-          syncthingDeviceId: existing?.syncthingDeviceId,
           lastOnlineAt: DateTime.now().millisecondsSinceEpoch,
         ));
         _metadataSyncService.connectToPeer(peer.deviceId, peer.metadataSyncUri);

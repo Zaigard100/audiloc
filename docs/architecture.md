@@ -20,10 +20,10 @@ lib/
     sync/
       discovery/             — bonsoir: кто есть в LAN
       metadata/               — crdt_sync: обмен CRDT-дельтами
-      files/                  — Syncthing REST-клиент + процесс-менеджер
+      files/                  — встроенный HTTP-сервер/клиент передачи
+                                 файлов (docs/adr/0010), без сторонних программ
       device_identity_service — стабильный id этого устройства
       sync_orchestrator       — клей: discovery → metadata sync → devices
-    settings/                — Syncthing API key (flutter_secure_storage)
   features/
     library/ playlists/ search/ devices/ player/ shell/
                               — экраны, виджеты, feature-провайдеры
@@ -71,10 +71,13 @@ flowchart LR
 ```
 
 Оба устройства симметричны: каждое одновременно слушает входящие
-подключения (`listen()`) и подключается исходящим `CrdtSyncClient` к
-обнаруженным пирам ([ADR 0005](adr/0005-crdt-sync-for-p2p-metadata.md)).
+подключения и подключается исходящим `CrdtSyncClient` к обнаруженным
+пирам ([ADR 0005](adr/0005-crdt-sync-for-p2p-metadata.md)).
 Файлы по этому каналу не идут — только CRDT-дельты; за сами файлы
-отвечает Syncthing отдельным путём ([ADR 0004](adr/0004-syncthing-external-process-for-file-sync.md)).
+отвечает встроенный `FileTransferServer`/`FileTransferClient` отдельным
+HTTP-каналом ([ADR 0010](adr/0010-built-in-file-transfer.md)):
+`FileSyncService` следит за треками без локального файла и докачивает
+их с первого online-пира, у которого файл есть.
 
 ## Тестируемость как следствие архитектуры
 

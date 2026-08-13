@@ -39,7 +39,6 @@ class DeviceIdentityService {
       name: name,
       host: current.host,
       syncPort: current.syncPort,
-      syncthingDeviceId: current.syncthingDeviceId,
       lastOnlineAt: current.lastOnlineAt,
     ));
   }

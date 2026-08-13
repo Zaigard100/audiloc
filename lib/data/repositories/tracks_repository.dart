@@ -14,16 +14,19 @@ import '../models/track.dart';
 /// content (same sha256 `id`) at different local paths, whichever import
 /// has the later HLC clobbers the other device's path for the *whole*
 /// row after sync — playback then opens a nonexistent file. Every read
-/// here resolves the path through `track_locations` instead, a table
+/// here resolves [Track.path] through `track_locations` instead, a table
 /// keyed `trackId:nodeId` so each device's own row survives merges from
-/// other devices untouched. See docs/adr/0009-local-track-paths.md.
+/// other devices untouched — and is `null` when *this* device has no row
+/// there, i.e. it knows the track exists (metadata synced) but doesn't
+/// have the file (yet). See docs/adr/0009-local-track-paths.md and
+/// docs/adr/0010-built-in-file-transfer.md.
 class TracksRepository {
   TracksRepository(this._crdt);
 
   final SqliteCrdt _crdt;
 
   static const _selectWithLocalPath = '''
-    SELECT t.*, COALESCE(tl.path, t.path) AS path
+    SELECT t.*, tl.path AS path
     FROM tracks t
     LEFT JOIN track_locations tl
       ON tl.id = t.id || ':' || ?1 AND tl.is_deleted = 0
@@ -58,11 +61,16 @@ class TracksRepository {
   }
 
   /// Inserts a new track, or revives/updates one previously soft-deleted
-  /// with the same content hash (re-import after removal, or the same file
-  /// discovered again via Syncthing under a different path). [track.path]
-  /// is recorded as *this device's* local path for the file — see the
-  /// class doc for why that's not the same as trusting `tracks.path`.
+  /// with the same content hash (re-import after removal, or the same
+  /// file arriving via [services/sync/files] under a different path).
+  /// [track.path] is recorded as *this device's* local path for the
+  /// file — see the class doc for why that's not the same as trusting
+  /// `tracks.path`. Requires a non-null path: this is how a device
+  /// declares "I have the actual file", not just metadata about it.
   Future<void> upsert(Track track) async {
+    final localPath = track.path;
+    assert(localPath != null, 'upsert() requires a local file path — this device has the file');
+
     await _crdt.execute('''
         INSERT INTO tracks
           (id, path, title, artist, album, genre, duration_ms, bitrate_kbps, cover_path, file_size, added_on_device)
@@ -81,7 +89,7 @@ class TracksRepository {
           is_deleted = 0
       ''', [
       track.id,
-      track.path,
+      localPath,
       track.title,
       track.artist,
       track.album,
@@ -98,8 +106,21 @@ class TracksRepository {
         ON CONFLICT (id) DO UPDATE SET
           path = excluded.path,
           is_deleted = 0
-      ''', ['${track.id}:${_crdt.nodeId}', track.id, track.path]);
+      ''', ['${track.id}:${_crdt.nodeId}', track.id, localPath]);
   }
+
+  /// Records that *this* device has downloaded [track.path] for
+  /// [track.id] without touching the rest of the track's metadata —
+  /// used by the file-transfer client once a download completes.
+  /// Equivalent to [upsert] when the track already exists, but doesn't
+  /// require (or overwrite) tag data.
+  Future<void> recordLocalFile(String trackId, String localPath) => _crdt.execute('''
+        INSERT INTO track_locations (id, track_id, path)
+          VALUES (?1, ?2, ?3)
+        ON CONFLICT (id) DO UPDATE SET
+          path = excluded.path,
+          is_deleted = 0
+      ''', ['$trackId:${_crdt.nodeId}', trackId, localPath]);
 
   /// Soft-delete: hides the track from the library, but only flags the
   /// `tracks` row (`is_deleted = 1`) — the audio file itself is never
@@ -118,6 +139,27 @@ class TracksRepository {
         WHERE t.is_deleted = 1
         ORDER BY t.modified DESC
       ''', () => [_crdt.nodeId]).map((rows) => rows.map(Track.fromRow).toList());
+
+  /// Tracks known (via synced metadata) but not present as a file on this
+  /// device — candidates for `services/sync/files` to fetch.
+  Stream<List<Track>> watchMissingFiles() => _crdt.watch('''
+        $_selectWithLocalPath
+        WHERE t.is_deleted = 0 AND tl.path IS NULL
+        ORDER BY t.modified DESC
+      ''', () => [_crdt.nodeId]).map((rows) => rows.map(Track.fromRow).toList());
+
+  /// Node ids of devices known (via synced `track_locations` rows — which
+  /// propagate over the same metadata-sync channel as everything else)
+  /// to have their own local copy of [trackId]. Doesn't imply that device
+  /// is currently online or reachable — callers cross-reference with
+  /// live discovery for that.
+  Future<List<String>> peersWithLocalCopy(String trackId) async {
+    final rows = await _crdt.query('''
+      SELECT DISTINCT node_id FROM track_locations
+      WHERE track_id = ?1 AND is_deleted = 0 AND node_id != ?2
+    ''', [trackId, _crdt.nodeId]);
+    return rows.map((r) => r['node_id']! as String).toList();
+  }
 
   Future<List<String>> allGenres() async {
     final rows = await _crdt.query('''

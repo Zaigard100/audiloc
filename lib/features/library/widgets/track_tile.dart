@@ -42,9 +42,21 @@ class TrackTile extends ConsumerWidget {
                 ),
         ),
       ),
-      title: Text(track.displayTitle, maxLines: 1, overflow: TextOverflow.ellipsis),
+      title: Row(
+        children: [
+          if (!track.isAvailableLocally) ...[
+            const Icon(Icons.cloud_download_outlined, size: 14, color: AppTheme.onSurfaceMuted),
+            const SizedBox(width: 4),
+          ],
+          Expanded(
+            child: Text(track.displayTitle, maxLines: 1, overflow: TextOverflow.ellipsis),
+          ),
+        ],
+      ),
       subtitle: Text(
-        '${track.displayArtist} · ${track.displayAlbum}',
+        track.isAvailableLocally
+            ? '${track.displayArtist} · ${track.displayAlbum}'
+            : '${track.displayArtist} · ${track.displayAlbum} · ждёт передачи с другого устройства',
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),
