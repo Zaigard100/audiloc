@@ -1,5 +1,7 @@
 import 'dart:io';
 
+import 'package:device_info_plus/device_info_plus.dart';
+
 import '../../data/db/audiloc_database.dart';
 import '../../data/models/device.dart';
 import '../../data/repositories/devices_repository.dart';
@@ -66,3 +68,36 @@ class DeviceIdentityService {
     return '$label (${deviceId.substring(0, 4)})';
   }
 }
+
+/// Platform + a concrete identifier for *this* installation — Android's
+/// device model, or the desktop hostname. Appended to the profile name
+/// (see [composeDeviceName]) so two devices sharing one profile
+/// (docs/adr/0013-account-profiles.md, docs/adr/0016-device-label.md)
+/// don't show up as identical, indistinguishable entries in each other's
+/// "Устройства" list. A plain top-level function, not a method, so it can
+/// serve as a default parameter value (a compile-time constant) while
+/// still being swappable for a deterministic stub in tests.
+Future<String> platformDeviceLabel() async {
+  if (Platform.isAndroid) {
+    final info = await DeviceInfoPlugin().androidInfo;
+    return 'Android ${info.model}';
+  }
+  final label = switch (Platform.operatingSystem) {
+    'ios' => 'iPhone',
+    'linux' => 'Linux',
+    'windows' => 'Windows',
+    'macos' => 'Mac',
+    _ => 'Устройство',
+  };
+  try {
+    final host = Platform.localHostname;
+    if (host.isNotEmpty && host.toLowerCase() != 'localhost') return '$label $host';
+  } catch (_) {
+    // Unsupported on some platforms; fall through to the bare label.
+  }
+  return label;
+}
+
+/// `"<profile name> (<platform label>)"` — the name this device registers
+/// for itself and advertises to peers. See [platformDeviceLabel].
+String composeDeviceName(String profileName, String platformLabel) => '$profileName ($platformLabel)';

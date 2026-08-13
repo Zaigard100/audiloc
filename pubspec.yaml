@@ -80,6 +80,10 @@ dependencies:
   crypto: ^3.0.6
   path: ^1.9.1
 
+  # Модель устройства (Android) для отображаемого имени устройства в
+  # списке сопряжённых — см. docs/adr/0016-device-label.md
+  device_info_plus: ^11.5.0
+
 # audiotags 1.4.5's android/build.gradle hardcodes compileSdkVersion 31,
 # below what its own transitive AndroidX deps require (34+) on current
 # tooling — build fails with "AAR metadata" errors. Not fixed upstream as

@@ -86,6 +86,7 @@ Future<ProfileSessionHandle> openProfileSession({
   required ProfilesStore profilesStore,
   required Future<void> Function(String profileId) switchProfile,
   required Future<void> Function(IncomingPairingRequest) joinProfileForPairing,
+  Future<String> Function() platformLabel = platformDeviceLabel,
 }) async {
   final profiles = await profilesStore.list();
   final profile = profiles.firstWhere((p) => p.id == profileId);
@@ -95,11 +96,13 @@ Future<ProfileSessionHandle> openProfileSession({
   final devicesRepository = DevicesRepository(database.crdt);
   final identity = DeviceIdentityService(database, devicesRepository);
   var selfDevice = await identity.ensureSelfDevice();
-  // The device name peers see is always this profile's name (see
-  // docs/adr/0013-account-profiles.md) — resynced on every open in case
-  // the profile was renamed while this device wasn't the active session.
-  if (selfDevice.name != profile.name) {
-    await identity.rename(profile.name);
+  // The device name peers see is always "<profile name> (<platform
+  // label>)" (docs/adr/0013-account-profiles.md,
+  // docs/adr/0016-device-label.md) — resynced on every open in case the
+  // profile was renamed while this device wasn't the active session.
+  final desiredName = composeDeviceName(profile.name, await platformLabel());
+  if (selfDevice.name != desiredName) {
+    await identity.rename(desiredName);
     selfDevice = (await devicesRepository.byId(identity.deviceId))!;
   }
 
@@ -163,12 +166,11 @@ Future<ProfileSessionHandle> openProfileSession({
 }
 
 /// Renames the *currently active* profile — its entry in [profilesStore],
-/// its self-device row (so the new name is what peers see, keeping the
-/// "device name = profile name" invariant — docs/adr/0013-account-profiles.md),
-/// and [currentProfileProvider]'s live state so the UI reflects it
-/// immediately without reopening the session. Used both for manual
-/// renames (the profile switcher) and for automatically adopting a
-/// peer's name after pairing (`AudilocApp`'s "Ждать сопряжения" flow).
+/// its self-device row (so the new `"<name> (<platform label>)"` is what
+/// peers see, keeping the invariant from docs/adr/0013-account-profiles.md
+/// and docs/adr/0016-device-label.md), and [currentProfileProvider]'s live
+/// state so the UI reflects it immediately without reopening the session.
+/// Used by the profile switcher's manual rename.
 ///
 /// Takes already-resolved dependencies rather than a `Ref`/`ProviderContainer`
 /// directly: callers reach this from both a `WidgetRef` (the switcher, a
@@ -181,9 +183,10 @@ Future<Profile> applyActiveProfileRename({
   required Profile current,
   required void Function(Profile) setCurrentProfile,
   required String name,
+  Future<String> Function() platformLabel = platformDeviceLabel,
 }) async {
   await profilesStore.rename(current.id, name);
-  await deviceIdentity.rename(name);
+  await deviceIdentity.rename(composeDeviceName(name, await platformLabel()));
   final renamed = current.copyWith(name: name);
   setCurrentProfile(renamed);
   return renamed;

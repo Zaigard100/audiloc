@@ -46,6 +46,7 @@ class _NoopPlayerService implements PlayerService {
 
 Future<void> _noopSwitch(String profileId) async {}
 Future<void> _noopJoin(IncomingPairingRequest request) async {}
+Future<String> _testPlatformLabel() async => 'TestOS';
 
 void main() {
   test(
@@ -69,6 +70,7 @@ void main() {
       profilesStore: store,
       switchProfile: _noopSwitch,
       joinProfileForPairing: _noopJoin,
+      platformLabel: _testPlatformLabel,
     );
     await first.close();
 
@@ -81,14 +83,16 @@ void main() {
       profilesStore: store,
       switchProfile: _noopSwitch,
       joinProfileForPairing: _noopJoin,
+      platformLabel: _testPlatformLabel,
     );
     await second.close();
   });
 
   test(
-      "the self-device's name always matches the active profile's name "
-      "(docs/adr/0013-account-profiles.md — this is what makes the paired-device "
-      "name meaningful for name adoption/the switcher)", () async {
+      "the self-device's name is always \"<profile name> (<platform label>)\" "
+      "(docs/adr/0013-account-profiles.md, docs/adr/0016-device-label.md — this "
+      "is what makes devices sharing a profile distinguishable in the switcher)",
+      () async {
     final appSupportDir = await Directory.systemTemp.createTemp('audiloc_session_name_');
     addTearDown(() => appSupportDir.delete(recursive: true));
     final store = ProfilesStore(appSupportDir);
@@ -101,10 +105,11 @@ void main() {
       profilesStore: store,
       switchProfile: _noopSwitch,
       joinProfileForPairing: _noopJoin,
+      platformLabel: _testPlatformLabel,
     );
     addTearDown(session.close);
 
-    expect(session.container.read(selfDeviceProvider).name, 'Мама');
+    expect(session.container.read(selfDeviceProvider).name, 'Мама (TestOS)');
   });
 
   test(
@@ -122,6 +127,7 @@ void main() {
       profilesStore: store,
       switchProfile: _noopSwitch,
       joinProfileForPairing: _noopJoin,
+      platformLabel: _testPlatformLabel,
     );
     await first.close();
 
@@ -133,10 +139,11 @@ void main() {
       profilesStore: store,
       switchProfile: _noopSwitch,
       joinProfileForPairing: _noopJoin,
+      platformLabel: _testPlatformLabel,
     );
     addTearDown(second.close);
 
-    expect(second.container.read(selfDeviceProvider).name, 'Новое имя');
+    expect(second.container.read(selfDeviceProvider).name, 'Новое имя (TestOS)');
   });
 
   test(
@@ -154,6 +161,7 @@ void main() {
       profilesStore: store,
       switchProfile: _noopSwitch,
       joinProfileForPairing: _noopJoin,
+      platformLabel: _testPlatformLabel,
     );
     addTearDown(session.close);
 
@@ -164,6 +172,7 @@ void main() {
       current: profile,
       setCurrentProfile: (p) => updatedState = p,
       name: 'Новое имя',
+      platformLabel: _testPlatformLabel,
     );
 
     expect(renamed.name, 'Новое имя');
@@ -171,6 +180,6 @@ void main() {
     expect((await store.list()).single.name, 'Новое имя');
     final selfId = session.container.read(selfDeviceProvider).id;
     final selfDeviceRow = await session.container.read(devicesRepositoryProvider).byId(selfId);
-    expect(selfDeviceRow?.name, 'Новое имя');
+    expect(selfDeviceRow?.name, 'Новое имя (TestOS)');
   });
 }
