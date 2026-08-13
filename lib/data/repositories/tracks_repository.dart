@@ -150,9 +150,24 @@ class TracksRepository {
   Future<void> restore(String id) =>
       _crdt.execute('UPDATE tracks SET is_deleted = 0 WHERE id = ?1', [id]);
 
+  /// Excludes tracks [eraseFileFromDisk] was already used on — "Стереть
+  /// навсегда" is meant to make a track actually disappear from
+  /// "Удалённые", not linger there looking like it's just waiting to
+  /// re-download. `eraseFileFromDisk` can't remove the `tracks` row
+  /// itself (`sql_crdt` never allows a real row wipe — see [delete]), so
+  /// this is what makes "erased" stick from the UI's perspective instead:
+  /// a track this device once had a `track_locations` row for, which is
+  /// now soft-deleted (`eraseFileFromDisk` cleared it), is excluded here
+  /// — as opposed to a track that simply never had a local copy on this
+  /// device at all (no row, ever), which still belongs in "Удалённые" as
+  /// a normal candidate for [restore].
   Stream<List<Track>> watchDeleted() => _crdt.watch('''
         $_selectWithLocalPath
         WHERE t.is_deleted = 1
+          AND NOT EXISTS (
+            SELECT 1 FROM track_locations tl2
+            WHERE tl2.id = t.id || ':' || ?1 AND tl2.is_deleted = 1
+          )
         ORDER BY t.modified DESC
       ''', () => [_crdt.nodeId]).map((rows) => rows.map(Track.fromRow).toList());
 
@@ -251,16 +266,18 @@ class TracksRepository {
 
   /// "Стереть навсегда" from Удалённые: deletes *this device's* actual
   /// copy of the audio file (and cached cover, if any) from local
-  /// storage, and clears this device's `track_locations` row.
+  /// storage, and clears this device's `track_locations` row — which is
+  /// also exactly the signal [watchDeleted] looks for to stop showing
+  /// this track in "Удалённые" at all, so "erase forever" actually reads
+  /// as "gone" instead of lingering there looking like it's just waiting
+  /// to re-download.
   ///
   /// This can never mean "erase everywhere" — `sql_crdt` always turns a
   /// `DELETE` into `is_deleted = 1` (by design: an unconditional row wipe
   /// would break sync for any other paired device that still has the
   /// track), so the `tracks` row itself stays exactly as soft-deleted as
-  /// it already was. Restoring afterward is still possible, but since
-  /// the local file is gone, it now behaves like any other track without
-  /// a local copy: it needs `services/sync/files` to fetch it again from
-  /// a peer that still has it, if one exists.
+  /// it already was; [restore] still works on it directly, it's just no
+  /// longer offered from the "Удалённые" screen once erased.
   Future<void> eraseFileFromDisk(String trackId) async {
     final locationId = '$trackId:${_crdt.nodeId}';
     final rows = await _crdt.query(

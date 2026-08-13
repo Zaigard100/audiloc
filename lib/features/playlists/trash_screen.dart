@@ -10,9 +10,11 @@ import '../library/widgets/track_tile.dart';
 /// "Удалённые" — soft-deleted tracks (long-press in Библиотека). Reached
 /// from a card on the Плейлисты grid, not a Библиотека tab (docs/adr/0014).
 /// "Восстановить" undoes the soft-delete; "Стереть навсегда" additionally
-/// frees this device's local copy of the file — see
-/// `TracksRepository.eraseFileFromDisk` for why that can only ever be a
-/// per-device action, never a "delete everywhere".
+/// frees this device's local copy of the file and — since that's also
+/// what `TracksRepository.watchDeleted()` looks for — makes the track
+/// disappear from this screen entirely, not just lose its file. See
+/// `TracksRepository.eraseFileFromDisk` for why the underlying row can
+/// only ever be soft-deleted per-device, never wiped everywhere.
 class TrashScreen extends ConsumerWidget {
   const TrashScreen({super.key});
 
@@ -69,9 +71,8 @@ class TrashScreen extends ConsumerWidget {
       builder: (context) => AlertDialog(
         title: const Text('Стереть навсегда?'),
         content: Text(
-          '«${track.displayTitle}» будет удалён с диска на этом устройстве. '
-          'Вернуть его получится, только если файл ещё есть на каком-то '
-          'другом сопряжённом устройстве — тогда он докачается заново.',
+          '«${track.displayTitle}» будет удалён с диска на этом устройстве и исчезнет '
+          'из «Удалённых». Импортировать его снова можно будет только заново, вручную.',
         ),
         actions: [
           TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Отмена')),

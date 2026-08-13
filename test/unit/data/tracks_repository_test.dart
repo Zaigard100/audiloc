@@ -308,8 +308,11 @@ void main() {
     });
   });
 
-  group('eraseFileFromDisk ("Стереть навсегда", docs/adr/0014)', () {
-    test('deletes the local audio and cover files, and the track stops resolving locally', () async {
+  group('eraseFileFromDisk ("Стереть навсегда", docs/adr/0014, docs/adr/0023)', () {
+    test(
+        'deletes the local audio and cover files, and the track disappears from watchDeleted '
+        'entirely — "Стереть навсегда" must not linger looking like a re-downloadable track',
+        () async {
       final dir = await Directory.systemTemp.createTemp('audiloc_erase_');
       addTearDown(() => dir.delete(recursive: true));
       final audioFile = File('${dir.path}/song.mp3')..writeAsBytesSync([1, 2, 3]);
@@ -319,14 +322,17 @@ void main() {
         Track(id: 'erase-me', path: audioFile.path, coverPath: coverFile.path, title: 'Song'),
       );
       await repository.delete('erase-me'); // "Стереть навсегда" is only reachable from Удалённые
+      expect(await repository.watchDeleted().first, isNotEmpty, reason: 'sanity check before erasing');
 
       await repository.eraseFileFromDisk('erase-me');
 
       expect(await audioFile.exists(), isFalse);
       expect(await coverFile.exists(), isFalse);
-      final erased = (await repository.watchDeleted().first).singleWhere((t) => t.id == 'erase-me');
-      expect(erased.path, isNull, reason: 'no longer resolves to a local copy on this device');
-      expect(erased.coverPath, isNull);
+      expect(
+        (await repository.watchDeleted().first).where((t) => t.id == 'erase-me'),
+        isEmpty,
+        reason: 'erased forever — gone from Удалённые, not just fileless',
+      );
     });
 
     test('is a no-op when this device never had a local copy to begin with', () async {
@@ -345,8 +351,40 @@ void main() {
 
       await repository.eraseFileFromDisk('erase-me'); // must not throw
 
-      final erased = (await repository.watchDeleted().first).singleWhere((t) => t.id == 'erase-me');
-      expect(erased.path, isNull);
+      expect((await repository.watchDeleted().first).where((t) => t.id == 'erase-me'), isEmpty);
+    });
+
+    test(
+        'a track soft-deleted normally (never erased) still shows up in watchDeleted, file intact',
+        () async {
+      final dir = await Directory.systemTemp.createTemp('audiloc_erase_untouched_');
+      addTearDown(() => dir.delete(recursive: true));
+      final audioFile = File('${dir.path}/song.mp3')..writeAsBytesSync([1, 2, 3]);
+
+      await repository.upsert(Track(id: 'just-deleted', path: audioFile.path, title: 'Song'));
+      await repository.delete('just-deleted');
+
+      final deleted = (await repository.watchDeleted().first).singleWhere((t) => t.id == 'just-deleted');
+      expect(deleted.path, audioFile.path);
+      expect(await audioFile.exists(), isTrue);
+    });
+
+    test(
+        'a track known only via sync, never downloaded to this device, still shows up in '
+        'watchDeleted — distinct from an erased one (no track_locations row for this node at all, '
+        'ever, vs. one that exists but is soft-deleted)', () async {
+      // Simulates metadata (not the file) arriving via CRDT sync from a
+      // peer — a bare tracks row, written directly rather than through
+      // TracksRepository.upsert() (which always records a local
+      // track_locations row, since it means "this device has the file").
+      await db.crdt.execute(
+        "INSERT INTO tracks (id, path, title) VALUES ('remote-only', '/peer/song.mp3', 'Remote Song')",
+        const [],
+      );
+      await repository.delete('remote-only');
+
+      final deleted = await repository.watchDeleted().first;
+      expect(deleted.map((t) => t.id), contains('remote-only'));
     });
   });
 }
