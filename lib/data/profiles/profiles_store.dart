@@ -67,16 +67,22 @@ class ProfilesStore {
     ));
   }
 
-  /// Only unregisters the profile — its directory (library, paired
-  /// devices, everything) is left on disk untouched. Deliberately
-  /// non-destructive: there's no undo for "wrong profile deleted"
-  /// otherwise.
+  /// Unregisters the profile *and* erases its entire directory — the CRDT
+  /// database, paired devices, cached covers, downloaded audio,
+  /// everything. Irreversible by design (docs/adr/0018-delete-profile.md)
+  /// — the UI is what's responsible for a serious confirmation before
+  /// calling this, and for never calling it on the currently *active*
+  /// profile: its database file is open and in use, so deleting it out
+  /// from under the running session would corrupt more than just that
+  /// profile (switch away first — `ProfileSwitcherSheet` enforces this).
   Future<void> delete(String id) async {
     final state = await _read();
     await _write(state.copyWith(
       profiles: [for (final p in state.profiles) if (p.id != id) p],
       activeProfileId: state.activeProfileId == id ? null : state.activeProfileId,
     ));
+    final dir = profileDir(id);
+    if (await dir.exists()) await dir.delete(recursive: true);
   }
 
   /// True only for a genuinely fresh install: no profiles registered yet

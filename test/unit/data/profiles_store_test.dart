@@ -54,12 +54,16 @@ void main() {
     expect(await store.activeProfileId(), a.id);
   });
 
-  test('delete only unregisters the profile — its directory is left on disk', () async {
+  test(
+      'delete unregisters the profile and erases its entire directory '
+      '(docs/adr/0018-delete-profile.md — irreversible by design)', () async {
     final profile = await store.create('Мама');
+    await File(p.join(store.profileDir(profile.id).path, 'audiloc.db')).writeAsBytes([1, 2, 3]);
+
     await store.delete(profile.id);
 
     expect(await store.list(), isEmpty);
-    expect(await store.profileDir(profile.id).exists(), isTrue, reason: 'non-destructive by design');
+    expect(await store.profileDir(profile.id).exists(), isFalse);
   });
 
   test('delete clears activeProfileId if it pointed at the deleted profile', () async {

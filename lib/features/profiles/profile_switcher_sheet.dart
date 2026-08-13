@@ -49,7 +49,8 @@ class _ProfileSwitcherSheetState extends ConsumerState<_ProfileSwitcherSheet> {
             const Text('Профили', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
             const SizedBox(height: 4),
             const Text(
-              'У каждого профиля своя библиотека и свой список сопряжённых устройств. Долгий тап — переименовать.',
+              'У каждого профиля своя библиотека и свой список сопряжённых устройств. '
+              'Долгий тап — переименовать, значок корзины — удалить безвозвратно.',
               style: TextStyle(color: AppTheme.onSurfaceMuted, fontSize: 12),
             ),
             FutureBuilder<List<Profile>>(
@@ -75,7 +76,17 @@ class _ProfileSwitcherSheetState extends ConsumerState<_ProfileSwitcherSheet> {
                           ),
                         ),
                         title: Text(profile.name),
-                        trailing: profile.id == current.id ? const Icon(Icons.check, color: AppTheme.accent) : null,
+                        // The active profile can't be deleted — its database
+                        // is open and in use (docs/adr/0018-delete-profile.md)
+                        // — so it gets the check mark instead of a delete
+                        // affordance; only inactive profiles show one.
+                        trailing: profile.id == current.id
+                            ? const Icon(Icons.check, color: AppTheme.accent)
+                            : IconButton(
+                                icon: const Icon(Icons.delete_outline, color: AppTheme.onSurfaceMuted),
+                                tooltip: 'Удалить профиль',
+                                onPressed: () => _deleteDialog(context, profile),
+                              ),
                         onTap: profile.id == current.id ? null : () => _switchTo(context, profile.id),
                         onLongPress: () => _renameDialog(context, profile),
                       ),
@@ -162,6 +173,52 @@ class _ProfileSwitcherSheetState extends ConsumerState<_ProfileSwitcherSheet> {
       // resync automatically the next time it's the active session.
       await ref.read(profilesStoreProvider).rename(profile.id, name);
     }
+    _refresh();
+  }
+
+  /// [profile] is never the active one here — the trailing delete button
+  /// only shows for inactive profiles (see [build]). Irreversible:
+  /// requires typing the profile's own name back, on top of the two
+  /// buttons, before the destructive action becomes available at all —
+  /// see docs/adr/0018-delete-profile.md.
+  Future<void> _deleteDialog(BuildContext context, Profile profile) async {
+    final controller = TextEditingController();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setState) {
+          final matches = controller.text.trim() == profile.name;
+          return AlertDialog(
+            title: const Text('Удалить профиль?'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '«${profile.name}» и вся его библиотека — треки, плейлисты, обложки, '
+                  'список сопряжённых устройств — будут удалены безвозвратно. Отменить это будет нельзя.',
+                ),
+                const SizedBox(height: 16),
+                Text('Чтобы подтвердить, введите «${profile.name}»:'),
+                const SizedBox(height: 4),
+                TextField(controller: controller, autofocus: true, onChanged: (_) => setState(() {})),
+              ],
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: const Text('Отмена')),
+              FilledButton(
+                style: FilledButton.styleFrom(backgroundColor: Theme.of(dialogContext).colorScheme.error),
+                onPressed: matches ? () => Navigator.of(dialogContext).pop(true) : null,
+                child: const Text('Удалить безвозвратно'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+    if (confirmed != true) return;
+
+    await ref.read(profilesStoreProvider).delete(profile.id);
     _refresh();
   }
 }
