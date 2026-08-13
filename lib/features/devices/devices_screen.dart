@@ -4,6 +4,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 
 import '../../core/providers.dart';
 import '../../core/theme/app_theme.dart';
+import '../../data/models/track.dart';
 import '../library/providers/library_providers.dart';
 import 'providers/devices_providers.dart';
 import 'widgets/device_tile.dart';
@@ -101,6 +102,10 @@ class _FileSyncStatus extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final missing = ref.watch(missingFilesProvider).value ?? const [];
+    final transfers = ref.watch(activeTransfersProvider).value ?? const {};
+    final byId = {for (final track in missing) track.id: track};
+    final queuedCount = missing.length - transfers.length;
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
@@ -108,11 +113,61 @@ class _FileSyncStatus extends ConsumerWidget {
         children: [
           const Text('Передача файлов', style: TextStyle(fontWeight: FontWeight.w600)),
           const SizedBox(height: 4),
+          if (missing.isEmpty)
+            const Text(
+              'Все известные треки уже есть на этом устройстве',
+              style: TextStyle(color: AppTheme.onSurfaceMuted, fontSize: 12),
+            )
+          else ...[
+            for (final entry in transfers.entries)
+              if (byId[entry.key] case final track?)
+                _TransferProgressRow(track: track, fraction: entry.value),
+            if (queuedCount > 0)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  'В очереди: $queuedCount — появятся сами, как только в сети '
+                  'найдётся устройство с этими файлами',
+                  style: const TextStyle(color: AppTheme.onSurfaceMuted, fontSize: 12),
+                ),
+              ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _TransferProgressRow extends StatelessWidget {
+  const _TransferProgressRow({required this.track, required this.fraction});
+
+  final Track track;
+  final double? fraction;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
           Text(
-            missing.isEmpty
-                ? 'Все известные треки уже есть на этом устройстве'
-                : 'Ожидают докачки: ${missing.length} — появятся сами, как только в сети найдётся устройство с этими файлами',
-            style: const TextStyle(color: AppTheme.onSurfaceMuted, fontSize: 12),
+            fraction == null
+                ? track.displayTitle
+                : '${track.displayTitle} — ${(fraction! * 100).round()}%',
+            style: const TextStyle(fontSize: 12),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 2),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: fraction,
+              minHeight: 4,
+              color: AppTheme.accent,
+              backgroundColor: AppTheme.surfaceHigh,
+            ),
           ),
         ],
       ),

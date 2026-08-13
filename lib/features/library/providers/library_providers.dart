@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/legacy.dart';
 
 import '../../../core/providers.dart';
 import '../../../data/models/track.dart';
+import '../../../services/sync/files/file_sync_service.dart';
 
 final libraryTracksProvider = StreamProvider<List<Track>>(
   (ref) => ref.watch(tracksRepositoryProvider).watchAll(),
@@ -64,3 +65,23 @@ final deletedTracksProvider = StreamProvider<List<Track>>(
 final missingFilesProvider = StreamProvider<List<Track>>(
   (ref) => ref.watch(tracksRepositoryProvider).watchMissingFiles(),
 );
+
+/// Live download progress for tracks currently being fetched from a peer:
+/// `trackId -> fraction` (`null` fraction means "in progress, size
+/// unknown" rather than "not downloading"). Entries disappear as soon as
+/// their download stops, successfully or not — see [TransferFinished].
+final activeTransfersProvider = StreamProvider<Map<String, double?>>((ref) async* {
+  final service = await ref.watch(fileSyncServiceProvider.future);
+  var current = <String, double?>{};
+  yield current;
+  await for (final event in service.transferEvents) {
+    current = Map.of(current);
+    switch (event) {
+      case TransferProgress(:final trackId, :final fraction):
+        current[trackId] = fraction;
+      case TransferFinished(:final trackId):
+        current.remove(trackId);
+    }
+    yield current;
+  }
+});

@@ -25,6 +25,9 @@ class TrackTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final isFavorite = ref.watch(favoriteIdsProvider).value?.contains(track.id) ?? false;
+    final transfers = ref.watch(activeTransfersProvider).value ?? const {};
+    final isTransferring = transfers.containsKey(track.id);
+    final fraction = transfers[track.id];
 
     return ListTile(
       onTap: onTap,
@@ -45,7 +48,13 @@ class TrackTile extends ConsumerWidget {
       title: Row(
         children: [
           if (!track.isAvailableLocally) ...[
-            const Icon(Icons.cloud_download_outlined, size: 14, color: AppTheme.onSurfaceMuted),
+            SizedBox(
+              width: 14,
+              height: 14,
+              child: isTransferring
+                  ? CircularProgressIndicator(strokeWidth: 2, value: fraction, color: AppTheme.accent)
+                  : const Icon(Icons.cloud_download_outlined, size: 14, color: AppTheme.onSurfaceMuted),
+            ),
             const SizedBox(width: 4),
           ],
           Expanded(
@@ -56,7 +65,8 @@ class TrackTile extends ConsumerWidget {
       subtitle: Text(
         track.isAvailableLocally
             ? '${track.displayArtist} · ${track.displayAlbum}'
-            : '${track.displayArtist} · ${track.displayAlbum} · ждёт передачи с другого устройства',
+            : '${track.displayArtist} · ${track.displayAlbum} · '
+                '${isTransferring ? 'загрузка${fraction == null ? '…' : ' ${(fraction * 100).round()}%'}' : 'ждёт передачи с другого устройства'}',
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),

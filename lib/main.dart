@@ -29,6 +29,10 @@ Future<void> main() async {
   // bonus, not a gate).
   unawaited(container.read(syncOrchestratorProvider).start(metadataSyncPort));
   unawaited(() async {
+    // Repair pre-existing local tracks that predate track_locations (or
+    // this device's own row in it) before anything starts treating them
+    // as missing — see TracksRepository.backfillLocalFileLocations.
+    await container.read(tracksRepositoryProvider).backfillLocalFileLocations();
     await container.read(fileTransferServerProvider).start();
     final fileSync = await container.read(fileSyncServiceProvider.future);
     fileSync.start();

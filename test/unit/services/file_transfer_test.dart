@@ -82,6 +82,32 @@ void main() {
     expect(await File(downloadedPath).readAsBytes(), bytes);
   });
 
+  test('onProgress reports byte counts against the whole file, not just the resumed remainder', () async {
+    final bytes = List<int>.generate(200000, (i) => i % 256);
+    final sourceFile = await writeSourceFile('big2.flac', bytes);
+    await tracksRepository.upsert(Track(id: 'track-3', path: sourceFile.path, title: 'Big Song 2'));
+
+    final partial = File('${destDir.path}/track-3.part');
+    await partial.writeAsBytes(bytes.sublist(0, 100000));
+
+    final client = FileTransferClient();
+    final updates = <(int, int)>[];
+    await client.download(
+      host: '127.0.0.1',
+      port: port,
+      trackId: 'track-3',
+      destinationDir: destDir,
+      onProgress: (received, total) => updates.add((received, total)),
+    );
+
+    expect(updates, isNotEmpty);
+    // Every update is against the full 200000-byte file, not the 100000
+    // remaining bytes this particular request actually streams.
+    expect(updates.every((u) => u.$2 == 200000), isTrue);
+    expect(updates.every((u) => u.$1 >= 100000), isTrue);
+    expect(updates.last.$1, 200000);
+  });
+
   test('requesting an unknown track fails rather than silently succeeding', () async {
     final client = FileTransferClient();
     await expectLater(

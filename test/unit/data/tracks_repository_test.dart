@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:audiloc/data/db/audiloc_database.dart';
 import 'package:audiloc/data/models/track.dart';
 import 'package:audiloc/data/repositories/tracks_repository.dart';
@@ -173,5 +175,42 @@ void main() {
   test('peersWithLocalCopy excludes this device even though it has the file', () async {
     await repository.upsert(track);
     expect(await repository.peersWithLocalCopy(track.id), isEmpty);
+  });
+
+  test(
+      'backfillLocalFileLocations recovers a track imported before track_locations '
+      'existed (regression: after tl.path stopped falling back to tracks.path, such '
+      'tracks looked permanently "missing" despite the file still being right there)',
+      () async {
+    final dir = await Directory.systemTemp.createTemp('audiloc_backfill_');
+    addTearDown(() => dir.delete(recursive: true));
+    final file = File('${dir.path}/song.mp3')..writeAsBytesSync([1, 2, 3]);
+
+    // Simulate a pre-migration row: tracks.path set, but no track_locations
+    // row for this device (as if imported before upsert() wrote one).
+    await db.crdt.execute('''
+      INSERT INTO tracks (id, path, title) VALUES (?1, ?2, ?3)
+    ''', ['legacy-track', file.path, 'Legacy Song']);
+
+    expect((await repository.byId('legacy-track'))!.path, isNull, reason: 'not backfilled yet');
+    expect((await repository.watchMissingFiles().first).map((t) => t.id), contains('legacy-track'));
+
+    await repository.backfillLocalFileLocations();
+
+    final recovered = await repository.byId('legacy-track');
+    expect(recovered!.path, file.path);
+    expect((await repository.watchMissingFiles().first).map((t) => t.id), isNot(contains('legacy-track')));
+  });
+
+  test('backfillLocalFileLocations does not adopt a path whose file does not actually exist here', () async {
+    // A track known only through sync: tracks.path holds a peer's path,
+    // which must never be trusted as this device's own local file.
+    await db.crdt.execute('''
+      INSERT INTO tracks (id, path, title) VALUES (?1, ?2, ?3)
+    ''', ['peer-track', '/some/other/device/song.mp3', 'Peer Song']);
+
+    await repository.backfillLocalFileLocations();
+
+    expect((await repository.byId('peer-track'))!.path, isNull);
   });
 }

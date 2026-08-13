@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:sqlite_crdt/sqlite_crdt.dart';
 
 import '../models/track.dart';
@@ -159,6 +161,31 @@ class TracksRepository {
       WHERE track_id = ?1 AND is_deleted = 0 AND node_id != ?2
     ''', [trackId, _crdt.nodeId]);
     return rows.map((r) => r['node_id']! as String).toList();
+  }
+
+  /// One-time repair, meant to run once at startup: a track imported by
+  /// this device *before* `track_locations` existed (or before this
+  /// device's [upsert] ever ran again since) has its real path sitting
+  /// only in `tracks.path`, with no row of its own in `track_locations`
+  /// — since [watchMissingFiles] no longer falls back to `tracks.path`
+  /// (that column can just as easily hold a peer's path after sync), such
+  /// a track would otherwise look permanently "missing" despite the file
+  /// being right there. Only trusts `tracks.path` when the file actually
+  /// exists at that path on *this* filesystem — never adopts it blind,
+  /// which is exactly the bug docs/adr/0009 fixed in the first place.
+  Future<void> backfillLocalFileLocations() async {
+    final rows = await _crdt.query('''
+      SELECT t.id, t.path FROM tracks t
+      LEFT JOIN track_locations tl ON tl.id = t.id || ':' || ?1 AND tl.is_deleted = 0
+      WHERE tl.id IS NULL AND t.is_deleted = 0
+    ''', [_crdt.nodeId]);
+
+    for (final row in rows) {
+      final path = row['path'] as String?;
+      if (path != null && await File(path).exists()) {
+        await recordLocalFile(row['id']! as String, path);
+      }
+    }
   }
 
   Future<List<String>> allGenres() async {

@@ -45,6 +45,12 @@ class FileSyncService {
   StreamSubscription<DiscoveryEvent>? _discoverySub;
   StreamSubscription<List<Track>>? _missingSub;
 
+  final _events = StreamController<TransferEvent>.broadcast();
+
+  /// Progress for downloads currently in flight — UI subscribes to this
+  /// to show something better than a static "waiting" count.
+  Stream<TransferEvent> get transferEvents => _events.stream;
+
   void start() {
     _missingSub = _tracksRepository.watchMissingFiles().listen((missing) {
       _lastMissing = missing;
@@ -95,16 +101,47 @@ class FileSyncService {
         port: filePort,
         trackId: trackId,
         destinationDir: _downloadsDir,
+        onProgress: (received, total) =>
+            _events.add(TransferProgress(trackId, receivedBytes: received, totalBytes: total)),
       );
       await _tracksRepository.recordLocalFile(trackId, path);
     } catch (_) {
       // Peer went offline mid-transfer, network hiccup, etc. — the next
       // watchMissingFiles emission or peer-found event will retry.
+    } finally {
+      _events.add(TransferFinished(trackId));
     }
   }
 
   Future<void> dispose() async {
     await _discoverySub?.cancel();
     await _missingSub?.cancel();
+    await _events.close();
   }
+}
+
+/// Emitted on [FileSyncService.transferEvents] while a track is being
+/// downloaded from a peer.
+sealed class TransferEvent {
+  const TransferEvent(this.trackId);
+  final String trackId;
+}
+
+/// A chunk of a download landed. [fraction] is `null` when the server
+/// didn't report a length (`totalBytes < 0`) — callers should show an
+/// indeterminate indicator rather than guess.
+class TransferProgress extends TransferEvent {
+  const TransferProgress(super.trackId, {required this.receivedBytes, required this.totalBytes});
+  final int receivedBytes;
+  final int totalBytes;
+
+  double? get fraction => totalBytes > 0 ? (receivedBytes / totalBytes).clamp(0, 1) : null;
+}
+
+/// The download for [trackId] stopped, successfully or not — either way,
+/// it's no longer "in flight" and UI should drop it from any active list.
+/// (Whether it actually succeeded is visible separately, through
+/// `TracksRepository.watchMissingFiles()`.)
+class TransferFinished extends TransferEvent {
+  const TransferFinished(super.trackId);
 }
