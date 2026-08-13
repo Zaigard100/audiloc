@@ -65,10 +65,14 @@ class PlaylistsRepository {
         ORDER BY pt.position
       ''', () => [playlistId, _crdt.nodeId]).map((rows) => rows.map(Track.fromRow).toList());
 
-  /// Like [watchTracks], but keeps each row's `playlist_tracks.id` so the
-  /// UI can remove *this* occurrence of a track from the playlist.
+  /// Like [watchTracks], but keeps each row's `playlist_tracks.id` and
+  /// `position` so the UI can remove *this* occurrence of a track, or
+  /// compute a new fractional position for drag-and-drop reordering
+  /// (`PlaylistDetailScreen`'s `ReorderableListView` — see [moveEntry]),
+  /// without an extra query.
   Stream<List<PlaylistItem>> watchItems(String playlistId) => _crdt.watch('''
-        SELECT pt.id AS entry_id, t.*, tl.path AS path, tl.cover_path AS cover_path FROM playlist_tracks pt
+        SELECT pt.id AS entry_id, pt.position AS position, t.*, tl.path AS path, tl.cover_path AS cover_path
+        FROM playlist_tracks pt
         JOIN tracks t ON t.id = pt.track_id AND t.is_deleted = 0
         LEFT JOIN track_locations tl ON tl.id = t.id || ':' || ?2 AND tl.is_deleted = 0
         WHERE pt.playlist_id = ?1 AND pt.is_deleted = 0

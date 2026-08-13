@@ -27,31 +27,57 @@ final filteredLibraryTracksProvider = Provider<List<Track>>((ref) {
       .toList();
 });
 
+/// What field the Library tab's flat track list is currently sorted by.
+enum LibrarySortField { title, artist, addedAt }
+
+class LibrarySortState {
+  const LibrarySortState({this.field = LibrarySortField.title, this.descending = false});
+
+  final LibrarySortField field;
+  final bool descending;
+}
+
+final librarySortProvider = StateProvider<LibrarySortState>((ref) => const LibrarySortState());
+
+/// The Library tab's "Все" list: `libraryTracksProvider`, sorted in memory
+/// per [librarySortProvider]. A plain `List.sort` rather than a SQL
+/// `ORDER BY` — a personal music collection is at most a few thousand
+/// rows, cheap to sort client-side, and this avoids a family of near-
+/// identical repository queries for what's a pure display concern.
+final sortedLibraryTracksProvider = Provider<List<Track>>((ref) {
+  final tracks = <Track>[...ref.watch(libraryTracksProvider).value ?? const []];
+  final sort = ref.watch(librarySortProvider);
+
+  int compare(Track a, Track b) => switch (sort.field) {
+        LibrarySortField.title => a.displayTitle.toLowerCase().compareTo(b.displayTitle.toLowerCase()),
+        LibrarySortField.artist => a.displayArtist.toLowerCase().compareTo(b.displayArtist.toLowerCase()),
+        LibrarySortField.addedAt =>
+          (a.modifiedAt ?? DateTime(0)).compareTo(b.modifiedAt ?? DateTime(0)),
+      };
+  tracks.sort(sort.descending ? (a, b) => compare(b, a) : compare);
+  return tracks;
+});
+
 /// "Избранное" as a live view, not a maintained playlist (ТЗ п.6.5): a
 /// track appears here for exactly as long as its heart is toggled on,
-/// with no separate storage or upkeep beyond `favorites`.
+/// with no separate storage or upkeep beyond `favorites`. Sorted by
+/// [favoritedAtProvider], most recently favorited first.
 final favoriteTracksProvider = Provider<List<Track>>((ref) {
   final tracks = ref.watch(libraryTracksProvider).value ?? const [];
-  final favoriteIds = ref.watch(favoriteIdsProvider).value ?? const {};
-  return tracks.where((t) => favoriteIds.contains(t.id)).toList();
+  final favoritedAt = ref.watch(favoritedAtProvider).value ?? const {};
+  final favorites = tracks.where((t) => favoritedAt.containsKey(t.id)).toList()
+    ..sort((a, b) => favoritedAt[b.id]!.compareTo(favoritedAt[a.id]!));
+  return favorites;
 });
 
-/// Genres aren't stored anywhere of their own — this is just the distinct,
-/// non-empty `tracks.genre` values already loaded, so it stays in sync
-/// with the library for free.
-final genresProvider = Provider<List<String>>((ref) {
-  final tracks = ref.watch(libraryTracksProvider).value ?? const [];
-  final genres = <String>{
-    for (final t in tracks)
-      if (t.genre != null && t.genre!.trim().isNotEmpty) t.genre!.trim(),
-  };
-  return genres.toList()..sort();
-});
-
-final tracksByGenreProvider = Provider.family<List<Track>, String>((ref, genre) {
-  final tracks = ref.watch(libraryTracksProvider).value ?? const [];
-  return tracks.where((t) => t.genre?.trim() == genre).toList();
-});
+/// When each currently-favorited track was (last) favorited — powers the
+/// "newest first" order of [favoriteTracksProvider]. Separate from
+/// [favoriteIdsProvider] (a plain `Set<String>`, used everywhere for the
+/// heart-icon toggle state) since most call sites only need membership,
+/// not a timestamp.
+final favoritedAtProvider = StreamProvider<Map<String, DateTime>>(
+  (ref) => ref.watch(favoritesRepositoryProvider).watchFavoritedAt(),
+);
 
 /// Soft-deleted tracks ("Удалённые"): hidden from the library, file left
 /// alone on disk, restorable — see `TracksRepository.delete`/`.restore`.

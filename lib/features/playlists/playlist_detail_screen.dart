@@ -4,8 +4,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/providers.dart';
 import '../../core/theme/app_theme.dart';
 import '../../data/models/playlist.dart';
+import '../../data/models/playlist_track.dart';
 import '../library/providers/library_providers.dart';
 import '../library/widgets/track_tile.dart';
+import '../player/models/queue_source.dart';
+import '../player/providers/player_providers.dart';
 import 'providers/playlists_providers.dart';
 
 class PlaylistDetailScreen extends ConsumerWidget {
@@ -17,9 +20,15 @@ class PlaylistDetailScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final itemsAsync = ref.watch(playlistItemsProvider(playlistId));
+    final name = playlist?.name ??
+        (ref.watch(playlistsProvider).value ?? const [])
+            .cast<Playlist?>()
+            .firstWhere((p) => p?.id == playlistId, orElse: () => null)
+            ?.name ??
+        'Плейлист';
 
     return Scaffold(
-      appBar: AppBar(title: Text(playlist?.name ?? 'Плейлист')),
+      appBar: AppBar(title: Text(name)),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _showAddTrackSheet(context, ref),
         child: const Icon(Icons.playlist_add),
@@ -29,15 +38,20 @@ class PlaylistDetailScreen extends ConsumerWidget {
             ? const Center(
                 child: Text('В плейлисте пока нет треков', style: TextStyle(color: AppTheme.onSurfaceMuted)),
               )
-            : ListView.builder(
+            : ReorderableListView.builder(
                 itemCount: items.length,
+                onReorderItem: (oldIndex, newIndex) => _reorder(ref, items, oldIndex, newIndex),
                 itemBuilder: (context, index) {
                   final item = items[index];
                   return TrackTile(
+                    key: ValueKey(item.entryId),
                     track: item.track,
-                    onTap: () => ref
-                        .read(playerServiceProvider)
-                        .setQueue(items.map((e) => e.track).toList(), startIndex: index),
+                    onTap: () {
+                      ref.read(queueSourceProvider.notifier).state = PlaylistQueueSource(name);
+                      ref
+                          .read(playerServiceProvider)
+                          .setQueue(items.map((e) => e.track).toList(), startIndex: index);
+                    },
                     trailing: IconButton(
                       icon: const Icon(Icons.remove_circle_outline),
                       color: AppTheme.onSurfaceMuted,
@@ -50,6 +64,23 @@ class PlaylistDetailScreen extends ConsumerWidget {
         error: (error, _) => Center(child: Text('Ошибка: $error')),
       ),
     );
+  }
+
+  /// [newIndex] (via `onReorderItem`) already accounts for [oldIndex]'s
+  /// item being removed — it's the item's final index in the post-move
+  /// list. `moveEntry`'s `beforePosition`/`afterPosition` mean exactly
+  /// "the neighbour that should end up smaller/larger", so the
+  /// neighbours of that post-move list are exactly what it needs.
+  Future<void> _reorder(WidgetRef ref, List<PlaylistItem> items, int oldIndex, int newIndex) async {
+    final reordered = [...items];
+    final moved = reordered.removeAt(oldIndex);
+    reordered.insert(newIndex, moved);
+
+    final before = newIndex > 0 ? reordered[newIndex - 1].position : null;
+    final after = newIndex < reordered.length - 1 ? reordered[newIndex + 1].position : null;
+    await ref
+        .read(playlistsRepositoryProvider)
+        .moveEntry(moved.entryId, beforePosition: before, afterPosition: after);
   }
 
   Future<void> _showAddTrackSheet(BuildContext context, WidgetRef ref) async {

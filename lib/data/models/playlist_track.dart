@@ -30,15 +30,19 @@ class PlaylistTrack {
 
 /// A playlist entry joined with its track — what the UI actually renders
 /// (needs [entryId] to let the user remove *this* occurrence of a track,
-/// as opposed to the track itself).
+/// as opposed to the track itself, and [position] to compute a new
+/// fractional position for drag-and-drop reordering without an extra
+/// query — see `PlaylistsRepository.moveEntry`).
 class PlaylistItem {
-  const PlaylistItem({required this.entryId, required this.track});
+  const PlaylistItem({required this.entryId, required this.track, required this.position});
 
   final String entryId;
   final Track track;
+  final double position;
 
   factory PlaylistItem.fromRow(Map<String, Object?> row) => PlaylistItem(
         entryId: row['entry_id']! as String,
         track: Track.fromRow(row),
+        position: (row['position']! as num).toDouble(),
       );
 }

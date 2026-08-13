@@ -67,13 +67,34 @@ void main() {
     expect(await tracks.exists('t1'), isTrue);
   });
 
-  test('watchItems exposes the entry id alongside the joined track', () async {
+  test('watchItems exposes the entry id and position alongside the joined track', () async {
     final playlist = await playlists.create('Roadtrip');
     await playlists.addTrack(playlist.id, 't1');
 
     final items = await playlists.watchItems(playlist.id).first;
     expect(items.single.track.id, 't1');
     expect(items.single.entryId, isNotEmpty);
+    expect(items.single.position, isPositive);
+  });
+
+  test(
+      'moveEntry reorders using watchItems\' own position values — the drag-and-drop '
+      'path in PlaylistDetailScreen', () async {
+    final playlist = await playlists.create('Roadtrip');
+    await playlists.addTrack(playlist.id, 't1');
+    await playlists.addTrack(playlist.id, 't2');
+    await playlists.addTrack(playlist.id, 't3');
+
+    final items = await playlists.watchItems(playlist.id).first;
+    expect(items.map((i) => i.track.id), ['t1', 't2', 't3']);
+
+    // Drag t1 to the end: its new neighbours are t3 (before) and nothing
+    // (after) — exactly what PlaylistDetailScreen._reorder computes from
+    // the post-move list.
+    await playlists.moveEntry(items[0].entryId, beforePosition: items[2].position, afterPosition: null);
+
+    final reordered = await playlists.watchItems(playlist.id).first;
+    expect(reordered.map((i) => i.track.id), ['t2', 't3', 't1']);
   });
 
   test('delete removes the playlist and its entries', () async {

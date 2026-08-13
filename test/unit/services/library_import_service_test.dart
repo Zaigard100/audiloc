@@ -7,6 +7,7 @@ import 'package:audiloc/services/dedupe/dedupe_service.dart';
 import 'package:audiloc/services/library_import/library_import_service.dart';
 import 'package:audiloc/services/library_import/tag_reader.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:path/path.dart' as p;
 
 /// `audiotags` is a native FFI plugin; it isn't loadable under plain
 /// `flutter test`, so tests fake tag extraction and exercise the real
@@ -22,11 +23,13 @@ class _FakeTagReader extends TagReader {
 
 void main() {
   late Directory tempDir;
+  late Directory audioDir;
   late AudilocDatabase db;
   late TracksRepository tracksRepository;
 
   setUp(() async {
     tempDir = await Directory.systemTemp.createTemp('audiloc_import_test_');
+    audioDir = await Directory('${tempDir.path}/audio').create();
     db = await AudilocDatabase.openInMemory();
     tracksRepository = TracksRepository(db.crdt);
   });
@@ -48,6 +51,7 @@ void main() {
         dedupeService: DedupeService(),
         deviceId: 'device-1',
         coverCacheDir: tempDir,
+        audioStorageDir: audioDir,
       );
 
   test('imports files with distinct content as separate tracks', () async {
@@ -64,6 +68,22 @@ void main() {
     expect(result.skippedDuplicates, 0);
     final all = await tracksRepository.all();
     expect(all.map((t) => t.title), containsAll(['Song A', 'Song B']));
+  });
+
+  test(
+      'imported tracks are read from a copy in audioStorageDir, not the original path — '
+      'and the original file is left untouched (docs/adr/0014)', () async {
+    final original = await writeFile('a.mp3', [1, 2, 3]);
+    final service = buildService({original.path: const TrackTags(title: 'Song A')});
+
+    await service.importFiles([original]);
+    final track = (await tracksRepository.all()).single;
+
+    expect(track.path, isNot(original.path));
+    expect(p.isWithin(audioDir.path, track.path!), isTrue);
+    expect(await File(track.path!).readAsBytes(), [1, 2, 3]);
+    expect(await original.exists(), isTrue, reason: 'a copy, never a move — the user\'s own file is untouched');
+    expect(await original.readAsBytes(), [1, 2, 3]);
   });
 
   test('importing identical bytes twice does not duplicate (hash-based id)', () async {

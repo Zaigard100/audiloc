@@ -249,12 +249,37 @@ class TracksRepository {
     }
   }
 
-  Future<List<String>> allGenres() async {
-    final rows = await _crdt.query('''
-      SELECT DISTINCT genre FROM tracks
-      WHERE is_deleted = 0 AND genre IS NOT NULL AND genre != ''
-      ORDER BY genre
-    ''');
-    return rows.map((r) => r['genre']! as String).toList();
+  /// "Стереть навсегда" from Удалённые: deletes *this device's* actual
+  /// copy of the audio file (and cached cover, if any) from local
+  /// storage, and clears this device's `track_locations` row.
+  ///
+  /// This can never mean "erase everywhere" — `sql_crdt` always turns a
+  /// `DELETE` into `is_deleted = 1` (by design: an unconditional row wipe
+  /// would break sync for any other paired device that still has the
+  /// track), so the `tracks` row itself stays exactly as soft-deleted as
+  /// it already was. Restoring afterward is still possible, but since
+  /// the local file is gone, it now behaves like any other track without
+  /// a local copy: it needs `services/sync/files` to fetch it again from
+  /// a peer that still has it, if one exists.
+  Future<void> eraseFileFromDisk(String trackId) async {
+    final locationId = '$trackId:${_crdt.nodeId}';
+    final rows = await _crdt.query(
+      'SELECT path, cover_path FROM track_locations WHERE id = ?1 AND is_deleted = 0',
+      [locationId],
+    );
+    if (rows.isEmpty) return;
+
+    final path = rows.first['path'] as String?;
+    final coverPath = rows.first['cover_path'] as String?;
+    if (path != null) {
+      final file = File(path);
+      if (await file.exists()) await file.delete();
+    }
+    if (coverPath != null) {
+      final coverFile = File(coverPath);
+      if (await coverFile.exists()) await coverFile.delete();
+    }
+
+    await _crdt.execute('DELETE FROM track_locations WHERE id = ?1', [locationId]);
   }
 }

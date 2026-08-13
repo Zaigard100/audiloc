@@ -5,6 +5,8 @@ import '../../core/providers.dart';
 import '../../core/theme/app_theme.dart';
 import '../library/providers/library_providers.dart';
 import '../library/widgets/track_tile.dart';
+import '../player/models/queue_source.dart';
+import '../player/providers/player_providers.dart';
 
 /// Поиск tab (ТЗ п.6.2): filters the already-loaded local library in
 /// memory — the library is small enough (personal music collections, not
@@ -56,7 +58,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                     final track = results[index];
                     return TrackTile(
                       track: track,
-                      onTap: () => ref.read(playerServiceProvider).setQueue(results, startIndex: index),
+                      onTap: () {
+                        ref.read(queueSourceProvider.notifier).state = const LibraryQueueSource();
+                        ref.read(playerServiceProvider).setQueue(results, startIndex: index);
+                      },
                     );
                   },
                 ),

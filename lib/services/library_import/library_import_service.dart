@@ -34,11 +34,13 @@ class LibraryImportService {
     required DedupeService dedupeService,
     required String deviceId,
     required Directory coverCacheDir,
+    required Directory audioStorageDir,
   })  : _tracksRepository = tracksRepository,
         _tagReader = tagReader,
         _dedupeService = dedupeService,
         _deviceId = deviceId,
-        _coverCacheDir = coverCacheDir;
+        _coverCacheDir = coverCacheDir,
+        _audioStorageDir = audioStorageDir;
 
   static const supportedExtensions = {
     '.mp3',
@@ -56,6 +58,7 @@ class LibraryImportService {
   final DedupeService _dedupeService;
   final String _deviceId;
   final Directory _coverCacheDir;
+  final Directory _audioStorageDir;
 
   Future<LibraryImportResult> importDirectory(
     Directory dir, {
@@ -101,10 +104,14 @@ class LibraryImportService {
     final id = await _hashFile(file);
     if (existingTracks.any((t) => t.id == id)) return null;
 
+    // Tags are read from the original file (it's still right there,
+    // untouched) — only the audio bytes AudiLoc will actually play from
+    // get copied, so tag extraction doesn't wait on the copy.
     final tags = await _tagReader.read(file.path);
+    final storedPath = await _storeLocally(file, id);
     final candidate = Track(
       id: id,
-      path: file.path,
+      path: storedPath,
       title: tags?.title,
       artist: tags?.artist,
       album: tags?.album,
@@ -119,6 +126,25 @@ class LibraryImportService {
     if (duplicate != null) return null;
 
     return candidate;
+  }
+
+  /// Copies [file] into this device's own audio storage (the same
+  /// directory `services/sync/files` downloads P2P-fetched tracks into —
+  /// see docs/adr/0014) rather than referencing it at its original path,
+  /// so every track — manually imported or synced from a peer — is read
+  /// from one place this device fully controls. The original file is
+  /// never touched or deleted: this is a copy, not a move, precisely so
+  /// an import can never surprise the user by altering their own files.
+  /// Idempotent by construction — the destination name is the content
+  /// hash, so re-importing the same bytes just finds the copy already
+  /// there.
+  Future<String> _storeLocally(File file, String id) async {
+    final dest = File(p.join(_audioStorageDir.path, '$id${p.extension(file.path)}'));
+    if (!await dest.exists()) {
+      if (!await _audioStorageDir.exists()) await _audioStorageDir.create(recursive: true);
+      await file.copy(dest.path);
+    }
+    return dest.path;
   }
 
   Future<String> _hashFile(File file) async {

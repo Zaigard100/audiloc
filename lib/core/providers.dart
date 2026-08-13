@@ -112,12 +112,14 @@ final coverCacheDirProvider = FutureProvider<Directory>((ref) async {
 
 final libraryImportServiceProvider = FutureProvider<LibraryImportService>((ref) async {
   final coverDir = await ref.watch(coverCacheDirProvider.future);
+  final audioDir = await ref.watch(syncedMusicDirProvider.future);
   return LibraryImportService(
     tracksRepository: ref.watch(tracksRepositoryProvider),
     tagReader: TagReader(),
     dedupeService: ref.watch(dedupeServiceProvider),
     deviceId: ref.watch(selfDeviceProvider).id,
     coverCacheDir: coverDir,
+    audioStorageDir: audioDir,
   );
 });
 
@@ -152,12 +154,14 @@ final syncOrchestratorProvider = Provider<SyncOrchestrator>((ref) {
   return orchestrator;
 });
 
-/// Where files fetched from peers land — kept inside this profile's own
-/// storage so no platform-specific public-storage/SAF permissions are
-/// needed on Android (ТЗ: приложение должно быть самодостаточным), and so
-/// different profiles sharing a device never mix downloaded files.
-/// Manually imported files (via the folder picker) are untouched and stay
-/// wherever the user pointed at — this is only for P2P-downloaded copies.
+/// This profile's own audio storage — where files fetched from peers
+/// land, *and* (see docs/adr/0014) where `LibraryImportService` copies
+/// every manually imported track too. Every track this device plays is
+/// read from here, never from wherever the user originally pointed the
+/// folder/file picker at — kept inside this profile's own storage so no
+/// platform-specific public-storage/SAF permissions are needed on
+/// Android (ТЗ: приложение должно быть самодостаточным), and so
+/// different profiles sharing a device never mix files.
 final syncedMusicDirProvider = FutureProvider<Directory>((ref) async {
   final base = ref.watch(profileDirProvider);
   final dir = Directory(p.join(base.path, 'synced_music'));

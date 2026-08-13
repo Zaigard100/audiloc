@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:qr_flutter/qr_flutter.dart';
 
 import '../../core/providers.dart';
 import '../../core/theme/app_theme.dart';
@@ -11,10 +10,11 @@ import 'providers/devices_providers.dart';
 import 'widgets/device_tile.dart';
 import 'widgets/sync_badge.dart';
 
-/// Устройства tab (ТЗ п.6.3): known peers with online status, a QR code
-/// for pairing (carries this device's id — see
-/// docs/adr/0006-device-identity-without-asymmetric-crypto.md for what
-/// that id actually is), and manual sync.
+/// Устройства tab (ТЗ п.6.3): known (paired) peers with online status and
+/// manual sync. Pairing itself happens through LAN discovery +
+/// confirm-on-both-sides (docs/adr/0011-mutual-pairing-confirmation.md),
+/// not a QR code — there's never been a scanner to read one with, only a
+/// display, so it added a screen without adding a way to actually pair.
 class DevicesScreen extends ConsumerWidget {
   const DevicesScreen({super.key});
 
@@ -43,29 +43,6 @@ class DevicesScreen extends ConsumerWidget {
           ),
           const Divider(height: 1),
           const SyncBadge(),
-          Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: QrImageView(data: self.id, size: 180),
-                ),
-                const SizedBox(height: 12),
-                Text(self.name, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-                const SizedBox(height: 4),
-                const Text(
-                  'Покажите этот QR-код на другом устройстве, чтобы добавить его в список',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: AppTheme.onSurfaceMuted, fontSize: 12),
-                ),
-              ],
-            ),
-          ),
           const Padding(
             padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
             child: Text('Известные устройства', style: TextStyle(color: AppTheme.onSurfaceMuted)),

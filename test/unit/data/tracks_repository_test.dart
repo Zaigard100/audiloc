@@ -102,15 +102,6 @@ void main() {
     expect(tracks.single.id, track.id);
   });
 
-  test('allGenres returns distinct non-empty genres', () async {
-    await repository.upsert(track);
-    await repository.upsert(const Track(id: 'hash-2', path: '/music/b.mp3', genre: 'Rock'));
-    await repository.upsert(const Track(id: 'hash-3', path: '/music/c.mp3', genre: 'Jazz'));
-    await repository.upsert(const Track(id: 'hash-4', path: '/music/d.mp3'));
-
-    expect(await repository.allGenres(), unorderedEquals(['Rock', 'Jazz']));
-  });
-
   test(
       'importing the same content on two devices keeps each device on its own local path '
       'after merging the other device\'s sync (regression: path used to be clobbered '
@@ -314,6 +305,48 @@ void main() {
       await repository.backfillLocalCovers(dir);
 
       expect((await repository.byId('legacy-track'))!.coverPath, isNull);
+    });
+  });
+
+  group('eraseFileFromDisk ("Стереть навсегда", docs/adr/0014)', () {
+    test('deletes the local audio and cover files, and the track stops resolving locally', () async {
+      final dir = await Directory.systemTemp.createTemp('audiloc_erase_');
+      addTearDown(() => dir.delete(recursive: true));
+      final audioFile = File('${dir.path}/song.mp3')..writeAsBytesSync([1, 2, 3]);
+      final coverFile = File('${dir.path}/song.cover')..writeAsBytesSync([4, 5, 6]);
+
+      await repository.upsert(
+        Track(id: 'erase-me', path: audioFile.path, coverPath: coverFile.path, title: 'Song'),
+      );
+      await repository.delete('erase-me'); // "Стереть навсегда" is only reachable from Удалённые
+
+      await repository.eraseFileFromDisk('erase-me');
+
+      expect(await audioFile.exists(), isFalse);
+      expect(await coverFile.exists(), isFalse);
+      final erased = (await repository.watchDeleted().first).singleWhere((t) => t.id == 'erase-me');
+      expect(erased.path, isNull, reason: 'no longer resolves to a local copy on this device');
+      expect(erased.coverPath, isNull);
+    });
+
+    test('is a no-op when this device never had a local copy to begin with', () async {
+      // Nothing to erase — must not throw.
+      await repository.eraseFileFromDisk('never-had-it');
+    });
+
+    test('does not error when the file was already missing from disk (e.g. deleted by hand)', () async {
+      final dir = await Directory.systemTemp.createTemp('audiloc_erase_missing_');
+      addTearDown(() => dir.delete(recursive: true));
+      final audioFile = File('${dir.path}/song.mp3')..writeAsBytesSync([1, 2, 3]);
+
+      await repository.upsert(Track(id: 'erase-me', path: audioFile.path, title: 'Song'));
+      await repository.delete('erase-me');
+      await audioFile.delete(); // simulate the file already being gone
+
+      await repository.eraseFileFromDisk('erase-me'); // must not throw
+
+      final erased = (await repository.watchDeleted().first).singleWhere((t) => t.id == 'erase-me');
+      expect(erased.path, isNull);
     });
   });
 }

@@ -1,3 +1,4 @@
+import 'package:crdt/crdt.dart';
 import 'package:path/path.dart' as p;
 
 /// A single audio file in the local library.
@@ -23,6 +24,7 @@ class Track {
     this.coverPath,
     this.fileSize,
     this.addedOnDevice,
+    this.modifiedAt,
   });
 
   final String id;
@@ -36,6 +38,14 @@ class Track {
   final String? coverPath;
   final int? fileSize;
   final String? addedOnDevice;
+
+  /// Best-effort "date added" — the CRDT `modified` timestamp of this
+  /// track's own row, not a dedicated column. Accurate for the common
+  /// case (a track that was imported once and never touched again since
+  /// — favoriting lives in a separate `favorites` table, so it doesn't
+  /// bump this). Not settable via [copyWith]: it's a read-only artifact
+  /// of how the row was stored, not something callers construct by hand.
+  final DateTime? modifiedAt;
 
   Duration get duration => Duration(milliseconds: durationMs ?? 0);
 
@@ -74,6 +84,7 @@ class Track {
         coverPath: row['cover_path'] as String?,
         fileSize: row['file_size'] as int?,
         addedOnDevice: row['added_on_device'] as String?,
+        modifiedAt: (row['modified'] as String?)?.toHlc.dateTime,
       );
 
   Track copyWith({

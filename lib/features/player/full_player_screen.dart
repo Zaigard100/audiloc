@@ -7,6 +7,7 @@ import '../../core/providers.dart';
 import '../../core/theme/app_theme.dart';
 import '../../services/playback/player_service.dart';
 import '../library/providers/library_providers.dart';
+import 'models/queue_source.dart';
 import 'providers/player_providers.dart';
 
 /// Full-screen player (ТЗ п.6.1): reached by swiping up / tapping the mini
@@ -22,6 +23,7 @@ class FullPlayerScreen extends ConsumerWidget {
     final isFavorite = track == null
         ? false
         : ref.watch(favoriteIdsProvider).value?.contains(track.id) ?? false;
+    final queueSource = ref.watch(queueSourceProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -75,6 +77,14 @@ class FullPlayerScreen extends ConsumerWidget {
                             textAlign: TextAlign.center,
                             style: const TextStyle(color: AppTheme.onSurfaceMuted, fontSize: 15),
                           ),
+                          if (_sourceLabel(queueSource) case final label?) ...[
+                            const SizedBox(height: 8),
+                            Text(
+                              label,
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(color: AppTheme.onSurfaceMuted, fontSize: 12),
+                            ),
+                          ],
                           const SizedBox(height: 16),
                           _SeekBar(position: position, onSeek: (d) => ref.read(playerServiceProvider).seek(d)),
                           Row(
@@ -114,6 +124,13 @@ class FullPlayerScreen extends ConsumerWidget {
             ),
     );
   }
+
+  String? _sourceLabel(QueueSource? source) => switch (source) {
+        null => null,
+        LibraryQueueSource() => 'Играет: Библиотека',
+        FavoritesQueueSource() => 'Играет: Избранное',
+        PlaylistQueueSource(:final name) => 'Играет: Плейлист «$name»',
+      };
 }
 
 class _SeekBar extends StatelessWidget {

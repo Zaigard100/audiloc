@@ -15,6 +15,16 @@ class FavoritesRepository {
       .watch('SELECT track_id FROM favorites WHERE is_deleted = 0 AND is_favorite = 1')
       .map((rows) => rows.map((r) => r['track_id']! as String).toSet());
 
+  /// When each currently-favorited track was (last) favorited — the CRDT
+  /// `modified` timestamp of its `favorites` row, which updates on every
+  /// toggle (including re-favoriting after unfavoriting). Powers "newest
+  /// favorited first" ordering in the UI.
+  Stream<Map<String, DateTime>> watchFavoritedAt() => _crdt
+      .watch('SELECT track_id, modified FROM favorites WHERE is_deleted = 0 AND is_favorite = 1')
+      .map((rows) => {
+            for (final r in rows) (r['track_id']! as String): (r['modified']! as String).toHlc.dateTime,
+          });
+
   Future<bool> isFavorite(String trackId) async {
     final rows = await _crdt.query('''
       SELECT is_favorite FROM favorites
