@@ -50,10 +50,16 @@ Future<void> main() async {
     playerServiceProvider.overrideWithValue(playerService),
   ]);
 
-  // LAN discovery + metadata sync + file transfer all start in the
-  // background and never block the UI (ТЗ п.7: offline-first, sync is a
-  // bonus, not a gate).
+  // LAN discovery + metadata sync + file transfer + pairing all start in
+  // the background and never block the UI (ТЗ п.7: offline-first, sync is
+  // a bonus, not a gate).
   unawaited(container.read(syncOrchestratorProvider).start(metadataSyncPort));
+  unawaited(container.read(pairingServerProvider).start());
+  // Forces PairingService to exist now rather than whenever some widget
+  // first reads it — its constructor is what subscribes to the (broadcast,
+  // so no-replay) responses stream, and a pairing response arriving before
+  // anyone's listening would otherwise be silently lost.
+  container.read(pairingServiceProvider);
   unawaited(() async {
     // Repair pre-existing local tracks that predate track_locations (or
     // this device's own row in it) before anything starts treating them

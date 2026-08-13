@@ -24,14 +24,44 @@ class DeviceTile extends ConsumerWidget {
       ),
       title: Text(device.name),
       subtitle: Text(isOnline ? 'В сети' : _lastSeenLabel(device)),
-      trailing: isOnline
-          ? IconButton(
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (isOnline)
+            IconButton(
               icon: const Icon(Icons.sync),
               tooltip: 'Синхронизировать сейчас',
               onPressed: () => _syncNow(ref),
-            )
-          : null,
+            ),
+          IconButton(
+            icon: const Icon(Icons.link_off),
+            tooltip: 'Отвязать устройство',
+            onPressed: () => _confirmUnpair(context, ref),
+          ),
+        ],
+      ),
     );
+  }
+
+  Future<void> _confirmUnpair(BuildContext context, WidgetRef ref) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Отвязать устройство?'),
+        content: Text(
+          '«${device.name}» перестанет синхронизироваться с этим устройством. '
+          'Чтобы связать их снова, потребуется новое подтверждение с обеих сторон.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Отмена')),
+          TextButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Отвязать')),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    await ref.read(metadataSyncServiceProvider).disconnectFromPeer(device.id);
+    await ref.read(devicesRepositoryProvider).delete(device.id);
   }
 
   String _lastSeenLabel(Device device) {

@@ -4,11 +4,55 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/providers.dart';
 import '../../../data/models/device.dart';
+import '../../../services/sync/discovery/discovered_peer.dart';
 import '../../../services/sync/discovery/discovery_event.dart';
 import '../../../services/sync/metadata/sync_stats.dart';
+import '../../../services/sync/pairing/pairing_models.dart';
 
 final knownDevicesProvider = StreamProvider<List<Device>>(
   (ref) => ref.watch(devicesRepositoryProvider).watchAll(),
+);
+
+/// Every peer currently visible on the LAN via mDNS, paired or not —
+/// raw discovery state, same source `onlineDeviceIdsProvider` taps.
+final nearbyPeersProvider = StreamProvider<Map<String, DiscoveredPeer>>((ref) {
+  final discovery = ref.watch(discoveryServiceProvider);
+  final peers = <String, DiscoveredPeer>{};
+  final controller = StreamController<Map<String, DiscoveredPeer>>.broadcast();
+
+  final sub = discovery.events.listen((event) {
+    switch (event) {
+      case PeerFound(:final peer):
+        peers[peer.deviceId] = peer;
+      case PeerLost(:final deviceId):
+        peers.remove(deviceId);
+    }
+    controller.add(Map.of(peers));
+  });
+
+  ref.onDispose(() {
+    sub.cancel();
+    controller.close();
+  });
+
+  return controller.stream;
+});
+
+/// Peers seen nearby that aren't in `devices` yet — candidates for
+/// "Найдено рядом" (see docs/adr/0011-mutual-pairing-confirmation.md).
+/// `SyncOrchestrator` deliberately never auto-adds these; this is purely
+/// for the UI to offer a "Добавить" action.
+final unpairedNearbyPeersProvider = Provider<List<DiscoveredPeer>>((ref) {
+  final nearby = ref.watch(nearbyPeersProvider).value ?? const {};
+  final pairedIds = (ref.watch(knownDevicesProvider).value ?? const []).map((d) => d.id).toSet();
+  return [for (final peer in nearby.values) if (!pairedIds.contains(peer.deviceId)) peer];
+});
+
+/// Requests from other devices waiting for this device's user to
+/// approve/reject — the app shell listens to this to pop up a dialog no
+/// matter which tab is open.
+final incomingPairingRequestsProvider = StreamProvider<IncomingPairingRequest>(
+  (ref) => ref.watch(pairingServiceProvider).incomingRequests,
 );
 
 /// Live online/offline state, built from raw discovery events — never

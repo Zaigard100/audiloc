@@ -25,8 +25,12 @@ lib/
       metadata/               — crdt_sync: обмен CRDT-дельтами
       files/                  — встроенный HTTP-сервер/клиент передачи
                                  файлов (docs/adr/0010), без сторонних программ
+      pairing/                — запрос/подтверждение сопряжения с обеих
+                                 сторон, прежде чем синк вообще начнётся
+                                 (docs/adr/0011)
       device_identity_service — стабильный id этого устройства
-      sync_orchestrator       — клей: discovery → metadata sync → devices
+      sync_orchestrator       — клей: discovery → metadata sync → devices,
+                                 но только для уже сопряжённых (docs/adr/0011)
   features/
     library/ playlists/ search/ devices/ player/ shell/
                               — экраны, виджеты, feature-провайдеры
@@ -67,15 +71,19 @@ flowchart LR
     A[Устройство A] -- mDNS TXT: id, port --> Bonsoir((LAN mDNS))
     Bonsoir -- PeerFound --> B[Устройство B: DiscoveryService]
     B --> Orch[SyncOrchestrator]
-    Orch -- upsert + connectToPeer --> Sync[MetadataSyncService]
-    Sync -- CrdtSyncClient ws:// --> ServerA[Устройство A: crdt_sync listen()]
-    ServerA -- changeset --> DB_A[(sqlite_crdt A)]
+    Orch -- "уже сопряжён? upsert + connectToPeer" --> Sync[MetadataSyncService]
+    Sync -- CrdtSyncClient ws:// --> ServerA[Устройство A: crdt_sync]
+    ServerA -- "peerId в devices? иначе close()" --> DB_A[(sqlite_crdt A)]
     Sync -- changeset --> DB_B[(sqlite_crdt B)]
 ```
 
 Оба устройства симметричны: каждое одновременно слушает входящие
 подключения и подключается исходящим `CrdtSyncClient` к обнаруженным
-пирам ([ADR 0005](adr/0005-crdt-sync-for-p2p-metadata.md)).
+пирам ([ADR 0005](adr/0005-crdt-sync-for-p2p-metadata.md)). Ни один из
+этих путей не запускается автоматически для несопряжённого пира —
+обнаружение сначала должно пройти через ручное подтверждение с обеих
+сторон ([ADR 0011](adr/0011-mutual-pairing-confirmation.md), модуль
+`sync/pairing/`).
 Файлы по этому каналу не идут — только CRDT-дельты; за сами файлы
 отвечает встроенный `FileTransferServer`/`FileTransferClient` отдельным
 HTTP-каналом ([ADR 0010](adr/0010-built-in-file-transfer.md)):

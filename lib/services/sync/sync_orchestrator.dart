@@ -7,10 +7,16 @@ import 'discovery/discovery_service.dart';
 import 'metadata/metadata_sync_service.dart';
 import 'metadata/sync_stats.dart';
 
-/// The "клей" (glue, ТЗ п.4) between discovery and metadata sync: when a
-/// known-or-new peer appears on the LAN, remember/refresh it in `devices`
-/// and open a sync connection automatically (ТЗ п.7 — no manual action
-/// required); when it disappears, tear the connection down.
+/// The "клей" (glue, ТЗ п.4) between discovery and metadata sync: when an
+/// *already paired* peer appears on the LAN, refresh it in `devices` and
+/// open a sync connection automatically (ТЗ п.7 — no manual action
+/// required once paired); when it disappears, tear the connection down.
+///
+/// Peers that aren't paired yet are deliberately left alone here — see
+/// docs/adr/0011-mutual-pairing-confirmation.md. `PairingService` is what
+/// turns a first-seen peer into a `devices` row (with the user's
+/// confirmation on both sides); this class only ever auto-syncs peers
+/// that already made it into that table.
 class SyncOrchestrator {
   SyncOrchestrator({
     required DiscoveryService discoveryService,
@@ -44,6 +50,11 @@ class SyncOrchestrator {
   Future<void> _handleDiscoveryEvent(DiscoveryEvent event) async {
     switch (event) {
       case PeerFound(:final peer):
+        // Only already-paired peers auto-sync — an unpaired one showing
+        // up here is surfaced to the UI separately (nearbyPeersProvider)
+        // so the user can send/receive a pairing request for it instead.
+        final existing = await _devicesRepository.byId(peer.deviceId);
+        if (existing == null) return;
         await _devicesRepository.upsert(Device(
           id: peer.deviceId,
           name: peer.name,

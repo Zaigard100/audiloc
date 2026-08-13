@@ -83,11 +83,53 @@ class DevicesScreen extends ConsumerWidget {
               child: Text('Ошибка: $error'),
             ),
           ),
+          const _NearbyUnpairedPeers(),
           const Divider(height: 32),
           const _FileSyncStatus(),
           const SizedBox(height: 24),
         ],
       ),
+    );
+  }
+}
+
+/// Peers visible on the LAN that this device hasn't paired with yet — see
+/// docs/adr/0011-mutual-pairing-confirmation.md. Nothing here syncs until
+/// the *other* side also confirms.
+class _NearbyUnpairedPeers extends ConsumerWidget {
+  const _NearbyUnpairedPeers();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final nearby = ref.watch(unpairedNearbyPeersProvider);
+    if (nearby.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Padding(
+          padding: EdgeInsets.fromLTRB(16, 8, 16, 8),
+          child: Text('Найдено рядом', style: TextStyle(color: AppTheme.onSurfaceMuted)),
+        ),
+        for (final peer in nearby)
+          ListTile(
+            leading: const CircleAvatar(
+              backgroundColor: AppTheme.surfaceHigh,
+              child: Icon(Icons.wifi_tethering, color: AppTheme.onSurfaceMuted),
+            ),
+            title: Text(peer.name),
+            subtitle: const Text('Не сопряжено'),
+            trailing: TextButton(
+              onPressed: () {
+                ref.read(pairingServiceProvider).requestPairing(peer);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Запрос на сопряжение отправлен «${peer.name}»')),
+                );
+              },
+              child: const Text('Добавить'),
+            ),
+          ),
+      ],
     );
   }
 }

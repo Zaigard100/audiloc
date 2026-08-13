@@ -21,6 +21,9 @@ import '../services/sync/files/file_sync_service.dart';
 import '../services/sync/files/file_transfer_client.dart';
 import '../services/sync/files/file_transfer_server.dart';
 import '../services/sync/metadata/metadata_sync_service.dart';
+import '../services/sync/pairing/pairing_client.dart';
+import '../services/sync/pairing/pairing_server.dart';
+import '../services/sync/pairing/pairing_service.dart';
 import '../services/sync/sync_orchestrator.dart';
 
 /// Central dependency wiring.
@@ -89,13 +92,17 @@ final discoveryServiceProvider = Provider<DiscoveryService>((ref) {
 
 final metadataSyncServiceProvider = Provider<MetadataSyncService>((ref) {
   final db = ref.watch(databaseProvider);
-  final service = MetadataSyncService(crdt: db.crdt);
+  final service = MetadataSyncService(
+    crdt: db.crdt,
+    devicesRepository: ref.watch(devicesRepositoryProvider),
+  );
   ref.onDispose(service.dispose);
   return service;
 });
 
 const metadataSyncPort = 8541;
 const fileTransferPort = 8542;
+const pairingPort = 8543;
 
 final syncOrchestratorProvider = Provider<SyncOrchestrator>((ref) {
   final orchestrator = SyncOrchestrator(
@@ -141,6 +148,32 @@ final fileSyncServiceProvider = FutureProvider<FileSyncService>((ref) async {
     client: ref.watch(fileTransferClientProvider),
     downloadsDir: downloadsDir,
     filePort: fileTransferPort,
+  );
+  ref.onDispose(service.dispose);
+  return service;
+});
+
+final pairingServerProvider = Provider<PairingServer>((ref) {
+  final server = PairingServer(port: pairingPort);
+  ref.onDispose(server.dispose);
+  return server;
+});
+
+final pairingClientProvider = Provider<PairingClient>((ref) => PairingClient());
+
+/// Turns a discovered-but-unpaired peer into a `devices` row, only after
+/// both sides confirm — see docs/adr/0011-mutual-pairing-confirmation.md.
+final pairingServiceProvider = Provider<PairingService>((ref) {
+  final self = ref.watch(selfDeviceProvider);
+  final service = PairingService(
+    server: ref.watch(pairingServerProvider),
+    client: ref.watch(pairingClientProvider),
+    devicesRepository: ref.watch(devicesRepositoryProvider),
+    metadataSyncService: ref.watch(metadataSyncServiceProvider),
+    selfId: self.id,
+    selfName: self.name,
+    pairingPort: pairingPort,
+    metadataSyncPort: metadataSyncPort,
   );
   ref.onDispose(service.dispose);
   return service;

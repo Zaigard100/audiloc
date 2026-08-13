@@ -5,6 +5,7 @@ import 'package:crdt/crdt.dart';
 import 'package:crdt_sync/crdt_sync.dart';
 import 'package:crdt_sync/crdt_sync_server.dart' as crdt_sync_server;
 
+import '../../../data/repositories/devices_repository.dart';
 import 'sync_stats.dart';
 
 enum PeerSyncState { connecting, connected, disconnected }
@@ -28,9 +29,12 @@ enum PeerSyncState { connecting, connected, disconnected }
 /// directly. As a side benefit we keep the `HttpServer` handle, so
 /// [dispose] can actually close it — `listen()` doesn't expose one.
 class MetadataSyncService {
-  MetadataSyncService({required Crdt crdt, this.port = 8541}) : _crdt = crdt;
+  MetadataSyncService({required Crdt crdt, required DevicesRepository devicesRepository, this.port = 8541})
+      : _crdt = crdt,
+        _devicesRepository = devicesRepository;
 
   final Crdt _crdt;
+  final DevicesRepository _devicesRepository;
   final int port;
 
   final _clients = <String, CrdtSyncClient>{};
@@ -69,7 +73,8 @@ class MetadataSyncService {
           request,
           onConnect: (crdtSync, _) {
             final peerId = crdtSync.peerId;
-            if (peerId != null) _setState(peerId, PeerSyncState.connected);
+            if (peerId == null) return;
+            unawaited(_authorizeOrReject(crdtSync, peerId));
           },
           onDisconnect: (peerId, code, reason) => _setState(peerId, PeerSyncState.disconnected),
           onChangesetReceived: (nodeId, counts) => _reportStats(nodeId, counts),
@@ -78,6 +83,19 @@ class MetadataSyncService {
         // A single bad handshake/upgrade shouldn't kill the accept loop.
       }
     }());
+  }
+
+  /// Refuses the connection unless [peerId] is a device this side has
+  /// paired with (see docs/adr/0011-mutual-pairing-confirmation.md) —
+  /// closing happens before `crdt_sync` gets to building/sending its
+  /// first changeset, so an unpaired peer never actually receives data.
+  Future<void> _authorizeOrReject(CrdtSync crdtSync, String peerId) async {
+    final paired = await _devicesRepository.byId(peerId) != null;
+    if (!paired) {
+      await crdtSync.close();
+      return;
+    }
+    _setState(peerId, PeerSyncState.connected);
   }
 
   /// Opens (or reuses) an outbound sync connection to a peer discovered on
