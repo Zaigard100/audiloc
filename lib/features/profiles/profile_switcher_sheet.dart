@@ -218,7 +218,26 @@ class _ProfileSwitcherSheetState extends ConsumerState<_ProfileSwitcherSheet> {
     );
     if (confirmed != true) return;
 
-    await ref.read(profilesStoreProvider).delete(profile.id);
-    _refresh();
+    // The registry write (unregistering) and the directory erasure are
+    // two separate steps inside ProfilesStore.delete() — if the second
+    // one throws (a file still locked by something, a permissions
+    // hiccup, whatever), the first already succeeded. Without a
+    // try/finally here, that exception would propagate up out of this
+    // unawaited-from-IconButton call, get silently dropped by the
+    // framework's error zone, and _refresh() would never run — the sheet
+    // would keep showing the "deleted" profile until it happened to
+    // rebuild for some unrelated reason (e.g. reopened fresh). Always
+    // refresh, and always surface a real failure instead of hiding it.
+    try {
+      await ref.read(profilesStoreProvider).delete(profile.id);
+    } catch (error) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Профиль удалён из списка, но часть файлов стереть не удалось: $error')),
+        );
+      }
+    } finally {
+      _refresh();
+    }
   }
 }

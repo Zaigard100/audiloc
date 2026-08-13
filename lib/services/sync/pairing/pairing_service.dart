@@ -115,11 +115,32 @@ class PairingService {
 
   /// The user approved an incoming request — only ever called for a
   /// request that reached [incomingRequests], so it's already known to be
-  /// legitimate (same profile, or an explicitly-allowed join). Always
-  /// acknowledges first, then either pairs directly (same profile
-  /// already) or hands off to [onJoinDifferentProfile] to switch this
-  /// device onto the requester's profile before pairing.
+  /// legitimate (same profile, or an explicitly-allowed join).
+  ///
+  /// Same profile: acknowledge and pair immediately, under this device's
+  /// current (and, since the hash matches, permanent) identity.
+  ///
+  /// Different profile: **does not respond here at all** — this
+  /// [PairingService] instance belongs to a session that [onJoinDifferentProfile]
+  /// is about to close, and a CRDT node id is per-database, not
+  /// per-device (docs/adr/0013-account-profiles.md): the identity
+  /// (`_selfId`/`_selfName`) this instance would respond with is about to
+  /// become permanently stale the moment the switch happens. Responding
+  /// now would leave the requester holding a `devices` row for an id that
+  /// no longer exists anywhere, which nothing ever cleans up — the
+  /// requester would show two entries for what's really one device: a
+  /// dead one under the old name, and (once sync catches up, if it even
+  /// gets authorized to — the requester never learns the new id any
+  /// other way) a live one under the new name. `onJoinDifferentProfile`
+  /// is expected to switch profiles and then call `approve` *again*, this
+  /// time on the new session's `PairingService` — where the hash matches
+  /// by construction, so it responds and pairs correctly, exactly once,
+  /// under the one identity that's actually going to stick around.
   Future<void> approve(IncomingPairingRequest request) async {
+    if (request.profileHash != _selfProfileHash) {
+      await _onJoinDifferentProfile(request);
+      return;
+    }
     await _client.sendResponse(
       host: request.fromHost,
       port: pairingPort,
@@ -128,12 +149,7 @@ class PairingService {
       accepted: true,
       profileHash: _selfProfileHash,
     );
-
-    if (request.profileHash == _selfProfileHash) {
-      await _pair(id: request.fromId, name: request.fromName, host: request.fromHost);
-    } else {
-      await _onJoinDifferentProfile(request);
-    }
+    await _pair(id: request.fromId, name: request.fromName, host: request.fromHost);
   }
 
   /// The user declined — nothing is written to `devices`, just tell the
@@ -146,14 +162,6 @@ class PairingService {
         accepted: false,
         profileHash: _selfProfileHash,
       );
-
-  /// Pairs [id]/[name]/[host] into whatever profile is *currently*
-  /// active, without sending a response — for use by the app shell right
-  /// after switching into the profile an [approve]'d request asked to
-  /// join: the response was already sent by the pre-switch `approve()`
-  /// call, on the (now-closed) old session's `PairingService`.
-  Future<void> pairWithoutResponding({required String id, required String name, required String host}) =>
-      _pair(id: id, name: name, host: host);
 
   Future<void> _handleResponse(PairingResponse response) async {
     if (!response.accepted) return;

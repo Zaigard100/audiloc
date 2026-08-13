@@ -124,10 +124,15 @@ class _AudilocAppState extends State<AudilocApp> {
   /// doesn't match the one currently active (only reachable while
   /// `_awaitingProfileAdoption` is true — docs/adr/0017-forbid-cross-profile-pairing-and-sharing.md).
   /// Finds (or creates) a local copy of the requester's profile, switches
-  /// onto it if it isn't already active, then pairs the requester in —
-  /// the switch alone is what turns "two independent libraries" into
-  /// "download the requester's library into this now-empty-or-matching
-  /// profile" via the ordinary CRDT sync that follows.
+  /// onto it if it isn't already active, then re-runs `approve` on the
+  /// *new* session's `PairingService` — the switch alone is what turns
+  /// "two independent libraries" into "download the requester's library
+  /// into this now-empty-or-matching profile" via the ordinary CRDT sync
+  /// that follows, and re-approving (rather than pairing directly) is
+  /// what makes sure the response the requester gets carries this
+  /// device's real, permanent identity in the new database — not the
+  /// placeholder identity that's about to stop existing (see
+  /// `PairingService.approve`'s doc for why that distinction matters).
   Future<void> _joinProfileForPairing(IncomingPairingRequest request) async {
     final store = _profilesStore!;
     final target = await store.findByHash(request.profileHash) ??
@@ -140,9 +145,7 @@ class _AudilocAppState extends State<AudilocApp> {
 
     final session = _session;
     if (session == null) return; // shouldn't happen, but never crash on it
-    await session.container
-        .read(pairingServiceProvider)
-        .pairWithoutResponding(id: request.fromId, name: request.fromName, host: request.fromHost);
+    await session.container.read(pairingServiceProvider).approve(request);
   }
 
   Future<void> _openProfile(String profileId) async {

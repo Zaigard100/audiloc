@@ -81,8 +81,39 @@ class ProfilesStore {
       profiles: [for (final p in state.profiles) if (p.id != id) p],
       activeProfileId: state.activeProfileId == id ? null : state.activeProfileId,
     ));
-    final dir = profileDir(id);
-    if (await dir.exists()) await dir.delete(recursive: true);
+    await _eraseDirectory(profileDir(id));
+  }
+
+  /// Best-effort recursive delete: removes every entry it can rather than
+  /// giving up the moment *one* can't be removed. A single
+  /// `Directory.delete(recursive: true)` call aborts entirely on its
+  /// first error — one locked/busy file (a leftover open handle from
+  /// something that was recently playing this profile's audio, say)
+  /// would otherwise leave the rest of a profile's files — its whole
+  /// database, every other track — sitting there untouched for no
+  /// reason. Rethrows only after the whole tree has been attempted, so a
+  /// caller that lets the error propagate still ends up with the
+  /// smallest possible leftover mess, not the largest.
+  Future<void> _eraseDirectory(Directory dir) async {
+    if (!await dir.exists()) return;
+    Object? firstError;
+    await for (final entity in dir.list(followLinks: false)) {
+      try {
+        if (entity is Directory) {
+          await _eraseDirectory(entity);
+        } else {
+          await entity.delete();
+        }
+      } catch (error) {
+        firstError ??= error;
+      }
+    }
+    try {
+      await dir.delete();
+    } catch (error) {
+      firstError ??= error;
+    }
+    if (firstError != null) throw firstError;
   }
 
   /// True only for a genuinely fresh install: no profiles registered yet

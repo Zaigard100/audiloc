@@ -43,7 +43,17 @@ Future<void> showEditTrackDialog(BuildContext context, WidgetRef ref, Track trac
                     final pickedPath = result?.files.single.path;
                     if (pickedPath == null) return;
                     final cacheDir = await ref.read(coverCacheDirProvider.future);
-                    final dest = File(p.join(cacheDir.path, '${track.id}.cover'));
+                    // A unique filename per pick, not the track's usual
+                    // `<id>.cover` — reusing that exact path would leave
+                    // both this preview and every other widget showing
+                    // this track's cover (TrackTile, mini player, ...)
+                    // stuck on Flutter's `FileImage` cache, which keys
+                    // purely on the path string and has no idea the bytes
+                    // underneath just changed. A fresh path is a
+                    // guaranteed cache miss everywhere, immediately.
+                    final dest = File(
+                      p.join(cacheDir.path, '${track.id}-${DateTime.now().millisecondsSinceEpoch}.cover'),
+                    );
                     await File(pickedPath).copy(dest.path);
                     setState(() => coverPath = dest.path);
                   },

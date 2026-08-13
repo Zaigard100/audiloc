@@ -66,6 +66,24 @@ void main() {
     expect(await store.profileDir(profile.id).exists(), isFalse);
   });
 
+  test(
+      'delete erases nested subdirectories too, not just top-level files — covers/ and '
+      'synced_music/ specifically (regression: a manual recursive walk replaced a single '
+      'Directory.delete(recursive: true) call, see docs/adr/0019-pairing-identity-and-cover-cache-fixes.md)',
+      () async {
+    final profile = await store.create('Мама');
+    final profileDir = store.profileDir(profile.id);
+    await File(p.join(profileDir.path, 'audiloc.db')).writeAsBytes([1, 2, 3]);
+    final coversDir = Directory(p.join(profileDir.path, 'covers'))..createSync();
+    await File(p.join(coversDir.path, 'track-1.cover')).writeAsBytes([9, 9]);
+    final musicDir = Directory(p.join(profileDir.path, 'synced_music'))..createSync();
+    await File(p.join(musicDir.path, 'song.mp3')).writeAsBytes([7, 7, 7]);
+
+    await store.delete(profile.id);
+
+    expect(await profileDir.exists(), isFalse);
+  });
+
   test('delete clears activeProfileId if it pointed at the deleted profile', () async {
     final profile = await store.create('Мама');
     await store.setActiveProfileId(profile.id);

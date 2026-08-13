@@ -157,10 +157,35 @@ void main() {
     });
 
     test(
-        'approve() with a *different* profile hash defers to onJoinDifferentProfile instead of '
-        'pairing directly — reachable only for a request that already made it past the '
-        'canJoinDifferentProfile filter (docs/adr/0017-forbid-cross-profile-pairing-and-sharing.md)',
+        'approve() with a *different* profile hash defers entirely to onJoinDifferentProfile — no '
+        'response, no pairing, from *this* (about-to-be-stale) identity (regression: a premature '
+        "response here left the requester with a ghost device entry under the old identity's "
+        'name that nothing ever cleaned up — docs/adr/0019-pairing-identity-and-cover-cache-fixes.md)',
         () async {
+      const request = IncomingPairingRequest(
+        fromId: 'peer-9',
+        fromName: 'Peer',
+        fromHost: '127.0.0.1',
+        profileHash: 'hash-other',
+      );
+      final responses = <bool>[];
+      server.responses.listen((r) => responses.add(r.accepted));
+
+      await service.approve(request);
+
+      expect(await devices.byId('peer-9'), isNull, reason: 'not paired into the current profile');
+      expect(joinCalls, [request]);
+      // Give any (unexpected) response a moment to arrive before asserting
+      // none did — approve() must not answer under an identity that's
+      // about to become permanently stale.
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+      expect(responses, isEmpty);
+    });
+
+    test(
+        're-calling approve() on a *new* session after onJoinDifferentProfile switches profiles '
+        'responds and pairs correctly, exactly once, under the new identity — the actual '
+        'end-to-end flow AudilocApp._joinProfileForPairing drives', () async {
       const request = IncomingPairingRequest(
         fromId: 'peer-9',
         fromName: 'Peer',
@@ -169,13 +194,34 @@ void main() {
       );
       final echoedResponse = server.responses.first.timeout(const Duration(seconds: 5));
 
+      // First call: different profile, defers — nothing happens yet.
       await service.approve(request);
+      // Simulates AudilocApp switching profiles and building a *new*
+      // PairingService whose selfProfileHash now matches the request
+      // (that's the whole point of the switch) — same server/devices/
+      // metadataSync here for simplicity, a real switch would use a
+      // fresh database too, but that's orthogonal to what this is
+      // testing: that re-approving answers and pairs exactly once.
+      final newSession = PairingService(
+        server: server,
+        client: PairingClient(),
+        devicesRepository: devices,
+        metadataSyncService: metadataSync,
+        selfId: db.nodeId,
+        selfName: 'This Device',
+        selfProfileHash: request.profileHash,
+        onJoinDifferentProfile: (_) async => fail('should not recurse — hash matches now'),
+        canJoinDifferentProfile: () async => false,
+        pairingPort: pairingPort,
+        metadataSyncPort: metadataPort,
+      );
+      addTearDown(newSession.dispose);
 
-      expect(await devices.byId('peer-9'), isNull, reason: 'not paired into the current profile');
-      expect(joinCalls, [request]);
-      // The response is still sent immediately, before the join/switch —
-      // the requester shouldn't have to wait on the accepting side's
-      // profile bookkeeping to know its request was accepted.
+      await newSession.approve(request);
+
+      final paired = await devices.byId('peer-9');
+      expect(paired, isNotNull);
+      expect(paired!.name, 'Peer');
       expect((await echoedResponse).accepted, isTrue);
     });
 
@@ -221,21 +267,6 @@ void main() {
       await Future<void>.delayed(const Duration(milliseconds: 300));
       expect(seen, hasLength(1));
       expect(seen.single.fromId, 'peer-9');
-    });
-
-    test('pairWithoutResponding pairs the requester without sending any response', () async {
-      final responses = <bool>[];
-      server.responses.listen((r) => responses.add(r.accepted));
-
-      await service.pairWithoutResponding(id: 'peer-9', name: 'Peer', host: '127.0.0.1');
-
-      final paired = await devices.byId('peer-9');
-      expect(paired, isNotNull);
-      expect(paired!.name, 'Peer');
-      // Give any (unexpected) response a moment to arrive before asserting
-      // none did.
-      await Future<void>.delayed(const Duration(milliseconds: 300));
-      expect(responses, isEmpty);
     });
 
     test('reject() does not pair, but still answers with accepted: false', () async {

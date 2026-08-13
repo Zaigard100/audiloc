@@ -35,7 +35,12 @@ Future<void> showPlaylistCoverPicker(BuildContext context, WidgetRef ref, Playli
               final pickedPath = result?.files.single.path;
               if (pickedPath == null) return;
               final cacheDir = await ref.read(coverCacheDirProvider.future);
-              final dest = File(p.join(cacheDir.path, 'playlist-${playlist.id}.cover'));
+              // Unique filename per pick — reusing the same path across
+              // edits would leave Flutter's path-keyed `FileImage` cache
+              // stuck on the old bytes (same fix as edit_track_dialog.dart).
+              final dest = File(
+                p.join(cacheDir.path, 'playlist-${playlist.id}-${DateTime.now().millisecondsSinceEpoch}.cover'),
+              );
               await File(pickedPath).copy(dest.path);
               await ref.read(playlistsRepositoryProvider).setCoverFromFile(playlist.id, dest.path);
             },
