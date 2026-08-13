@@ -35,8 +35,12 @@ lib/
                                  программ; FileSyncService — аудио,
                                  CoverSyncService — обложки (docs/adr/0012)
       pairing/                — запрос/подтверждение сопряжения с обеих
-                                 сторон, прежде чем синк вообще начнётся
-                                 (docs/adr/0011)
+                                 сторон, прежде чем синк вообще начнётся,
+                                 только для одного и того же профиля
+                                 (docs/adr/0011, docs/adr/0017)
+      share/                  — "Поделиться" треком/альбомом с любым
+                                 видимым устройством, независимо от
+                                 профиля и сопряжения (docs/adr/0017)
       device_identity_service — стабильный id этого устройства
       sync_orchestrator       — клей: discovery → metadata sync → devices,
                                  но только для уже сопряжённых (docs/adr/0011)
@@ -126,7 +130,8 @@ HTTP-каналом ([ADR 0010](adr/0010-built-in-file-transfer.md)):
   `SqliteCrdt.openInMemory()` даёт быстрые изолированные unit-тесты
   без диска.
 - `databaseProvider`/`selfDeviceProvider`/`profileDirProvider`/
-  `currentProfileProvider`/`profilesStoreProvider`/`switchProfileProvider`
-  — плейсхолдеры, переопределяемые через `overrideWithValue` — виджет-тесты
-  подставляют свою in-memory БД тем же способом, что и
-  `openProfileSession`.
+  `currentProfileProvider`/`profilesStoreProvider`/`switchProfileProvider`/
+  `joinProfileForPairingProvider`/`canJoinDifferentProfileProvider`/
+  `waitForPairingProvider` — плейсхолдеры, переопределяемые через
+  `overrideWithValue` — виджет-тесты подставляют свою in-memory БД тем
+  же способом, что и `openProfileSession`.
