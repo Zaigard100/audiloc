@@ -1,0 +1,28 @@
+{
+  "buildFiles": [
+    "/home/zaigard/.pub-cache/hosted/pub.dev/audiotags-1.4.5/android/CMakeLists.txt"
+  ],
+  "cleanCommandsComponents": [
+    [
+      "/home/zaigard/Android/Sdk/cmake/3.22.1/bin/ninja",
+      "-C",
+      "/home/zaigard/.pub-cache/hosted/pub.dev/audiotags-1.4.5/android/.cxx/Debug/4p2p283x/armeabi-v7a",
+      "clean"
+    ]
+  ],
+  "buildTargetsCommandComponents": [
+    "/home/zaigard/Android/Sdk/cmake/3.22.1/bin/ninja",
+    "-C",
+    "/home/zaigard/.pub-cache/hosted/pub.dev/audiotags-1.4.5/android/.cxx/Debug/4p2p283x/armeabi-v7a",
+    "{LIST_OF_TARGETS_TO_BUILD}"
+  ],
+  "libraries": {},
+  "toolchains": {
+    "toolchain": {
+      "cCompilerExecutable": "/home/zaigard/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/bin/clang.lld",
+      "cppCompilerExecutable": "/home/zaigard/Android/Sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/bin/clang++.lld"
+    }
+  },
+  "cFileExtensions": [],
+  "cppFileExtensions": []
+}

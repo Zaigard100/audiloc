@@ -1,0 +1,2 @@
+/home/zaigard/.pub-cache/hosted/pub.dev/audiotags-1.4.5/android/.cxx/Debug/4p2p283x/armeabi-v7a/CMakeFiles/edit_cache.dir
+/home/zaigard/.pub-cache/hosted/pub.dev/audiotags-1.4.5/android/.cxx/Debug/4p2p283x/armeabi-v7a/CMakeFiles/rebuild_cache.dir

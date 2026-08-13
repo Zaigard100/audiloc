@@ -85,6 +85,16 @@ dependencies:
   crypto: ^3.0.6
   path: ^1.9.1
 
+# audiotags 1.4.5's android/build.gradle hardcodes compileSdkVersion 31,
+# below what its own transitive AndroidX deps require (34+) on current
+# tooling — build fails with "AAR metadata" errors. Not fixed upstream as
+# of this writing (checked erikas-taroza/audiotags@master). Vendored copy
+# in third_party/audiotags is identical except compileSdkVersion 31 -> 36;
+# drop this override once upstream republishes a fix.
+dependency_overrides:
+  audiotags:
+    path: third_party/audiotags
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

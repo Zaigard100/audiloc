@@ -19,8 +19,16 @@ pluginManagement {
 
 plugins {
     id("dev.flutter.flutter-plugin-loader") version "1.0.0"
-    id("com.android.application") version "9.1.0" apply false
-    id("org.jetbrains.kotlin.android") version "2.4.0" apply false
+    // Pinned to the last 8.x line on purpose: AGP 9's "built-in Kotlin"
+    // silently drops Kotlin compilation for plugins that still apply the
+    // classic `org.jetbrains.kotlin.android` plugin in their own
+    // android/build.gradle (file_picker, audiotags) — their sources never
+    // get a compileDebugKotlin task, so the app fails to link against
+    // them ("cannot find symbol ... FilePickerPlugin"). See
+    // https://kotl.in/gradle/agp-built-in-kotlin.
+    id("com.android.application") version "8.13.2" apply false
+    id("org.jetbrains.kotlin.android") version "2.2.20" apply false
+    id("org.gradle.toolchains.foojay-resolver-convention") version "1.0.0"
 }
 
 include(":app")
