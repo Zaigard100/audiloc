@@ -9,11 +9,18 @@ import '../../../data/models/track.dart';
 import '../providers/library_providers.dart';
 
 class TrackTile extends ConsumerWidget {
-  const TrackTile({super.key, required this.track, required this.onTap, this.trailing});
+  const TrackTile({
+    super.key,
+    required this.track,
+    required this.onTap,
+    this.trailing,
+    this.onLongPress,
+  });
 
   final Track track;
   final VoidCallback onTap;
   final Widget? trailing;
+  final VoidCallback? onLongPress;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -21,6 +28,7 @@ class TrackTile extends ConsumerWidget {
 
     return ListTile(
       onTap: onTap,
+      onLongPress: onLongPress,
       leading: ClipRRect(
         borderRadius: BorderRadius.circular(4),
         child: SizedBox(

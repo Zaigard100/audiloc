@@ -9,12 +9,16 @@ import '../../core/providers.dart';
 import '../../core/theme/app_theme.dart';
 import '../../data/models/track.dart';
 import 'providers/library_providers.dart';
+import 'widgets/delete_track_action.dart';
 import 'widgets/track_tile.dart';
 
 /// Библиотека tab (ТЗ п.6.2): плоский список треков, "Избранное" (живое
 /// представление над `favorites`, не отдельно поддерживаемый плейлист —
-/// трек попадает туда, пока горит сердечко, и только на это время) и
-/// жанры (тоже не хранятся отдельно — просто различные `tracks.genre`).
+/// трек попадает туда, пока горит сердечко, и только на это время),
+/// жанры (тоже не хранятся отдельно — просто различные `tracks.genre`) и
+/// "Удалённые" — долгий тап по треку убирает его из библиотеки
+/// (soft-delete: сам файл не трогается), эта вкладка — единственное
+/// место, откуда его можно вернуть.
 /// Альбомы/исполнители как отдельные вкладки — см. docs/roadmap.md.
 class LibraryScreen extends ConsumerWidget {
   const LibraryScreen({super.key});
@@ -22,7 +26,7 @@ class LibraryScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return DefaultTabController(
-      length: 3,
+      length: 4,
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Библиотека'),
@@ -34,10 +38,12 @@ class LibraryScreen extends ConsumerWidget {
             ),
           ],
           bottom: const TabBar(
+            isScrollable: true,
             tabs: [
               Tab(text: 'Все'),
               Tab(text: 'Избранное'),
               Tab(text: 'Жанры'),
+              Tab(text: 'Удалённые'),
             ],
           ),
         ),
@@ -46,6 +52,7 @@ class LibraryScreen extends ConsumerWidget {
             _AllTracksTab(onImport: () => _importFolder(context, ref)),
             const _FavoritesTab(),
             const _GenresTab(),
+            const _TrashTab(),
           ],
         ),
       ),
@@ -170,8 +177,45 @@ class _TrackList extends ConsumerWidget {
         return TrackTile(
           track: track,
           onTap: () => ref.read(playerServiceProvider).setQueue(tracks, startIndex: index),
+          onLongPress: () => confirmAndDeleteTrack(context, ref, track),
         );
       },
+    );
+  }
+}
+
+class _TrashTab extends ConsumerWidget {
+  const _TrashTab();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final tracksAsync = ref.watch(deletedTracksProvider);
+    return tracksAsync.when(
+      data: (tracks) {
+        if (tracks.isEmpty) {
+          return const Center(
+            child: Text('Удалённых треков нет', style: TextStyle(color: AppTheme.onSurfaceMuted)),
+          );
+        }
+        return ListView.builder(
+          itemCount: tracks.length,
+          itemBuilder: (context, index) {
+            final track = tracks[index];
+            return TrackTile(
+              track: track,
+              onTap: () {}, // deleted tracks aren't queued for playback
+              trailing: IconButton(
+                icon: const Icon(Icons.restore),
+                tooltip: 'Вернуть в библиотеку',
+                color: AppTheme.accent,
+                onPressed: () => ref.read(tracksRepositoryProvider).restore(track.id),
+              ),
+            );
+          },
+        );
+      },
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (error, _) => Center(child: Text('Ошибка: $error')),
     );
   }
 }

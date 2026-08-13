@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/providers.dart';
 import 'providers/library_providers.dart';
+import 'widgets/delete_track_action.dart';
 import 'widgets/track_tile.dart';
 
 /// Tracks in one genre — reached from the Library tab's "Жанры" list.
@@ -40,6 +41,7 @@ class GenreTracksScreen extends ConsumerWidget {
                 return TrackTile(
                   track: track,
                   onTap: () => ref.read(playerServiceProvider).setQueue(tracks, startIndex: index),
+                  onLongPress: () => confirmAndDeleteTrack(context, ref, track),
                 );
               },
             ),

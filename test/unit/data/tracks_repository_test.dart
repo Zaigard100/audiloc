@@ -56,6 +56,21 @@ void main() {
     expect(await repository.all(), isEmpty);
   });
 
+  test('delete leaves the track visible in watchDeleted, restore brings it back', () async {
+    await repository.upsert(track);
+    await repository.delete(track.id);
+
+    final deleted = await repository.watchDeleted().first;
+    expect(deleted.single.id, track.id);
+    expect(deleted.single.path, track.path, reason: 'the file itself was never touched');
+
+    await repository.restore(track.id);
+
+    expect(await repository.exists(track.id), isTrue);
+    expect(await repository.watchDeleted().first, isEmpty);
+    expect((await repository.byId(track.id))!.title, track.title);
+  });
+
   test('upsert revives a previously soft-deleted track with the same id', () async {
     await repository.upsert(track);
     await repository.delete(track.id);

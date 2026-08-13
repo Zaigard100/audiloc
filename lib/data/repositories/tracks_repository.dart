@@ -101,8 +101,23 @@ class TracksRepository {
       ''', ['${track.id}:${_crdt.nodeId}', track.id, track.path]);
   }
 
+  /// Soft-delete: hides the track from the library, but only flags the
+  /// `tracks` row (`is_deleted = 1`) — the audio file itself is never
+  /// touched, and the row (along with its `track_locations` path) is
+  /// still there for [restore] or [watchDeleted].
   Future<void> delete(String id) =>
       _crdt.execute('DELETE FROM tracks WHERE id = ?1', [id]);
+
+  /// Undoes [delete]. A plain `UPDATE` rather than a fresh [upsert]: the
+  /// row's other fields are untouched, this only flips the flag back.
+  Future<void> restore(String id) =>
+      _crdt.execute('UPDATE tracks SET is_deleted = 0 WHERE id = ?1', [id]);
+
+  Stream<List<Track>> watchDeleted() => _crdt.watch('''
+        $_selectWithLocalPath
+        WHERE t.is_deleted = 1
+        ORDER BY t.modified DESC
+      ''', () => [_crdt.nodeId]).map((rows) => rows.map(Track.fromRow).toList());
 
   Future<List<String>> allGenres() async {
     final rows = await _crdt.query('''

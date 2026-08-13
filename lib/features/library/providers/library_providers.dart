@@ -51,3 +51,9 @@ final tracksByGenreProvider = Provider.family<List<Track>, String>((ref, genre) 
   final tracks = ref.watch(libraryTracksProvider).value ?? const [];
   return tracks.where((t) => t.genre?.trim() == genre).toList();
 });
+
+/// Soft-deleted tracks ("Удалённые"): hidden from the library, file left
+/// alone on disk, restorable — see `TracksRepository.delete`/`.restore`.
+final deletedTracksProvider = StreamProvider<List<Track>>(
+  (ref) => ref.watch(tracksRepositoryProvider).watchDeleted(),
+);
