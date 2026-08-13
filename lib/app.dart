@@ -40,11 +40,14 @@ class _AudilocAppState extends State<AudilocApp> {
 
   /// Set while this device is a placeholder profile waiting to be paired
   /// into an existing one (the "Ждать сопряжения" button — same-owner,
-  /// second-device scenario). Just drives the banner in [build] — the
-  /// actual adoption happens through the ordinary pairing-approve flow
-  /// (see [_joinProfileForPairing]), which always switches this device
-  /// onto the requester's profile when the hashes don't already match,
-  /// clearing this flag as a side effect of [_switchProfile].
+  /// second-device scenario). Drives the banner in [build], and — via
+  /// `canJoinDifferentProfile` passed to [openProfileSession] — is the
+  /// *only* condition under which a mismatched-hash pairing request is
+  /// even shown to the user rather than auto-declined; see
+  /// docs/adr/0017-forbid-cross-profile-pairing-and-sharing.md. Approving
+  /// such a request switches this device onto the requester's profile
+  /// (see [_joinProfileForPairing]), clearing this flag as a side effect
+  /// of [_switchProfile].
   bool _awaitingProfileAdoption = false;
 
   @override
@@ -99,11 +102,12 @@ class _AudilocAppState extends State<AudilocApp> {
   }
 
   /// "Это моё второе устройство" — creates an empty placeholder profile
-  /// and opens it. No bespoke watching logic needed beyond that: the
-  /// moment another device pairs *into* this one, the ordinary
-  /// approve-flow (see [_joinProfileForPairing]) finds the placeholder's
-  /// hash doesn't match the requester's, and switches this device onto
-  /// (a fresh local copy of) the requester's profile — docs/adr/0015.
+  /// and opens it, with `_awaitingProfileAdoption` set. That flag is what
+  /// makes `PairingService` let a mismatched-hash request through to the
+  /// UI at all (see `canJoinDifferentProfile` on [openProfileSession]) —
+  /// approving it then finds the placeholder's hash doesn't match the
+  /// requester's, and switches this device onto (a fresh local copy of)
+  /// the requester's profile — docs/adr/0017.
   Future<void> _waitForPairing() async {
     final profile = await _profilesStore!.create('Новое устройство');
     await _profilesStore!.setActiveProfileId(profile.id);
@@ -117,7 +121,8 @@ class _AudilocAppState extends State<AudilocApp> {
 
   /// Handed to [openProfileSession] as `joinProfileForPairing` — called
   /// by `PairingService.approve()` when an incoming request's profile
-  /// doesn't match the one currently active (docs/adr/0015-profile-identity-in-pairing.md).
+  /// doesn't match the one currently active (only reachable while
+  /// `_awaitingProfileAdoption` is true — docs/adr/0017-forbid-cross-profile-pairing-and-sharing.md).
   /// Finds (or creates) a local copy of the requester's profile, switches
   /// onto it if it isn't already active, then pairs the requester in —
   /// the switch alone is what turns "two independent libraries" into
@@ -147,6 +152,7 @@ class _AudilocAppState extends State<AudilocApp> {
       profilesStore: _profilesStore!,
       switchProfile: _switchProfile,
       joinProfileForPairing: _joinProfileForPairing,
+      canJoinDifferentProfile: () async => _awaitingProfileAdoption,
     );
     if (!mounted) {
       await session.close();

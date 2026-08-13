@@ -21,9 +21,23 @@ class PlaylistsRepository {
   final SqliteCrdt _crdt;
   final _uuid = const Uuid();
 
-  Stream<List<Playlist>> watchPlaylists() => _crdt
-      .watch('SELECT * FROM playlists WHERE is_deleted = 0 ORDER BY name')
-      .map((rows) => rows.map(Playlist.fromRow).toList());
+  /// Resolves each playlist's cover, if it has one, through whichever of
+  /// the two per-device location tables applies — see [Playlist.coverPath]'s
+  /// doc for why neither can be a plain synced path column.
+  static const _selectWithCover = '''
+    SELECT p.*, tl.cover_path AS track_cover_path, pl.cover_path AS playlist_cover_path
+    FROM playlists p
+    LEFT JOIN track_locations tl
+      ON tl.id = p.cover_track_id || ':' || ?1 AND tl.is_deleted = 0
+    LEFT JOIN playlist_locations pl
+      ON pl.id = p.id || ':' || ?1 AND pl.is_deleted = 0
+  ''';
+
+  Stream<List<Playlist>> watchPlaylists() => _crdt.watch('''
+        $_selectWithCover
+        WHERE p.is_deleted = 0
+        ORDER BY p.name
+      ''', () => [_crdt.nodeId]).map((rows) => rows.map(Playlist.fromRow).toList());
 
   Future<Playlist> create(String name) async {
     final id = _uuid.v4();
@@ -36,6 +50,31 @@ class PlaylistsRepository {
   Future<void> rename(String id, String name) => _crdt.execute('''
         UPDATE playlists SET name = ?1 WHERE id = ?2
       ''', [name, id]);
+
+  /// Uses one of the playlist's own tracks' cover art as its cover —
+  /// clears any custom file previously set via [setCoverFromFile], since
+  /// only one can apply at a time (see [Playlist.coverPath]).
+  Future<void> setCoverFromTrack(String playlistId, String trackId) async {
+    await _crdt.execute('UPDATE playlists SET cover_track_id = ?1 WHERE id = ?2', [trackId, playlistId]);
+    await _crdt.execute(
+      'UPDATE playlist_locations SET is_deleted = 1 WHERE id = ?1',
+      ['$playlistId:${_crdt.nodeId}'],
+    );
+  }
+
+  /// Sets a custom cover image this device has cached at [localPath] —
+  /// clears [Playlist.coverTrackId] since only one cover source can apply
+  /// at a time.
+  Future<void> setCoverFromFile(String playlistId, String localPath) async {
+    await _crdt.execute('UPDATE playlists SET cover_track_id = NULL WHERE id = ?1', [playlistId]);
+    await _crdt.execute('''
+      INSERT INTO playlist_locations (id, playlist_id, cover_path)
+        VALUES (?1, ?2, ?3)
+      ON CONFLICT (id) DO UPDATE SET
+        cover_path = excluded.cover_path,
+        is_deleted = 0
+    ''', ['$playlistId:${_crdt.nodeId}', playlistId, localPath]);
+  }
 
   Future<void> delete(String id) async {
     await _crdt.execute('DELETE FROM playlists WHERE id = ?1', [id]);

@@ -8,6 +8,7 @@ import '../../../services/sync/discovery/discovered_peer.dart';
 import '../../../services/sync/discovery/discovery_event.dart';
 import '../../../services/sync/metadata/sync_stats.dart';
 import '../../../services/sync/pairing/pairing_models.dart';
+import '../../../services/sync/share/share_models.dart';
 
 final knownDevicesProvider = StreamProvider<List<Device>>(
   (ref) => ref.watch(devicesRepositoryProvider).watchAll(),
@@ -53,6 +54,13 @@ final unpairedNearbyPeersProvider = Provider<List<DiscoveredPeer>>((ref) {
 /// matter which tab is open.
 final incomingPairingRequestsProvider = StreamProvider<IncomingPairingRequest>(
   (ref) => ref.watch(pairingServiceProvider).incomingRequests,
+);
+
+/// "Поделиться" offers waiting for this device's user to accept/decline —
+/// same pattern as [incomingPairingRequestsProvider], but for
+/// [shareServiceProvider] (docs/adr/0017-forbid-cross-profile-pairing-and-sharing.md).
+final incomingShareOffersProvider = StreamProvider<IncomingShareOffer>(
+  (ref) => ref.watch(shareServiceProvider).incomingOffers,
 );
 
 /// Live online/offline state, built from raw discovery events — never

@@ -29,7 +29,7 @@ class TrackTile extends ConsumerWidget {
     final isTransferring = transfers.containsKey(track.id);
     final fraction = transfers[track.id];
 
-    return ListTile(
+    final tile = ListTile(
       onTap: onTap,
       onLongPress: onLongPress,
       leading: ClipRRect(
@@ -77,5 +77,11 @@ class TrackTile extends ConsumerWidget {
             onPressed: () => ref.read(favoritesRepositoryProvider).toggle(track.id),
           ),
     );
+
+    // Right-click opens the same action menu as a long-press — desktop
+    // has no long-press gesture, so this is the only way to reach it
+    // there (docs/adr/0017-forbid-cross-profile-pairing-and-sharing.md).
+    if (onLongPress == null) return tile;
+    return GestureDetector(onSecondaryTap: onLongPress, child: tile);
   }
 }

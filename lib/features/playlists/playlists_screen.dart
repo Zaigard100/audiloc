@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -7,6 +9,7 @@ import '../../core/theme/app_theme.dart';
 import 'favorites_screen.dart';
 import 'providers/playlists_providers.dart';
 import 'trash_screen.dart';
+import 'widgets/playlist_actions_sheet.dart';
 
 /// Плейлисты tab: a grid of square cards, not a list — "Избранное" and
 /// "Удалённые" are pinned first as special cards (docs/adr/0014), then
@@ -56,7 +59,13 @@ class PlaylistsScreen extends ConsumerWidget {
                 label: playlist.name,
                 icon: Icons.queue_music,
                 color: AppTheme.surfaceHigh,
+                coverPath: playlist.coverPath,
                 onTap: () => context.push('/playlists/${playlist.id}', extra: playlist),
+                // Right-click on desktop opens the same menu as long-press
+                // — see docs/adr/0017-forbid-cross-profile-pairing-and-sharing.md.
+                // Only user-created playlists get this menu — "Избранное"/
+                // "Удалённые" above are fixed, built-in views.
+                onLongPress: () => showPlaylistActionsSheet(context, ref, playlist),
               ),
           ],
         ),
@@ -97,6 +106,8 @@ class _PlaylistTile extends StatelessWidget {
     required this.icon,
     required this.color,
     required this.onTap,
+    this.coverPath,
+    this.onLongPress,
   });
 
   final String label;
@@ -104,36 +115,79 @@ class _PlaylistTile extends StatelessWidget {
   final Color color;
   final VoidCallback onTap;
 
+  /// A resolved local image path (docs/adr/0017-forbid-cross-profile-pairing-and-sharing.md)
+  /// — when set, replaces [icon] entirely. Only ever non-null for a
+  /// user-created playlist that's had a cover picked for it.
+  final String? coverPath;
+
+  final VoidCallback? onLongPress;
+
   @override
   Widget build(BuildContext context) {
     final isAccent = color == AppTheme.accent;
-    return Material(
+    final tile = Material(
       color: color,
       borderRadius: BorderRadius.circular(16),
+      clipBehavior: Clip.antiAlias,
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
         onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, size: 40, color: isAccent ? Colors.white : AppTheme.onSurfaceMuted),
-              const SizedBox(height: 10),
-              Text(
-                label,
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  color: isAccent ? Colors.white : null,
+        onLongPress: onLongPress,
+        child: coverPath != null
+            ? Stack(
+                fit: StackFit.expand,
+                children: [
+                  Image.file(File(coverPath!), fit: BoxFit.cover),
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [Colors.transparent, Colors.black.withValues(alpha: 0.7)],
+                        ),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(10, 20, 10, 10),
+                        child: Text(
+                          label,
+                          textAlign: TextAlign.center,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.white),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              )
+            : Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(icon, size: 40, color: isAccent ? Colors.white : AppTheme.onSurfaceMuted),
+                    const SizedBox(height: 10),
+                    Text(
+                      label,
+                      textAlign: TextAlign.center,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: isAccent ? Colors.white : null,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ],
-          ),
-        ),
       ),
     );
+
+    if (onLongPress == null) return tile;
+    return GestureDetector(onSecondaryTap: onLongPress, child: tile);
   }
 }

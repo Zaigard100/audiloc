@@ -106,4 +106,68 @@ void main() {
     expect(await playlists.watchPlaylists().first, isEmpty);
     expect(await playlists.watchTracks(playlist.id).first, isEmpty);
   });
+
+  test('rename updates the name without touching id or its tracks', () async {
+    final playlist = await playlists.create('Roadtrip');
+    await playlists.addTrack(playlist.id, 't1');
+
+    await playlists.rename(playlist.id, 'Summer Roadtrip');
+
+    final renamed = (await playlists.watchPlaylists().first).single;
+    expect(renamed.id, playlist.id);
+    expect(renamed.name, 'Summer Roadtrip');
+    expect(await playlists.watchTracks(playlist.id).first, hasLength(1));
+  });
+
+  group(
+      'cover (docs/adr/0017-forbid-cross-profile-pairing-and-sharing.md — '
+      'a playlist\'s cover is either one of its own tracks\' art, or a picked file, never both)',
+      () {
+    setUp(() async {
+      // t1 gets real cover art recorded for *this* device — the same
+      // shape TracksRepository.upsert leaves in track_locations.
+      await tracks.upsert(Track(id: 't1', path: '/music/t1.mp3', title: 't1', coverPath: '/covers/t1.cover'));
+    });
+
+    test('setCoverFromTrack resolves coverPath through that track\'s own local cover', () async {
+      final playlist = await playlists.create('Roadtrip');
+
+      await playlists.setCoverFromTrack(playlist.id, 't1');
+
+      final updated = (await playlists.watchPlaylists().first).single;
+      expect(updated.coverTrackId, 't1');
+      expect(updated.coverPath, '/covers/t1.cover');
+    });
+
+    test('setCoverFromFile sets a custom cover and clears any track-based one', () async {
+      final playlist = await playlists.create('Roadtrip');
+      await playlists.setCoverFromTrack(playlist.id, 't1');
+
+      await playlists.setCoverFromFile(playlist.id, '/covers/playlist-custom.cover');
+
+      final updated = (await playlists.watchPlaylists().first).single;
+      expect(updated.coverTrackId, isNull);
+      expect(updated.coverPath, '/covers/playlist-custom.cover');
+    });
+
+    test('setCoverFromTrack overrides a previously set custom file cover', () async {
+      final playlist = await playlists.create('Roadtrip');
+      await playlists.setCoverFromFile(playlist.id, '/covers/playlist-custom.cover');
+
+      await playlists.setCoverFromTrack(playlist.id, 't1');
+
+      final updated = (await playlists.watchPlaylists().first).single;
+      expect(updated.coverTrackId, 't1');
+      expect(updated.coverPath, '/covers/t1.cover');
+    });
+
+    test('a playlist with no cover set resolves coverPath to null', () async {
+      final playlist = await playlists.create('Roadtrip');
+
+      final fetched = (await playlists.watchPlaylists().first).single;
+      expect(fetched.id, playlist.id);
+      expect(fetched.coverTrackId, isNull);
+      expect(fetched.coverPath, isNull);
+    });
+  });
 }

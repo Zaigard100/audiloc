@@ -10,15 +10,18 @@ import '../../services/library_import/library_import_service.dart';
 import '../player/models/queue_source.dart';
 import '../player/providers/player_providers.dart';
 import 'providers/library_providers.dart';
-import 'widgets/delete_track_action.dart';
+import 'widgets/track_actions_sheet.dart';
 import 'widgets/track_tile.dart';
 
 /// Библиотека tab (ТЗ п.6.2): a flat, sortable list of every track. Long-
-/// press soft-deletes (see [confirmAndDeleteTrack]) — the file itself is
-/// never touched, and it stays recoverable from "Удалённые" on the
-/// Плейлисты tab (docs/adr/0014). "Избранное" and "Жанры" used to be
-/// tabs here too; Избранное moved to Плейлисты as a live view of its
-/// own, and "Жанры" was removed outright, not just relocated.
+/// press (or right-click on desktop) opens an action menu — edit, add to
+/// playlist, "Поделиться", delete (see [showTrackActionsSheet]). Delete
+/// is a soft-delete — the file itself is never touched, and it stays
+/// recoverable from "Удалённые" on the Плейлисты tab (docs/adr/0014).
+/// "Избранное" and "Жанры" used to be tabs here too; Избранное moved to
+/// Плейлисты as a live view of its own, and "Жанры" was removed outright,
+/// not just relocated (`Track.genre` itself is still editable, though —
+/// docs/adr/0017-forbid-cross-profile-pairing-and-sharing.md).
 class LibraryScreen extends ConsumerWidget {
   const LibraryScreen({super.key});
 
@@ -154,7 +157,7 @@ class _SortedTrackList extends ConsumerWidget {
             ref.read(queueSourceProvider.notifier).state = const LibraryQueueSource();
             ref.read(playerServiceProvider).setQueue(tracks, startIndex: index);
           },
-          onLongPress: () => confirmAndDeleteTrack(context, ref, track),
+          onLongPress: () => showTrackActionsSheet(context, ref, track),
         );
       },
     );

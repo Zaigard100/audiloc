@@ -28,6 +28,9 @@ import '../services/sync/pairing/pairing_client.dart';
 import '../services/sync/pairing/pairing_models.dart';
 import '../services/sync/pairing/pairing_server.dart';
 import '../services/sync/pairing/pairing_service.dart';
+import '../services/sync/share/share_client.dart';
+import '../services/sync/share/share_server.dart';
+import '../services/sync/share/share_service.dart';
 import '../services/sync/sync_orchestrator.dart';
 
 /// Central dependency wiring.
@@ -82,12 +85,21 @@ final switchProfileProvider = Provider<Future<void> Function(String profileId)>(
 
 /// Called by [PairingService.approve] when an incoming request's profile
 /// doesn't match this device's current one — see
-/// docs/adr/0015-profile-identity-in-pairing.md. `PairingService` itself
-/// can't switch profiles (it lives inside the very `ProviderContainer`
-/// that would need tearing down), so `AudilocApp` supplies the real
-/// implementation, same pattern as [switchProfileProvider].
+/// docs/adr/0017-forbid-cross-profile-pairing-and-sharing.md. `PairingService`
+/// itself can't switch profiles (it lives inside the very
+/// `ProviderContainer` that would need tearing down), so `AudilocApp`
+/// supplies the real implementation, same pattern as [switchProfileProvider].
 final joinProfileForPairingProvider = Provider<Future<void> Function(IncomingPairingRequest)>(
   (ref) => throw UnimplementedError('joinProfileForPairingProvider must be overridden by AudilocApp'),
+);
+
+/// Whether this device is currently allowed to switch profiles in
+/// response to a mismatched-hash pairing request — true only during the
+/// explicit "Ждать сопряжения" wait (ADR 0013's second-device scenario).
+/// Everywhere else, a mismatched request is auto-declined before it ever
+/// reaches the UI — see docs/adr/0017-forbid-cross-profile-pairing-and-sharing.md.
+final canJoinDifferentProfileProvider = Provider<Future<bool> Function()>(
+  (ref) => throw UnimplementedError('canJoinDifferentProfileProvider must be overridden by AudilocApp'),
 );
 
 final tracksRepositoryProvider =
@@ -234,10 +246,10 @@ final pairingClientProvider = Provider<PairingClient>((ref) => PairingClient());
 
 /// Turns a discovered-but-unpaired peer into a `devices` row, only after
 /// both sides confirm — see docs/adr/0011-mutual-pairing-confirmation.md.
-/// "Pairing" also means "add this device to a profile"
-/// (docs/adr/0015-profile-identity-in-pairing.md) — this is why it needs
-/// [currentProfileProvider]'s hash and [joinProfileForPairingProvider],
-/// not just the sync/devices plumbing ADR 0011 needed.
+/// Strictly same-device/profile now — see [canJoinDifferentProfileProvider]
+/// and docs/adr/0017-forbid-cross-profile-pairing-and-sharing.md for the
+/// one narrow exception and why moving content between different profiles
+/// goes through [shareServiceProvider] instead.
 final pairingServiceProvider = Provider<PairingService>((ref) {
   final self = ref.watch(selfDeviceProvider);
   final profile = ref.watch(currentProfileProvider);
@@ -250,9 +262,39 @@ final pairingServiceProvider = Provider<PairingService>((ref) {
     selfName: self.name,
     selfProfileHash: profile.profileHash,
     onJoinDifferentProfile: ref.watch(joinProfileForPairingProvider),
+    canJoinDifferentProfile: ref.watch(canJoinDifferentProfileProvider),
     pairingPort: pairingPort,
     metadataSyncPort: metadataSyncPort,
   );
   ref.onDispose(service.dispose);
+  return service;
+});
+
+const sharePort = 8544;
+
+final shareServerProvider = Provider<ShareServer>((ref) {
+  final server = ShareServer(port: sharePort);
+  ref.onDispose(server.dispose);
+  return server;
+});
+
+final shareClientProvider = Provider<ShareClient>((ref) => ShareClient());
+
+/// "Поделиться" — sends/receives individual tracks or albums between any
+/// two devices regardless of profile or pairing status, replacing what
+/// pairing itself used to do across profiles — see
+/// docs/adr/0017-forbid-cross-profile-pairing-and-sharing.md.
+final shareServiceProvider = Provider<ShareService>((ref) {
+  final self = ref.watch(selfDeviceProvider);
+  final service = ShareService(
+    server: ref.watch(shareServerProvider),
+    client: ref.watch(shareClientProvider),
+    fileTransferClient: ref.watch(fileTransferClientProvider),
+    resolveImportService: () => ref.read(libraryImportServiceProvider.future),
+    selfId: self.id,
+    selfName: self.name,
+    sharePort: sharePort,
+    fileTransferPort: fileTransferPort,
+  );
   return service;
 });

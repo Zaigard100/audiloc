@@ -23,7 +23,7 @@ class AudilocDatabase {
     final dbPath = path ?? await _defaultPath();
     final crdt = await SqliteCrdt.open(
       dbPath,
-      version: 3,
+      version: 4,
       onCreate: _createSchema,
       onUpgrade: _upgradeSchema,
     );
@@ -33,7 +33,7 @@ class AudilocDatabase {
   /// In-memory database for tests: fast, isolated, no filesystem access.
   static Future<AudilocDatabase> openInMemory() async {
     final crdt = await SqliteCrdt.openInMemory(
-      version: 3,
+      version: 4,
       onCreate: _createSchema,
     );
     return AudilocDatabase._(crdt);
@@ -67,6 +67,7 @@ class AudilocDatabase {
       CREATE TABLE playlists (
         id TEXT NOT NULL,
         name TEXT NOT NULL,
+        cover_track_id TEXT,
         PRIMARY KEY (id)
       )
     ''');
@@ -95,6 +96,7 @@ class AudilocDatabase {
       )
     ''');
     await _createTrackLocationsTable(db);
+    await _createPlaylistLocationsTable(db);
   }
 
   /// `track_locations` holds where *this device* actually has each track's
@@ -124,12 +126,32 @@ class AudilocDatabase {
         )
       ''');
 
+  /// `playlist_locations` is `track_locations`' exact counterpart for a
+  /// playlist's *custom* cover image (docs/adr/0017-forbid-cross-profile-pairing-and-sharing.md)
+  /// — keyed `playlistId:nodeId` so each device's own cached copy of the
+  /// image survives CRDT merges untouched. Only used when a playlist's
+  /// cover is a picked file, not one of its own tracks' art — that case
+  /// (`playlists.cover_track_id`) resolves through `track_locations`
+  /// instead and needs no table of its own.
+  static Future<void> _createPlaylistLocationsTable(CrdtTableExecutor db) => db.execute('''
+        CREATE TABLE playlist_locations (
+          id TEXT NOT NULL,
+          playlist_id TEXT NOT NULL,
+          cover_path TEXT,
+          PRIMARY KEY (id)
+        )
+      ''');
+
   static Future<void> _upgradeSchema(CrdtTableExecutor db, int from, int to) async {
     if (from < 2) {
       await _createTrackLocationsTable(db);
     }
     if (from < 3) {
       await db.execute('ALTER TABLE track_locations ADD COLUMN cover_path TEXT');
+    }
+    if (from < 4) {
+      await db.execute('ALTER TABLE playlists ADD COLUMN cover_track_id TEXT');
+      await _createPlaylistLocationsTable(db);
     }
   }
 

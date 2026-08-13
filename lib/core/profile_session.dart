@@ -51,6 +51,7 @@ class ProfileSessionHandle {
     await _step('backgroundWork', () => _backgroundWork);
     await _step('pairingService', () => container.read(pairingServiceProvider).dispose());
     await _step('pairingServer', () => container.read(pairingServerProvider).dispose());
+    await _step('shareServer', () => container.read(shareServerProvider).dispose());
     await _step('fileTransferServer', () => container.read(fileTransferServerProvider).dispose());
     await _step(
         'fileSyncService', () async => (await container.read(fileSyncServiceProvider.future)).dispose());
@@ -86,6 +87,7 @@ Future<ProfileSessionHandle> openProfileSession({
   required ProfilesStore profilesStore,
   required Future<void> Function(String profileId) switchProfile,
   required Future<void> Function(IncomingPairingRequest) joinProfileForPairing,
+  required Future<bool> Function() canJoinDifferentProfile,
   Future<String> Function() platformLabel = platformDeviceLabel,
 }) async {
   final profiles = await profilesStore.list();
@@ -115,6 +117,7 @@ Future<ProfileSessionHandle> openProfileSession({
     profilesStoreProvider.overrideWithValue(profilesStore),
     switchProfileProvider.overrideWithValue(switchProfile),
     joinProfileForPairingProvider.overrideWithValue(joinProfileForPairing),
+    canJoinDifferentProfileProvider.overrideWithValue(canJoinDifferentProfile),
   ]);
 
   // The three fixed-port *bind* calls are awaited — deliberately *not*
@@ -139,6 +142,7 @@ Future<ProfileSessionHandle> openProfileSession({
   await container.read(metadataSyncServiceProvider).startServer();
   unawaited(container.read(syncOrchestratorProvider).start(metadataSyncPort));
   await container.read(pairingServerProvider).start();
+  await container.read(shareServerProvider).start();
   await container.read(fileTransferServerProvider).start();
   // Forces PairingService to exist now rather than whenever some widget
   // first reads it — its constructor is what subscribes to the (broadcast,

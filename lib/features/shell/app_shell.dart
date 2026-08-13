@@ -10,14 +10,16 @@ import '../library/library_screen.dart';
 import '../player/mini_player.dart';
 import '../playlists/playlists_screen.dart';
 import '../search/search_screen.dart';
+import 'widgets/share_offer_dialog.dart';
 
 const _tabs = ['library', 'playlists', 'search', 'devices'];
 
 /// Bottom-tab shell (ТЗ п.6.2): Библиотека / Плейлисты / Поиск / Устройства,
 /// with the mini-player pinned above the tab bar so it's always reachable.
 /// Also owns the incoming-pairing-request dialog (ТЗ +
-/// docs/adr/0011-mutual-pairing-confirmation.md) — it needs to show up no
-/// matter which tab the user is on, not just from the Устройства screen.
+/// docs/adr/0011-mutual-pairing-confirmation.md) and the incoming
+/// "Поделиться" offer dialog (docs/adr/0017-forbid-cross-profile-pairing-and-sharing.md)
+/// — both need to show up no matter which tab the user is on.
 class AppShell extends ConsumerWidget {
   const AppShell({super.key, required this.tab});
 
@@ -30,6 +32,10 @@ class AppShell extends ConsumerWidget {
     ref.listen(incomingPairingRequestsProvider, (previous, next) {
       final request = next.value;
       if (request != null) _showPairingRequestDialog(context, ref, request);
+    });
+    ref.listen(incomingShareOffersProvider, (previous, next) {
+      final offer = next.value;
+      if (offer != null) showShareOfferDialog(context, ref, offer);
     });
 
     return Scaffold(
@@ -62,12 +68,14 @@ class AppShell extends ConsumerWidget {
   }
 
   void _showPairingRequestDialog(BuildContext context, WidgetRef ref, IncomingPairingRequest request) {
-    // Same profile already (re-pairing a lost device, or this is the
-    // requester's own second device that already adopted its hash) —
-    // no switch is about to happen, keep the message simple. Different
-    // profile — approving will switch this device onto the requester's
-    // profile instead of merging two independent libraries together, see
-    // docs/adr/0015-profile-identity-in-pairing.md; say so plainly.
+    // A mismatched-hash request only ever reaches this dialog at all
+    // while this device is a placeholder waiting via "Ждать сопряжения"
+    // (docs/adr/0017-forbid-cross-profile-pairing-and-sharing.md) — any
+    // other cross-profile request is auto-declined before the user ever
+    // sees it. Same profile already (re-pairing a lost device) — no
+    // switch is about to happen, keep the message simple. Different —
+    // approving switches this device onto the requester's profile; say
+    // so plainly.
     final sameProfile = ref.read(currentProfileProvider).profileHash == request.profileHash;
     showDialog<void>(
       context: context,
@@ -100,4 +108,5 @@ class AppShell extends ConsumerWidget {
       ),
     );
   }
+
 }

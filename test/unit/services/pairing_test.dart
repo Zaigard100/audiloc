@@ -11,8 +11,8 @@ import 'package:flutter_test/flutter_test.dart';
 /// Real (non-mocked) HTTP round-trips for the pairing handshake — the
 /// built-in replacement for the old "any peer on the LAN auto-syncs"
 /// behavior. See docs/adr/0011-mutual-pairing-confirmation.md and, for
-/// the profile-hash comparison in `PairingService.approve()`,
-/// docs/adr/0015-profile-identity-in-pairing.md.
+/// the profile-hash filtering in `PairingService`,
+/// docs/adr/0017-forbid-cross-profile-pairing-and-sharing.md.
 void main() {
   group('PairingServer/PairingClient protocol', () {
     late PairingServer server;
@@ -83,6 +83,7 @@ void main() {
     late PairingServer server;
     late PairingService service;
     late List<IncomingPairingRequest> joinCalls;
+    late bool canJoinDifferentProfile;
 
     // The response/request in these tests is deliberately pointed back at
     // this same device's own server — there's only one "device" here, but
@@ -99,6 +100,9 @@ void main() {
       server = PairingServer(port: pairingPort);
       await server.start();
       joinCalls = [];
+      // Default: no "Ждать сопряжения" in progress — matches most
+      // devices most of the time (docs/adr/0017-forbid-cross-profile-pairing-and-sharing.md).
+      canJoinDifferentProfile = false;
       service = PairingService(
         server: server,
         client: PairingClient(),
@@ -108,6 +112,7 @@ void main() {
         selfName: 'This Device',
         selfProfileHash: selfProfileHash,
         onJoinDifferentProfile: (request) async => joinCalls.add(request),
+        canJoinDifferentProfile: () async => canJoinDifferentProfile,
         pairingPort: pairingPort,
         metadataSyncPort: metadataPort,
       );
@@ -153,8 +158,9 @@ void main() {
 
     test(
         'approve() with a *different* profile hash defers to onJoinDifferentProfile instead of '
-        'pairing directly — this is what stops two independent libraries from merging '
-        '(docs/adr/0015-profile-identity-in-pairing.md)', () async {
+        'pairing directly — reachable only for a request that already made it past the '
+        'canJoinDifferentProfile filter (docs/adr/0017-forbid-cross-profile-pairing-and-sharing.md)',
+        () async {
       const request = IncomingPairingRequest(
         fromId: 'peer-9',
         fromName: 'Peer',
@@ -171,6 +177,50 @@ void main() {
       // the requester shouldn't have to wait on the accepting side's
       // profile bookkeeping to know its request was accepted.
       expect((await echoedResponse).accepted, isTrue);
+    });
+
+    test(
+        'a different-profile request is auto-declined and never reaches incomingRequests when '
+        "canJoinDifferentProfile is false — nothing for the user to approve, so no dialog "
+        '(docs/adr/0017-forbid-cross-profile-pairing-and-sharing.md)', () async {
+      final seen = <IncomingPairingRequest>[];
+      service.incomingRequests.listen(seen.add);
+      final echoedResponse = server.responses.first.timeout(const Duration(seconds: 5));
+
+      await PairingClient().sendRequest(
+        host: '127.0.0.1',
+        port: pairingPort,
+        fromId: 'peer-9',
+        fromName: 'Peer',
+        profileHash: 'hash-other',
+      );
+
+      expect((await echoedResponse).accepted, isFalse);
+      // Give the (non-)event a moment before asserting it never arrived.
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+      expect(seen, isEmpty);
+      expect(joinCalls, isEmpty);
+      expect(await devices.byId('peer-9'), isNull);
+    });
+
+    test(
+        'a different-profile request reaches incomingRequests when canJoinDifferentProfile is '
+        'true (the "Ждать сопряжения" placeholder waiting to join another profile)', () async {
+      canJoinDifferentProfile = true;
+      final seen = <IncomingPairingRequest>[];
+      service.incomingRequests.listen(seen.add);
+
+      await PairingClient().sendRequest(
+        host: '127.0.0.1',
+        port: pairingPort,
+        fromId: 'peer-9',
+        fromName: 'Peer',
+        profileHash: 'hash-other',
+      );
+
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+      expect(seen, hasLength(1));
+      expect(seen.single.fromId, 'peer-9');
     });
 
     test('pairWithoutResponding pairs the requester without sending any response', () async {

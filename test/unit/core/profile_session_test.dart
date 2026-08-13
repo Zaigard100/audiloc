@@ -47,6 +47,7 @@ class _NoopPlayerService implements PlayerService {
 Future<void> _noopSwitch(String profileId) async {}
 Future<void> _noopJoin(IncomingPairingRequest request) async {}
 Future<String> _testPlatformLabel() async => 'TestOS';
+Future<bool> _noopCanJoin() async => false;
 
 void main() {
   test(
@@ -70,6 +71,7 @@ void main() {
       profilesStore: store,
       switchProfile: _noopSwitch,
       joinProfileForPairing: _noopJoin,
+      canJoinDifferentProfile: _noopCanJoin,
       platformLabel: _testPlatformLabel,
     );
     await first.close();
@@ -83,6 +85,7 @@ void main() {
       profilesStore: store,
       switchProfile: _noopSwitch,
       joinProfileForPairing: _noopJoin,
+      canJoinDifferentProfile: _noopCanJoin,
       platformLabel: _testPlatformLabel,
     );
     await second.close();
@@ -105,6 +108,7 @@ void main() {
       profilesStore: store,
       switchProfile: _noopSwitch,
       joinProfileForPairing: _noopJoin,
+      canJoinDifferentProfile: _noopCanJoin,
       platformLabel: _testPlatformLabel,
     );
     addTearDown(session.close);
@@ -127,6 +131,7 @@ void main() {
       profilesStore: store,
       switchProfile: _noopSwitch,
       joinProfileForPairing: _noopJoin,
+      canJoinDifferentProfile: _noopCanJoin,
       platformLabel: _testPlatformLabel,
     );
     await first.close();
@@ -139,6 +144,7 @@ void main() {
       profilesStore: store,
       switchProfile: _noopSwitch,
       joinProfileForPairing: _noopJoin,
+      canJoinDifferentProfile: _noopCanJoin,
       platformLabel: _testPlatformLabel,
     );
     addTearDown(second.close);
@@ -161,6 +167,7 @@ void main() {
       profilesStore: store,
       switchProfile: _noopSwitch,
       joinProfileForPairing: _noopJoin,
+      canJoinDifferentProfile: _noopCanJoin,
       platformLabel: _testPlatformLabel,
     );
     addTearDown(session.close);
