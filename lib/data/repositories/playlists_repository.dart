@@ -60,6 +60,15 @@ class PlaylistsRepository {
         ORDER BY pt.position
       ''', () => [playlistId]).map((rows) => rows.map(Track.fromRow).toList());
 
+  /// Like [watchTracks], but keeps each row's `playlist_tracks.id` so the
+  /// UI can remove *this* occurrence of a track from the playlist.
+  Stream<List<PlaylistItem>> watchItems(String playlistId) => _crdt.watch('''
+        SELECT pt.id AS entry_id, t.* FROM playlist_tracks pt
+        JOIN tracks t ON t.id = pt.track_id AND t.is_deleted = 0
+        WHERE pt.playlist_id = ?1 AND pt.is_deleted = 0
+        ORDER BY pt.position
+      ''', () => [playlistId]).map((rows) => rows.map(PlaylistItem.fromRow).toList());
+
   Stream<List<PlaylistTrack>> watchEntries(String playlistId) => _crdt.watch('''
         SELECT * FROM playlist_tracks
         WHERE playlist_id = ?1 AND is_deleted = 0

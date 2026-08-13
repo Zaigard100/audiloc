@@ -1,3 +1,5 @@
+import 'track.dart';
+
 /// One entry in a playlist.
 ///
 /// [position] uses fractional indexing (space left between neighbours on
@@ -23,5 +25,20 @@ class PlaylistTrack {
         playlistId: row['playlist_id']! as String,
         trackId: row['track_id']! as String,
         position: (row['position']! as num).toDouble(),
+      );
+}
+
+/// A playlist entry joined with its track — what the UI actually renders
+/// (needs [entryId] to let the user remove *this* occurrence of a track,
+/// as opposed to the track itself).
+class PlaylistItem {
+  const PlaylistItem({required this.entryId, required this.track});
+
+  final String entryId;
+  final Track track;
+
+  factory PlaylistItem.fromRow(Map<String, Object?> row) => PlaylistItem(
+        entryId: row['entry_id']! as String,
+        track: Track.fromRow(row),
       );
 }
