@@ -52,22 +52,27 @@ class PlaylistsRepository {
   }
 
   /// Ordered tracks for a playlist, joined against `tracks` so deleted or
-  /// still-syncing tracks (no local row yet) are silently skipped.
+  /// still-syncing tracks (no local row yet) are silently skipped. `path`
+  /// is resolved through `track_locations` the same way
+  /// `TracksRepository` does — see its class doc for why `tracks.path`
+  /// alone isn't safe to play from.
   Stream<List<Track>> watchTracks(String playlistId) => _crdt.watch('''
-        SELECT t.* FROM playlist_tracks pt
+        SELECT t.*, COALESCE(tl.path, t.path) AS path FROM playlist_tracks pt
         JOIN tracks t ON t.id = pt.track_id AND t.is_deleted = 0
+        LEFT JOIN track_locations tl ON tl.id = t.id || ':' || ?2 AND tl.is_deleted = 0
         WHERE pt.playlist_id = ?1 AND pt.is_deleted = 0
         ORDER BY pt.position
-      ''', () => [playlistId]).map((rows) => rows.map(Track.fromRow).toList());
+      ''', () => [playlistId, _crdt.nodeId]).map((rows) => rows.map(Track.fromRow).toList());
 
   /// Like [watchTracks], but keeps each row's `playlist_tracks.id` so the
   /// UI can remove *this* occurrence of a track from the playlist.
   Stream<List<PlaylistItem>> watchItems(String playlistId) => _crdt.watch('''
-        SELECT pt.id AS entry_id, t.* FROM playlist_tracks pt
+        SELECT pt.id AS entry_id, t.*, COALESCE(tl.path, t.path) AS path FROM playlist_tracks pt
         JOIN tracks t ON t.id = pt.track_id AND t.is_deleted = 0
+        LEFT JOIN track_locations tl ON tl.id = t.id || ':' || ?2 AND tl.is_deleted = 0
         WHERE pt.playlist_id = ?1 AND pt.is_deleted = 0
         ORDER BY pt.position
-      ''', () => [playlistId]).map((rows) => rows.map(PlaylistItem.fromRow).toList());
+      ''', () => [playlistId, _crdt.nodeId]).map((rows) => rows.map(PlaylistItem.fromRow).toList());
 
   Stream<List<PlaylistTrack>> watchEntries(String playlistId) => _crdt.watch('''
         SELECT * FROM playlist_tracks

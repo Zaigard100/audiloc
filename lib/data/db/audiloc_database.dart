@@ -23,8 +23,9 @@ class AudilocDatabase {
     final dbPath = path ?? await _defaultPath();
     final crdt = await SqliteCrdt.open(
       dbPath,
-      version: 1,
+      version: 2,
       onCreate: _createSchema,
+      onUpgrade: _upgradeSchema,
     );
     return AudilocDatabase._(crdt);
   }
@@ -32,7 +33,7 @@ class AudilocDatabase {
   /// In-memory database for tests: fast, isolated, no filesystem access.
   static Future<AudilocDatabase> openInMemory() async {
     final crdt = await SqliteCrdt.openInMemory(
-      version: 1,
+      version: 2,
       onCreate: _createSchema,
     );
     return AudilocDatabase._(crdt);
@@ -89,6 +90,32 @@ class AudilocDatabase {
         PRIMARY KEY (id)
       )
     ''');
+    await _createTrackLocationsTable(db);
+  }
+
+  /// `track_locations` holds where *this device* actually has each track's
+  /// file, keyed by `trackId:nodeId` so every device's own row survives
+  /// CRDT merges untouched by other devices' rows for the same track —
+  /// unlike `tracks.path`, which is a plain synced column and therefore
+  /// "last HLC wins" for the *whole row*. Two devices independently
+  /// importing the same content (same sha256 id) at different local paths
+  /// used to end up with one device's path silently overwriting the
+  /// other's after sync, causing playback to open a nonexistent file and
+  /// (since media_kit skips unplayable queue entries) start a completely
+  /// different track instead. See docs/adr/0009-local-track-paths.md.
+  static Future<void> _createTrackLocationsTable(CrdtTableExecutor db) => db.execute('''
+        CREATE TABLE track_locations (
+          id TEXT NOT NULL,
+          track_id TEXT NOT NULL,
+          path TEXT NOT NULL,
+          PRIMARY KEY (id)
+        )
+      ''');
+
+  static Future<void> _upgradeSchema(CrdtTableExecutor db, int from, int to) async {
+    if (from < 2) {
+      await _createTrackLocationsTable(db);
+    }
   }
 
   static Future<String> _defaultPath() async {

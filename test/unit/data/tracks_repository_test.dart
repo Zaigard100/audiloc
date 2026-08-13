@@ -1,6 +1,7 @@
 import 'package:audiloc/data/db/audiloc_database.dart';
 import 'package:audiloc/data/models/track.dart';
 import 'package:audiloc/data/repositories/tracks_repository.dart';
+import 'package:crdt/crdt.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -91,5 +92,38 @@ void main() {
     await repository.upsert(const Track(id: 'hash-4', path: '/music/d.mp3'));
 
     expect(await repository.allGenres(), unorderedEquals(['Rock', 'Jazz']));
+  });
+
+  test(
+      'importing the same content on two devices keeps each device on its own local path '
+      'after merging the other device\'s sync (regression: path used to be clobbered '
+      'row-wide by whichever import had the later HLC, causing playback to open a path '
+      'that only existed on the other device)', () async {
+    final peerDb = await AudilocDatabase.openInMemory();
+    addTearDown(peerDb.close);
+    final peerRepository = TracksRepository(peerDb.crdt);
+
+    const sharedId = 'same-content-hash';
+    await repository.upsert(const Track(id: sharedId, path: '/android/song.mp3', title: 'Song'));
+    // A later write, simulating the peer importing the identical file
+    // (same content hash) at its own, different local path.
+    await peerRepository.upsert(const Track(id: sharedId, path: '/linux/song.mp3', title: 'Song'));
+
+    // Merge the peer's changeset in, as metadata sync would. getChangeset()
+    // returns raw DB rows with `hlc` as text; over the wire crdt_sync
+    // parses that back into an Hlc before merge() sees it, so do the same
+    // here rather than going through a real socket.
+    final rawChangeset = await peerDb.crdt.getChangeset();
+    final changeset = {
+      for (final entry in rawChangeset.entries)
+        entry.key: [
+          for (final record in entry.value) {...record, 'hlc': (record['hlc']! as String).toHlc},
+        ],
+    };
+    await db.crdt.merge(changeset);
+
+    final merged = await repository.byId(sharedId);
+    expect(merged, isNotNull);
+    expect(merged!.path, '/android/song.mp3', reason: 'must keep this device\'s own path, not the peer\'s');
   });
 }
