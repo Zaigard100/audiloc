@@ -47,10 +47,23 @@ class DeviceIdentityService {
   String _defaultDeviceName() {
     try {
       final host = Platform.localHostname;
-      if (host.isNotEmpty) return host;
+      // Android doesn't expose a real hostname through this API — it
+      // reliably returns "localhost", which is actively misleading once
+      // shown as a *peer's* name on someone else's Devices screen.
+      if (host.isNotEmpty && host.toLowerCase() != 'localhost') return host;
     } catch (_) {
       // Unsupported on some platforms; fall through to the default below.
     }
-    return 'Моё устройство';
+    final label = switch (Platform.operatingSystem) {
+      'android' => 'Android',
+      'ios' => 'iPhone',
+      'linux' => 'Linux',
+      'windows' => 'Windows',
+      'macos' => 'Mac',
+      _ => 'Устройство',
+    };
+    // A short suffix so multiple devices on the same OS stay
+    // distinguishable in the list instead of all showing the same label.
+    return '$label (${deviceId.substring(0, 4)})';
   }
 }

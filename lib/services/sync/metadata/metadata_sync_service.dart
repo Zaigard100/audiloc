@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:crdt/crdt.dart';
 import 'package:crdt_sync/crdt_sync.dart';
@@ -17,11 +18,15 @@ enum PeerSyncState { connecting, connected, disconnected }
 /// outbound connection per peer discovered by `DiscoveryService`. Whichever
 /// side dials in, the same `Crdt` instance ends up synchronized both ways.
 ///
-/// Known limitation: `crdt_sync`'s `listen()` helper doesn't expose a
-/// handle to stop the underlying `HttpServer` — see
-/// docs/adr/0005-crdt-sync-for-p2p-metadata.md. Acceptable for an
-/// app-lifetime service; would need upstreaming or a custom server loop to
-/// fix properly.
+/// [startServer] deliberately does **not** use `crdt_sync_server.listen()`:
+/// that helper binds to `InternetAddress.loopbackIPv4`, which only accepts
+/// connections from the same machine — useless for LAN sync, and the
+/// actual reason two real devices could discover each other (mDNS is
+/// OS-level, unaffected) but never sync (this app's own socket was
+/// unreachable from outside). This runs the same accept loop `listen()`
+/// does internally, but bound to all interfaces, using `upgrade()`
+/// directly. As a side benefit we keep the `HttpServer` handle, so
+/// [dispose] can actually close it — `listen()` doesn't expose one.
 class MetadataSyncService {
   MetadataSyncService({required Crdt crdt, this.port = 8541}) : _crdt = crdt;
 
@@ -34,25 +39,45 @@ class MetadataSyncService {
   final _statsController = StreamController<SyncStats>.broadcast();
   final _stateController = StreamController<(String deviceId, PeerSyncState)>.broadcast();
 
-  bool _serverStarted = false;
+  HttpServer? _server;
 
   Stream<SyncStats> get onChangesetApplied => _statsController.stream;
   Stream<(String, PeerSyncState)> get onPeerStateChanged => _stateController.stream;
 
   PeerSyncState stateOf(String deviceId) => _states[deviceId] ?? PeerSyncState.disconnected;
 
-  /// Starts accepting incoming connections from peers. Safe to call once;
-  /// subsequent calls are ignored.
+  /// Starts accepting incoming connections from peers on all network
+  /// interfaces. Safe to call once; subsequent calls are ignored.
   Future<void> startServer() async {
-    if (_serverStarted) return;
-    _serverStarted = true;
-    // `listen` runs an internal accept loop for the app's lifetime.
-    unawaited(crdt_sync_server.listen(
-      _crdt,
-      port,
-      onChangesetReceived: (nodeId, counts) => _reportStats(nodeId, counts),
-      onDisconnect: (peerId, code, reason) => _setState(peerId, PeerSyncState.disconnected),
-    ));
+    if (_server != null) return;
+    final server = await HttpServer.bind(InternetAddress.anyIPv4, port);
+    _server = server;
+    unawaited(_acceptLoop(server));
+  }
+
+  Future<void> _acceptLoop(HttpServer server) async {
+    await for (final request in server) {
+      _handleConnection(request);
+    }
+  }
+
+  void _handleConnection(HttpRequest request) {
+    unawaited(() async {
+      try {
+        await crdt_sync_server.upgrade(
+          _crdt,
+          request,
+          onConnect: (crdtSync, _) {
+            final peerId = crdtSync.peerId;
+            if (peerId != null) _setState(peerId, PeerSyncState.connected);
+          },
+          onDisconnect: (peerId, code, reason) => _setState(peerId, PeerSyncState.disconnected),
+          onChangesetReceived: (nodeId, counts) => _reportStats(nodeId, counts),
+        );
+      } catch (_) {
+        // A single bad handshake/upgrade shouldn't kill the accept loop.
+      }
+    }());
   }
 
   /// Opens (or reuses) an outbound sync connection to a peer discovered on
@@ -97,6 +122,8 @@ class MetadataSyncService {
       await client.disconnect();
     }
     _clients.clear();
+    await _server?.close(force: true);
+    _server = null;
     await _statsController.close();
     await _stateController.close();
   }
