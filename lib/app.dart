@@ -149,9 +149,22 @@ class _AudilocAppState extends State<AudilocApp> {
     final target = await store.findByHash(request.profileHash) ??
         await store.create(request.fromName, profileHash: request.profileHash);
 
-    final currentProfileId = _session?.container.read(currentProfileProvider).id;
-    if (currentProfileId != target.id) {
+    // Captured *before* switching — _switchProfile clears this flag as
+    // one of its first steps, so this is the only place that can still
+    // tell whether the profile we're about to leave was the "Ждать
+    // сопряжения" placeholder (see [_waitForPairing]) rather than some
+    // profile the user was otherwise actually using.
+    final wasPlaceholder = _awaitingProfileAdoption;
+    final oldProfileId = _session?.container.read(currentProfileProvider).id;
+    if (oldProfileId != target.id) {
       await _switchProfile(target.id);
+      // The placeholder has done its one job — it exists solely to wait
+      // for exactly this moment. Left registered, it would sit in the
+      // switcher forever as a permanently-empty, unreachable "Новое
+      // устройство" nobody asked to keep (docs/adr/0021-clean-up-placeholder-profile-after-join.md).
+      if (wasPlaceholder && oldProfileId != null) {
+        await store.delete(oldProfileId);
+      }
     }
 
     final session = _session;
