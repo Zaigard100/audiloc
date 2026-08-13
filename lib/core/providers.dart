@@ -17,6 +17,7 @@ import '../services/playback/media_kit_player_service.dart';
 import '../services/playback/player_service.dart';
 import '../services/sync/device_identity_service.dart';
 import '../services/sync/discovery/discovery_service.dart';
+import '../services/sync/files/cover_sync_service.dart';
 import '../services/sync/files/file_sync_service.dart';
 import '../services/sync/files/file_transfer_client.dart';
 import '../services/sync/files/file_transfer_server.dart';
@@ -147,6 +148,23 @@ final fileSyncServiceProvider = FutureProvider<FileSyncService>((ref) async {
     discoveryService: ref.watch(discoveryServiceProvider),
     client: ref.watch(fileTransferClientProvider),
     downloadsDir: downloadsDir,
+    filePort: fileTransferPort,
+  );
+  ref.onDispose(service.dispose);
+  return service;
+});
+
+/// Watches for tracks whose cover art isn't cached on this device yet and
+/// fetches it from whichever online peer has it — see
+/// docs/adr/0012-local-cover-paths.md. Reuses `FileTransferServer`'s
+/// `/covers/<id>` route on the same port, so no separate port needed.
+final coverSyncServiceProvider = FutureProvider<CoverSyncService>((ref) async {
+  final coverDir = await ref.watch(coverCacheDirProvider.future);
+  final service = CoverSyncService(
+    tracksRepository: ref.watch(tracksRepositoryProvider),
+    discoveryService: ref.watch(discoveryServiceProvider),
+    client: ref.watch(fileTransferClientProvider),
+    coverCacheDir: coverDir,
     filePort: fileTransferPort,
   );
   ref.onDispose(service.dispose);

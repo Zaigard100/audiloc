@@ -61,13 +61,18 @@ Future<void> main() async {
   // anyone's listening would otherwise be silently lost.
   container.read(pairingServiceProvider);
   unawaited(() async {
-    // Repair pre-existing local tracks that predate track_locations (or
-    // this device's own row in it) before anything starts treating them
-    // as missing — see TracksRepository.backfillLocalFileLocations.
-    await container.read(tracksRepositoryProvider).backfillLocalFileLocations();
+    // Repair pre-existing local tracks/covers that predate track_locations
+    // (or this device's own row in it) before anything starts treating
+    // them as missing — see TracksRepository.backfillLocalFileLocations
+    // and .backfillLocalCovers.
+    final tracksRepository = container.read(tracksRepositoryProvider);
+    await tracksRepository.backfillLocalFileLocations();
+    await tracksRepository.backfillLocalCovers(await container.read(coverCacheDirProvider.future));
     await container.read(fileTransferServerProvider).start();
     final fileSync = await container.read(fileSyncServiceProvider.future);
     fileSync.start();
+    final coverSync = await container.read(coverSyncServiceProvider.future);
+    coverSync.start();
   }());
 
   runApp(UncontrolledProviderScope(container: container, child: const AudilocApp()));

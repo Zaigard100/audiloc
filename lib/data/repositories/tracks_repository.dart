@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:path/path.dart' as p;
 import 'package:sqlite_crdt/sqlite_crdt.dart';
 
 import '../models/track.dart';
@@ -11,24 +12,27 @@ import '../models/track.dart';
 /// `services/sync/metadata`). Callers never need to think about conflicts:
 /// `sql_crdt` resolves them by highest HLC on merge.
 ///
-/// One exception, deliberately: the file path. `tracks.path` is a synced
-/// column like any other, so if two devices independently import the same
-/// content (same sha256 `id`) at different local paths, whichever import
-/// has the later HLC clobbers the other device's path for the *whole*
-/// row after sync — playback then opens a nonexistent file. Every read
-/// here resolves [Track.path] through `track_locations` instead, a table
-/// keyed `trackId:nodeId` so each device's own row survives merges from
-/// other devices untouched — and is `null` when *this* device has no row
-/// there, i.e. it knows the track exists (metadata synced) but doesn't
-/// have the file (yet). See docs/adr/0009-local-track-paths.md and
-/// docs/adr/0010-built-in-file-transfer.md.
+/// One exception, deliberately: local file paths. `tracks.path` and
+/// `tracks.cover_path` are synced columns like any other, so if two
+/// devices independently import the same content (same sha256 `id`) at
+/// different local paths, whichever import has the later HLC clobbers the
+/// other device's path for the *whole* row after sync — playback then
+/// opens a nonexistent file, and cover art shows a broken-image icon.
+/// Every read here resolves [Track.path]/[Track.coverPath] through
+/// `track_locations` instead, a table keyed `trackId:nodeId` so each
+/// device's own row survives merges from other devices untouched — both
+/// are `null` when *this* device has no row there, i.e. it knows the
+/// track exists (metadata synced) but doesn't have that particular file
+/// (yet). See docs/adr/0009-local-track-paths.md,
+/// docs/adr/0010-built-in-file-transfer.md and
+/// docs/adr/0012-local-cover-paths.md.
 class TracksRepository {
   TracksRepository(this._crdt);
 
   final SqliteCrdt _crdt;
 
   static const _selectWithLocalPath = '''
-    SELECT t.*, tl.path AS path
+    SELECT t.*, tl.path AS path, tl.cover_path AS cover_path
     FROM tracks t
     LEFT JOIN track_locations tl
       ON tl.id = t.id || ':' || ?1 AND tl.is_deleted = 0
@@ -103,12 +107,13 @@ class TracksRepository {
       track.addedOnDevice,
     ]);
     await _crdt.execute('''
-        INSERT INTO track_locations (id, track_id, path)
-          VALUES (?1, ?2, ?3)
+        INSERT INTO track_locations (id, track_id, path, cover_path)
+          VALUES (?1, ?2, ?3, ?4)
         ON CONFLICT (id) DO UPDATE SET
           path = excluded.path,
+          cover_path = excluded.cover_path,
           is_deleted = 0
-      ''', ['${track.id}:${_crdt.nodeId}', track.id, localPath]);
+      ''', ['${track.id}:${_crdt.nodeId}', track.id, localPath, track.coverPath]);
   }
 
   /// Records that *this* device has downloaded [track.path] for
@@ -123,6 +128,15 @@ class TracksRepository {
           path = excluded.path,
           is_deleted = 0
       ''', ['$trackId:${_crdt.nodeId}', trackId, localPath]);
+
+  /// Records that *this* device has cached [coverPath] for [trackId]'s
+  /// cover art — see docs/adr/0012-local-cover-paths.md. A plain
+  /// `UPDATE`, not an upsert: only ever called for a track this device
+  /// already has a `track_locations` row for (it already has the audio
+  /// file — see [watchMissingCovers]), so there's always a row to update.
+  Future<void> recordLocalCover(String trackId, String coverPath) => _crdt.execute('''
+        UPDATE track_locations SET cover_path = ?1, is_deleted = 0 WHERE id = ?2
+      ''', [coverPath, '$trackId:${_crdt.nodeId}']);
 
   /// Soft-delete: hides the track from the library, but only flags the
   /// `tracks` row (`is_deleted = 1`) — the audio file itself is never
@@ -163,6 +177,30 @@ class TracksRepository {
     return rows.map((r) => r['node_id']! as String).toList();
   }
 
+  /// Tracks with cover art known to exist somewhere (`tracks.cover_path`
+  /// non-null — used purely as a boolean hint here, see the class doc)
+  /// and the audio file already local, but no locally cached cover yet —
+  /// candidates for cover-art download. Deliberately requires the audio
+  /// file first: no point fetching cosmetic cover art for a track that
+  /// isn't even playable here yet.
+  Stream<List<Track>> watchMissingCovers() => _crdt.watch('''
+        $_selectWithLocalPath
+        WHERE t.is_deleted = 0 AND t.cover_path IS NOT NULL
+          AND tl.path IS NOT NULL AND tl.cover_path IS NULL
+        ORDER BY t.modified DESC
+      ''', () => [_crdt.nodeId]).map((rows) => rows.map(Track.fromRow).toList());
+
+  /// Like [peersWithLocalCopy], but for cover art specifically — a peer
+  /// can easily have the audio file without (yet) having cached the
+  /// cover, or vice versa.
+  Future<List<String>> peersWithLocalCover(String trackId) async {
+    final rows = await _crdt.query('''
+      SELECT DISTINCT node_id FROM track_locations
+      WHERE track_id = ?1 AND is_deleted = 0 AND node_id != ?2 AND cover_path IS NOT NULL
+    ''', [trackId, _crdt.nodeId]);
+    return rows.map((r) => r['node_id']! as String).toList();
+  }
+
   /// One-time repair, meant to run once at startup: a track imported by
   /// this device *before* `track_locations` existed (or before this
   /// device's [upsert] ever ran again since) has its real path sitting
@@ -184,6 +222,29 @@ class TracksRepository {
       final path = row['path'] as String?;
       if (path != null && await File(path).exists()) {
         await recordLocalFile(row['id']! as String, path);
+      }
+    }
+  }
+
+  /// Same idea as [backfillLocalFileLocations], for cover art: a track
+  /// this device imported before `track_locations.cover_path` existed
+  /// already has its cover cached on disk (`LibraryImportService` writes
+  /// it at a deterministic `$trackId.cover` path in [coverCacheDir]) but
+  /// no row tracking that. Only trusts a file that actually exists there
+  /// — never `tracks.cover_path` itself, which is a different device's
+  /// path as often as not. See docs/adr/0012-local-cover-paths.md.
+  Future<void> backfillLocalCovers(Directory coverCacheDir) async {
+    final rows = await _crdt.query('''
+      SELECT t.id FROM tracks t
+      JOIN track_locations tl ON tl.id = t.id || ':' || ?1 AND tl.is_deleted = 0
+      WHERE t.is_deleted = 0 AND t.cover_path IS NOT NULL AND tl.cover_path IS NULL
+    ''', [_crdt.nodeId]);
+
+    for (final row in rows) {
+      final id = row['id']! as String;
+      final file = File(p.join(coverCacheDir.path, '$id.cover'));
+      if (await file.exists()) {
+        await recordLocalCover(id, file.path);
       }
     }
   }

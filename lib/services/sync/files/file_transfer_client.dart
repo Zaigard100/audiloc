@@ -44,4 +44,21 @@ class FileTransferClient {
     await partFile.rename(finalFile.path);
     return finalFile.path;
   }
+
+  /// Downloads `http://$host:$port/covers/$trackId` into
+  /// `$destinationDir/$trackId.cover` — the same deterministic filename
+  /// `LibraryImportService` caches covers under locally, so every device
+  /// resolves its own copy the same way. No resume support: small enough
+  /// that a dropped connection just means retrying from scratch. Returns
+  /// the saved file's path.
+  Future<String> downloadCover({
+    required String host,
+    required int port,
+    required String trackId,
+    required Directory destinationDir,
+  }) async {
+    final file = File(p.join(destinationDir.path, '$trackId.cover'));
+    await _dio.download('http://$host:$port/covers/$trackId', file.path);
+    return file.path;
+  }
 }

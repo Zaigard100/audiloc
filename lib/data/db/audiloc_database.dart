@@ -23,7 +23,7 @@ class AudilocDatabase {
     final dbPath = path ?? await _defaultPath();
     final crdt = await SqliteCrdt.open(
       dbPath,
-      version: 2,
+      version: 3,
       onCreate: _createSchema,
       onUpgrade: _upgradeSchema,
     );
@@ -33,7 +33,7 @@ class AudilocDatabase {
   /// In-memory database for tests: fast, isolated, no filesystem access.
   static Future<AudilocDatabase> openInMemory() async {
     final crdt = await SqliteCrdt.openInMemory(
-      version: 2,
+      version: 3,
       onCreate: _createSchema,
     );
     return AudilocDatabase._(crdt);
@@ -107,11 +107,19 @@ class AudilocDatabase {
   /// other's after sync, causing playback to open a nonexistent file and
   /// (since media_kit skips unplayable queue entries) start a completely
   /// different track instead. See docs/adr/0009-local-track-paths.md.
+  ///
+  /// `cover_path` carries the exact same fix for cover art
+  /// (docs/adr/0012-local-cover-paths.md): `tracks.cover_path` is a plain
+  /// synced column too, so it's only ever trustworthy as "some device has
+  /// cover art for this track", never as a literal path — the actual
+  /// per-device cover path lives here instead, nullable, since a device
+  /// can easily have the audio file without (yet) having the cover.
   static Future<void> _createTrackLocationsTable(CrdtTableExecutor db) => db.execute('''
         CREATE TABLE track_locations (
           id TEXT NOT NULL,
           track_id TEXT NOT NULL,
           path TEXT NOT NULL,
+          cover_path TEXT,
           PRIMARY KEY (id)
         )
       ''');
@@ -119,6 +127,9 @@ class AudilocDatabase {
   static Future<void> _upgradeSchema(CrdtTableExecutor db, int from, int to) async {
     if (from < 2) {
       await _createTrackLocationsTable(db);
+    }
+    if (from < 3) {
+      await db.execute('ALTER TABLE track_locations ADD COLUMN cover_path TEXT');
     }
   }
 

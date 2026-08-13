@@ -115,4 +115,43 @@ void main() {
       throwsA(anything),
     );
   });
+
+  group('cover art (docs/adr/0012-local-cover-paths.md)', () {
+    test('downloads a track\'s cover art from this device\'s own server', () async {
+      final coverBytes = utf8.encode('not really a jpeg, just some cover bytes');
+      final coverFile = await writeSourceFile('cover.jpg', coverBytes);
+      final audioFile = await writeSourceFile('song.mp3', utf8.encode('audio bytes'));
+      await tracksRepository.upsert(Track(
+        id: 'track-cover-1',
+        path: audioFile.path,
+        coverPath: coverFile.path,
+        title: 'Song',
+      ));
+
+      final downloadedPath = await FileTransferClient().downloadCover(
+        host: '127.0.0.1',
+        port: port,
+        trackId: 'track-cover-1',
+        destinationDir: destDir,
+      );
+
+      expect(downloadedPath, endsWith('track-cover-1.cover'));
+      expect(await File(downloadedPath).readAsBytes(), coverBytes);
+    });
+
+    test('requesting a cover for a track that has none fails rather than silently succeeding', () async {
+      final audioFile = await writeSourceFile('song2.mp3', utf8.encode('audio bytes'));
+      await tracksRepository.upsert(Track(id: 'track-no-cover', path: audioFile.path, title: 'Song'));
+
+      await expectLater(
+        FileTransferClient().downloadCover(
+          host: '127.0.0.1',
+          port: port,
+          trackId: 'track-no-cover',
+          destinationDir: destDir,
+        ),
+        throwsA(anything),
+      );
+    });
+  });
 }

@@ -22,7 +22,7 @@
 | `title`, `artist`, `album`, `genre` | TEXT? | Из тегов (`audiotags`, [ADR 0002](adr/0002-audiotags-instead-of-id3.md)) |
 | `duration_ms` | INTEGER? | Best-effort из тегов; `media_kit` даёт точное значение в рантайме |
 | `bitrate_kbps` | INTEGER? | Зарезервировано; `audiotags` его сейчас не отдаёт |
-| `cover_path` | TEXT? | Путь к обложке, закэшированной на диск при импорте |
+| `cover_path` | TEXT? | Сырой столбец, приложение его не читает напрямую — только как признак "у какого-то устройства есть обложка", см. `track_locations` ниже и [ADR 0012](adr/0012-local-cover-paths.md) |
 | `file_size` | INTEGER? | Байты; резерв для более точной дедупликации в будущем |
 | `added_on_device` | TEXT? | Id устройства, первым импортировавшего файл |
 
@@ -39,7 +39,8 @@
 |---|---|---|
 | `id` (PK) | TEXT | `'$trackId:$nodeId'` — составной ключ, см. ниже почему |
 | `track_id` | TEXT | Ссылается на `tracks.id` |
-| `path` | TEXT | Путь к файлу **на этом конкретном устройстве** |
+| `path` | TEXT | Путь к аудиофайлу **на этом конкретном устройстве** |
+| `cover_path` | TEXT? | Путь к закэшированной обложке **на этом конкретном устройстве** — та же идея, что и `path`, см. [ADR 0012](adr/0012-local-cover-paths.md). Может быть NULL, даже когда `path` уже есть: устройство вполне может иметь аудио без обложки, пока та не докачалась |
 
 `path` умышленно **не** входит в идентичность трека и задумывался как
 локальный для устройства с самого начала — но `tracks.path` сам по
@@ -56,18 +57,21 @@
 способ в этой CRDT-модели дать каждому устройству *свою* строку,
 которую слияние с чужими записями не заденет: конфликты `sql_crdt`
 разрешает по первичному ключу, а он у каждого устройства свой.
-`TracksRepository`/`PlaylistsRepository` при чтении резолвят путь
-через `LEFT JOIN ... tl.path AS path`, отфильтрованный по `node_id`
-текущего устройства — **без** отката на `tracks.path`: если у этого
-устройства нет собственной строки в `track_locations`, `Track.path`
-в модели приходит `null` (`Track.isAvailableLocally == false`), а не
-чужой, физически не существующий на этом устройстве путь. Такой трек
-попадает в `TracksRepository.watchMissingFiles()`, и
-`FileSyncService` докачивает файл с первого online-пира, у которого
+`TracksRepository`/`PlaylistsRepository` при чтении резолвят оба пути
+через `LEFT JOIN ... tl.path AS path, tl.cover_path AS cover_path`,
+отфильтрованный по `node_id` текущего устройства — **без** отката на
+`tracks.path`/`tracks.cover_path`: если у этого устройства нет
+собственной строки в `track_locations`, `Track.path`/`Track.coverPath`
+в модели приходят `null` (`Track.isAvailableLocally == false` для
+аудио), а не чужой, физически не существующий на этом устройстве
+путь. Трек без аудио попадает в `TracksRepository.watchMissingFiles()`,
+и `FileSyncService` докачивает файл с первого online-пира, у которого
 он есть (`peersWithLocalCopy()`) — см.
-[ADR 0010](adr/0010-built-in-file-transfer.md). После успешной
-докачки `TracksRepository.recordLocalFile()` пишет строку в
-`track_locations`, и трек становится доступным локально.
+[ADR 0010](adr/0010-built-in-file-transfer.md). Трек с аудио, но без
+локальной обложки — в `watchMissingCovers()`, докачивается отдельно
+`CoverSyncService` ([ADR 0012](adr/0012-local-cover-paths.md)). После
+успешной докачки `TracksRepository.recordLocalFile()`/`recordLocalCover()`
+пишут строку в `track_locations`, и файл становится доступным локально.
 
 ## `favorites`
 

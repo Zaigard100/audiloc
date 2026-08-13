@@ -213,4 +213,107 @@ void main() {
 
     expect((await repository.byId('peer-track'))!.path, isNull);
   });
+
+  group('cover art (docs/adr/0012-local-cover-paths.md)', () {
+    Future<void> mergeFrom(AudilocDatabase peerDb) async {
+      final rawChangeset = await peerDb.crdt.getChangeset();
+      final changeset = {
+        for (final entry in rawChangeset.entries)
+          entry.key: [
+            for (final record in entry.value) {...record, 'hlc': (record['hlc']! as String).toHlc},
+          ],
+      };
+      await db.crdt.merge(changeset);
+    }
+
+    test(
+        'cover art known only through sync has a null coverPath and is not yet a '
+        '"missing cover" until the audio file itself is local', () async {
+      final peerDb = await AudilocDatabase.openInMemory();
+      addTearDown(peerDb.close);
+      final peerRepository = TracksRepository(peerDb.crdt);
+
+      await peerRepository.upsert(const Track(
+        id: 'peer-only',
+        path: '/linux/song.mp3',
+        coverPath: '/linux/covers/peer-only.cover',
+        title: 'Song',
+      ));
+      await mergeFrom(peerDb);
+
+      final track = await repository.byId('peer-only');
+      expect(track!.coverPath, isNull, reason: 'the peer\'s absolute cover path is never trustworthy here');
+
+      // Audio isn't local yet either, so there's no point fetching cover
+      // art for it yet.
+      expect((await repository.watchMissingCovers().first).map((t) => t.id), isNot(contains('peer-only')));
+
+      // Once the audio file becomes local (simulating FileSyncService
+      // finishing a download), the cover becomes a real candidate.
+      await repository.recordLocalFile('peer-only', '/this-device/song.mp3');
+      expect((await repository.watchMissingCovers().first).map((t) => t.id), contains('peer-only'));
+
+      final peers = await repository.peersWithLocalCover('peer-only');
+      expect(peers, [peerDb.nodeId]);
+    });
+
+    test('recordLocalCover makes the cover resolve locally and drops it from watchMissingCovers', () async {
+      final peerDb = await AudilocDatabase.openInMemory();
+      addTearDown(peerDb.close);
+      final peerRepository = TracksRepository(peerDb.crdt);
+
+      await peerRepository.upsert(const Track(
+        id: 'shared',
+        path: '/linux/song.mp3',
+        coverPath: '/linux/covers/shared.cover',
+        title: 'Song',
+      ));
+      await mergeFrom(peerDb);
+      await repository.recordLocalFile('shared', '/this-device/song.mp3');
+
+      await repository.recordLocalCover('shared', '/this-device/covers/shared.cover');
+
+      final track = await repository.byId('shared');
+      expect(track!.coverPath, '/this-device/covers/shared.cover');
+      expect((await repository.watchMissingCovers().first).map((t) => t.id), isNot(contains('shared')));
+    });
+
+    test(
+        'backfillLocalCovers recovers a cover this device already cached before '
+        'track_locations.cover_path existed, but only if the file is actually there',
+        () async {
+      final dir = await Directory.systemTemp.createTemp('audiloc_cover_backfill_');
+      addTearDown(() => dir.delete(recursive: true));
+      final coverFile = File('${dir.path}/legacy-track.cover')..writeAsBytesSync([1, 2, 3]);
+
+      // Simulate a track this device already has the audio for (a real
+      // track_locations row), with a stale/foreign tracks.cover_path (as
+      // if synced from whichever device originally extracted it) and no
+      // cover_path of its own yet.
+      await repository.upsert(const Track(id: 'legacy-track', path: '/music/song.mp3', title: 'Song'));
+      await db.crdt.execute(
+        "UPDATE tracks SET cover_path = '/some/other/device/covers/legacy-track.cover' WHERE id = 'legacy-track'",
+      );
+
+      expect((await repository.byId('legacy-track'))!.coverPath, isNull, reason: 'not backfilled yet');
+
+      await repository.backfillLocalCovers(dir);
+
+      expect((await repository.byId('legacy-track'))!.coverPath, coverFile.path);
+    });
+
+    test('backfillLocalCovers does nothing when no local cover file actually exists', () async {
+      final dir = await Directory.systemTemp.createTemp('audiloc_cover_backfill_empty_');
+      addTearDown(() => dir.delete(recursive: true));
+
+      await repository.upsert(const Track(id: 'legacy-track', path: '/music/song.mp3', title: 'Song'));
+      await db.crdt.execute(
+        "UPDATE tracks SET cover_path = '/some/other/device/covers/legacy-track.cover' WHERE id = 'legacy-track'",
+      );
+
+      await repository.backfillLocalCovers(dir);
+
+      expect((await repository.byId('legacy-track'))!.coverPath, isNull);
+    });
+  });
 }

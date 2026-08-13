@@ -5,10 +5,11 @@ import 'package:path/path.dart' as p;
 
 import '../../../data/repositories/tracks_repository.dart';
 
-/// Serves this device's local audio files to peers over plain HTTP —
-/// `GET /tracks/<trackId>`, with HTTP range support for resumable
-/// downloads. Replaces the earlier design of shelling out to an
-/// external Syncthing process (see
+/// Serves this device's local audio files and cover art to peers over
+/// plain HTTP — `GET /tracks/<trackId>` (with HTTP range support for
+/// resumable downloads) and `GET /covers/<trackId>` (small, single-shot,
+/// no range support needed). Replaces the earlier design of shelling out
+/// to an external Syncthing process (see
 /// docs/adr/0010-built-in-file-transfer.md): AudiLoc only needs the LAN
 /// connectivity it already has for metadata sync, no second app to
 /// install.
@@ -41,43 +42,19 @@ class FileTransferServer {
   Future<void> _handle(HttpRequest request) async {
     try {
       final segments = request.uri.pathSegments;
-      if (request.method != 'GET' || segments.length != 2 || segments[0] != 'tracks') {
+      if (request.method != 'GET' || segments.length != 2) {
         await _respondNotFound(request);
         return;
       }
 
-      final track = await _tracksRepository.byId(segments[1]);
-      final localPath = track?.path;
-      if (track == null || localPath == null) {
-        await _respondNotFound(request);
-        return;
+      switch (segments[0]) {
+        case 'tracks':
+          await _handleTrack(request, segments[1]);
+        case 'covers':
+          await _handleCover(request, segments[1]);
+        default:
+          await _respondNotFound(request);
       }
-      final file = File(localPath);
-      if (!await file.exists()) {
-        await _respondNotFound(request);
-        return;
-      }
-
-      final length = await file.length();
-      final response = request.response
-        ..headers.set(HttpHeaders.contentTypeHeader, 'application/octet-stream')
-        ..headers.set('X-Original-Extension', p.extension(localPath))
-        ..headers.set(HttpHeaders.acceptRangesHeader, 'bytes');
-
-      final range = request.headers.value(HttpHeaders.rangeHeader);
-      final parsedRange = range == null ? null : _parseRange(range, length);
-      if (parsedRange != null) {
-        final (start, end) = parsedRange;
-        response
-          ..statusCode = HttpStatus.partialContent
-          ..headers.set(HttpHeaders.contentRangeHeader, 'bytes $start-$end/$length')
-          ..headers.contentLength = end - start + 1;
-        await response.addStream(file.openRead(start, end + 1));
-      } else {
-        response.headers.contentLength = length;
-        await response.addStream(file.openRead());
-      }
-      await response.close();
     } catch (_) {
       // Peer disconnected mid-transfer, file vanished between the exists()
       // check and the read, etc. — never let one bad request take the
@@ -89,6 +66,63 @@ class FileTransferServer {
         // Response already closed/broken; nothing more to do.
       }
     }
+  }
+
+  Future<void> _handleTrack(HttpRequest request, String trackId) async {
+    final track = await _tracksRepository.byId(trackId);
+    final localPath = track?.path;
+    if (track == null || localPath == null) {
+      await _respondNotFound(request);
+      return;
+    }
+    final file = File(localPath);
+    if (!await file.exists()) {
+      await _respondNotFound(request);
+      return;
+    }
+
+    final length = await file.length();
+    final response = request.response
+      ..headers.set(HttpHeaders.contentTypeHeader, 'application/octet-stream')
+      ..headers.set('X-Original-Extension', p.extension(localPath))
+      ..headers.set(HttpHeaders.acceptRangesHeader, 'bytes');
+
+    final range = request.headers.value(HttpHeaders.rangeHeader);
+    final parsedRange = range == null ? null : _parseRange(range, length);
+    if (parsedRange != null) {
+      final (start, end) = parsedRange;
+      response
+        ..statusCode = HttpStatus.partialContent
+        ..headers.set(HttpHeaders.contentRangeHeader, 'bytes $start-$end/$length')
+        ..headers.contentLength = end - start + 1;
+      await response.addStream(file.openRead(start, end + 1));
+    } else {
+      response.headers.contentLength = length;
+      await response.addStream(file.openRead());
+    }
+    await response.close();
+  }
+
+  /// No range/resume support — cover art is small enough that a dropped
+  /// connection just means the client retries from scratch.
+  Future<void> _handleCover(HttpRequest request, String trackId) async {
+    final track = await _tracksRepository.byId(trackId);
+    final coverPath = track?.coverPath;
+    if (track == null || coverPath == null) {
+      await _respondNotFound(request);
+      return;
+    }
+    final file = File(coverPath);
+    if (!await file.exists()) {
+      await _respondNotFound(request);
+      return;
+    }
+
+    final response = request.response
+      ..headers.set(HttpHeaders.contentTypeHeader, 'application/octet-stream')
+      ..headers.contentLength = await file.length();
+    await response.addStream(file.openRead());
+    await response.close();
   }
 
   Future<void> _respondNotFound(HttpRequest request) async {
