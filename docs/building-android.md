@@ -123,9 +123,25 @@ Rust-код через `cargokit` под каждый целевой ABI (`arm64
 | `INTERNET`, `ACCESS_NETWORK_STATE` | Встроенная передача файлов между устройствами (docs/adr/0010) и синк метаданных (`crdt_sync`) |
 | `ACCESS_WIFI_STATE`, `CHANGE_WIFI_MULTICAST_STATE` | mDNS-обнаружение устройств в LAN (`bonsoir`) |
 | `READ_MEDIA_AUDIO` (Android 13+), `READ_EXTERNAL_STORAGE` (до Android 12) | Чтение аудиофайлов из выбранной папки при импорте библиотеки |
-| `POST_NOTIFICATIONS` | Задел под будущий `audio_service` (см. ниже) |
+| `POST_NOTIFICATIONS`, `WAKE_LOCK`, `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_MEDIA_PLAYBACK` | `audio_service` — уведомление воспроизведения, лок-скрин, кнопки гарнитуры (см. ниже) |
 
-## 5. Известные ограничения
+## 5. Лок-скрин / уведомление / кнопки гарнитуры
+
+`AudilocAudioHandler` (`lib/services/playback/audiloc_audio_handler.dart`)
+оборачивает существующий `PlayerService` для `audio_service` — сама
+логика воспроизведения не меняется, просто её состояние ещё и
+зеркалится наружу (уведомление, лок-скрин), а команды оттуда (в т.ч.
+клик по кнопке на гарнитуре/Bluetooth-наушниках) приходят обратно в
+тот же `PlayerService`. Включается только на Android
+(`Platform.isAndroid` в `main.dart`) — у `audio_service` нет
+Linux/Windows-реализации, `MainActivity` наследуется от
+`AudioServiceActivity` вместо `FlutterActivity`, `<service>`/
+`<receiver>` прописаны в манифесте. Проверено реальной сборкой
+(`flutter build apk`), живая проверка на устройстве, что уведомление
+и клик по кнопке гарнитуры действительно работают — ещё не сделана
+(следующий шаг для пользователя после установки).
+
+## 6. Известные ограничения
 
 - **`READ_MEDIA_AUDIO` не запрашивается в рантайме.** На Android 13+
   одного объявления в манифесте недостаточно — приложение должно
@@ -133,16 +149,3 @@ Rust-код через `cargokit` под каждый целевой ABI (`arm64
   `permission_handler`). Это не реализовано: на Android 13+ импорт
   папки может увидеть 0 файлов, пока разрешение не выдано пользователем
   каким-то другим путём (вручную через настройки приложения). Роадмап-пункт.
-- **`audio_service` подключён как зависимость, но не связан с
-  плеером.** Для лок-скрин/Bluetooth-кнопок (ТЗ п.3) по-хорошему нужен
-  `AudioHandler`-класс поверх `MediaKitPlayerService`, `MainActivity`
-  должна наследоваться от `FlutterFragmentActivity` (сейчас — обычная
-  `FlutterActivity`, см. `android/app/src/main/kotlin/.../MainActivity.kt`),
-  плюс `<service>`/`<receiver>` в манифесте под `audio_service`. Ничего
-  из этого не сделано — фоновое воспроизведение с системными
-  элементами управления пока не работает, только пока приложение на
-  экране. Отдельная задача на будущее.
-Пункт про Syncthing как отдельный процесс (ранее — про foreground-сервис
-для него) снят: встроенная передача файлов (docs/adr/0010) — это
-обычный HTTP-сервер/клиент в самом процессе приложения, отдельного
-системного сервиса не требует.

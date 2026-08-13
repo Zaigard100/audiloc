@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:io';
 
+import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:media_kit/media_kit.dart';
@@ -8,6 +10,8 @@ import 'app.dart';
 import 'core/providers.dart';
 import 'data/db/audiloc_database.dart';
 import 'data/repositories/devices_repository.dart';
+import 'services/playback/audiloc_audio_handler.dart';
+import 'services/playback/media_kit_player_service.dart';
 import 'services/sync/device_identity_service.dart';
 
 Future<void> main() async {
@@ -19,9 +23,31 @@ Future<void> main() async {
   final identity = DeviceIdentityService(database, devicesRepository);
   final selfDevice = await identity.ensureSelfDevice();
 
+  // Created here rather than left to playerServiceProvider's own default so
+  // the same instance can be handed to AudilocAudioHandler below — the UI
+  // and the OS media session must be driving (and observing) one player,
+  // not two independent ones.
+  final playerService = MediaKitPlayerService();
+
+  // Notification/lock-screen controls + headset buttons (ТЗ п.3). Android
+  // only: audio_service has no Linux/Windows platform implementation (see
+  // AudilocAudioHandler's doc comment), and calling AudioService.init on a
+  // platform without one throws rather than no-op-ing.
+  if (Platform.isAndroid) {
+    await AudioService.init(
+      builder: () => AudilocAudioHandler(playerService),
+      config: const AudioServiceConfig(
+        androidNotificationChannelId: 'com.audiloc.audiloc.channel.audio',
+        androidNotificationChannelName: 'AudiLoc',
+        androidNotificationOngoing: true,
+      ),
+    );
+  }
+
   final container = ProviderContainer(overrides: [
     databaseProvider.overrideWithValue(database),
     selfDeviceProvider.overrideWithValue(selfDevice),
+    playerServiceProvider.overrideWithValue(playerService),
   ]);
 
   // LAN discovery + metadata sync + file transfer all start in the

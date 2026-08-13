@@ -1,5 +1,9 @@
 package com.audiloc.audiloc
 
-import io.flutter.embedding.android.FlutterActivity
+import com.ryanheise.audioservice.AudioServiceActivity
 
-class MainActivity : FlutterActivity()
+// AudioServiceActivity (still a FlutterActivity under the hood) instead of
+// plain FlutterActivity — required by audio_service to share its
+// FlutterEngine with the background playback service. See
+// docs/building-android.md.
+class MainActivity : AudioServiceActivity()

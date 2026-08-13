@@ -14,7 +14,10 @@ lib/
     db/                      — схема sqlite_crdt (docs/data-model.md)
     repositories/            — CRUD + watch() поверх CRDT-таблиц
   services/
-    playback/                — PlayerService (интерфейс) + media_kit
+    playback/                — PlayerService (интерфейс) + media_kit;
+                                AudilocAudioHandler зеркалит его в
+                                audio_service (лок-скрин/уведомление/
+                                гарнитура, Android-only)
     library_import/          — скан папки → теги → sha256 id → tracks
     dedupe/                  — эвристика дублей (docs/adr/0007)
     sync/
