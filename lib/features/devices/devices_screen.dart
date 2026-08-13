@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/providers.dart';
 import '../../core/theme/app_theme.dart';
 import '../../data/models/track.dart';
+import '../about/about_screen.dart';
 import '../library/providers/library_providers.dart';
 import '../profiles/profile_switcher_sheet.dart';
 import 'providers/devices_providers.dart';
@@ -15,6 +16,8 @@ import 'widgets/sync_badge.dart';
 /// confirm-on-both-sides (docs/adr/0011-mutual-pairing-confirmation.md),
 /// not a QR code — there's never been a scanner to read one with, only a
 /// display, so it added a screen without adding a way to actually pair.
+/// Also the entry point to [AboutScreen] — the app has no separate
+/// settings tab, and this is the closest thing to one.
 class DevicesScreen extends ConsumerWidget {
   const DevicesScreen({super.key});
 
@@ -26,7 +29,17 @@ class DevicesScreen extends ConsumerWidget {
     final onlineIds = ref.watch(onlineDeviceIdsProvider).value ?? const {};
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Устройства')),
+      appBar: AppBar(
+        title: const Text('Устройства'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.info_outline),
+            tooltip: 'О приложении',
+            onPressed: () =>
+                Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AboutScreen())),
+          ),
+        ],
+      ),
       body: ListView(
         children: [
           ListTile(

@@ -84,6 +84,10 @@ dependencies:
   # списке сопряжённых — см. docs/adr/0016-device-label.md
   device_info_plus: ^11.5.0
 
+  # Версия приложения на экране "О приложении" — берётся из pubspec.yaml
+  # платформенно, не дублируется вручную
+  package_info_plus: ^8.3.1
+
 # audiotags 1.4.5's android/build.gradle hardcodes compileSdkVersion 31,
 # below what its own transitive AndroidX deps require (34+) on current
 # tooling — build fails with "AAR metadata" errors. Not fixed upstream as
