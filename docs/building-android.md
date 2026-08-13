@@ -37,12 +37,19 @@
    fish_add_path $ANDROID_HOME/cmdline-tools/latest/bin $ANDROID_HOME/platform-tools
    ```
 
-4. Поставить нужные компоненты SDK и принять лицензии:
+4. Поставить нужные компоненты SDK и принять лицензии. Версию платформы
+   берите строго ту, что зафиксирована как `compileSdkVersion` в этой
+   версии Flutter (`android/app/build.gradle.kts` использует
+   `flutter.compileSdkVersion` — сейчас это **36**; при обновлении
+   Flutter SDK значение может измениться, проверить можно в
+   `flutter/packages/flutter_tools/gradle/.../FlutterExtension.kt`):
    ```bash
-   sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+   sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0"
    flutter doctor --android-licenses   # принять все (y)
    ```
-   NDK отдельно ставить не обязательно — Flutter Gradle-плагин сам
+   `minSdk` в проекте — 24 (Android 7.0), т.е. само приложение будет
+   ставиться и работать на устройствах от Android 7.0, компиляция
+   против API 36 на это не влияет. NDK отдельно ставить не обязательно — Flutter Gradle-плагин сам
    подтягивает версию, зафиксированную в `android/app/build.gradle.kts`
    (`ndkVersion = flutter.ndkVersion`), при первой сборке.
 
