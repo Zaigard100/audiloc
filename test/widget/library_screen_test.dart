@@ -8,31 +8,30 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  late AudilocDatabase db;
+  testWidgets('LibraryScreen: empty state, then lists tracks once imported', (tester) async {
+    final db = await AudilocDatabase.openInMemory();
+    addTearDown(db.close);
+    final container = ProviderContainer(overrides: [databaseProvider.overrideWithValue(db)]);
+    addTearDown(container.dispose);
 
-  setUp(() async {
-    db = await AudilocDatabase.openInMemory();
-  });
-
-  tearDown(() => db.close());
-
-  Widget buildApp() => ProviderScope(
-        overrides: [databaseProvider.overrideWithValue(db)],
-        child: const MaterialApp(home: LibraryScreen()),
-      );
-
-  testWidgets('shows the empty state when the library has no tracks', (tester) async {
-    await tester.pumpWidget(buildApp());
-    await tester.pump();
+    await tester.pumpWidget(UncontrolledProviderScope(
+      container: container,
+      child: const MaterialApp(home: LibraryScreen()),
+    ));
+    // Plain pump() drains the event loop each call, letting the
+    // sqflite_common_ffi isolate's initial (empty) query response land.
+    for (var i = 0; i < 30; i++) {
+      await tester.pump();
+      if (find.text('Библиотека пуста').evaluate().isNotEmpty) break;
+    }
 
     expect(find.text('Библиотека пуста'), findsOneWidget);
-  });
 
-  testWidgets('lists tracks once they exist in the repository', (tester) async {
     await TracksRepository(db.crdt).upsert(const Track(id: 't1', path: '/a.mp3', title: 'Song A'));
-
-    await tester.pumpWidget(buildApp());
-    await tester.pump();
+    for (var i = 0; i < 30; i++) {
+      await tester.pump();
+      if (find.text('Song A').evaluate().isNotEmpty) break;
+    }
 
     expect(find.text('Song A'), findsOneWidget);
     expect(find.text('Библиотека пуста'), findsNothing);

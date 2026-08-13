@@ -50,8 +50,7 @@ class MetadataSyncService {
     unawaited(crdt_sync_server.listen(
       _crdt,
       port,
-      onChangesetReceived: (nodeId, counts) =>
-          _statsController.add(SyncStats(deviceId: nodeId, recordCounts: counts)),
+      onChangesetReceived: (nodeId, counts) => _reportStats(nodeId, counts),
       onDisconnect: (peerId, code, reason) => _setState(peerId, PeerSyncState.disconnected),
     ));
   }
@@ -67,8 +66,7 @@ class MetadataSyncService {
       onConnecting: () => _setState(deviceId, PeerSyncState.connecting),
       onConnect: (_, _) => _setState(deviceId, PeerSyncState.connected),
       onDisconnect: (_, _, _) => _setState(deviceId, PeerSyncState.disconnected),
-      onChangesetReceived: (nodeId, counts) =>
-          _statsController.add(SyncStats(deviceId: nodeId, recordCounts: counts)),
+      onChangesetReceived: (nodeId, counts) => _reportStats(nodeId, counts),
     );
     _clients[deviceId] = client;
     client.connect();
@@ -80,9 +78,18 @@ class MetadataSyncService {
     _setState(deviceId, PeerSyncState.disconnected);
   }
 
+  // `crdt_sync` callbacks can fire asynchronously after dispose() has
+  // already closed these controllers (e.g. a peer disconnect event
+  // in flight when the app/service is torn down) — guard both sinks.
   void _setState(String deviceId, PeerSyncState state) {
+    if (_stateController.isClosed) return;
     _states[deviceId] = state;
     _stateController.add((deviceId, state));
+  }
+
+  void _reportStats(String nodeId, Map<String, int> counts) {
+    if (_statsController.isClosed) return;
+    _statsController.add(SyncStats(deviceId: nodeId, recordCounts: counts));
   }
 
   Future<void> dispose() async {

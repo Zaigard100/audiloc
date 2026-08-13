@@ -7,46 +7,42 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  late AudilocDatabase db;
+  testWidgets('TrackTile: renders, favorite toggles offline-first, onTap fires', (tester) async {
+    final db = await AudilocDatabase.openInMemory();
+    addTearDown(db.close);
+    final container = ProviderContainer(overrides: [databaseProvider.overrideWithValue(db)]);
+    addTearDown(container.dispose);
 
-  setUp(() async {
-    db = await AudilocDatabase.openInMemory();
-  });
+    const track = Track(id: 't1', path: '/a.mp3', title: 'Song', artist: 'Artist', album: 'Album');
+    var tapped = false;
 
-  tearDown(() => db.close());
-
-  const track = Track(id: 't1', path: '/a.mp3', title: 'Song', artist: 'Artist', album: 'Album');
-
-  Widget buildApp({VoidCallback? onTap}) => ProviderScope(
-        overrides: [databaseProvider.overrideWithValue(db)],
-        child: MaterialApp(
-          home: Scaffold(body: TrackTile(track: track, onTap: onTap ?? () {})),
-        ),
-      );
-
-  testWidgets('shows title, artist and album', (tester) async {
-    await tester.pumpWidget(buildApp());
-    expect(find.text('Song'), findsOneWidget);
-    expect(find.textContaining('Artist'), findsOneWidget);
-  });
-
-  testWidgets('starts unfavorited and flips immediately on tap (offline-first)', (tester) async {
-    await tester.pumpWidget(buildApp());
+    await tester.pumpWidget(UncontrolledProviderScope(
+      container: container,
+      child: MaterialApp(
+        home: Scaffold(body: TrackTile(track: track, onTap: () => tapped = true)),
+      ),
+    ));
     await tester.pump();
 
+    expect(find.text('Song'), findsOneWidget);
+    expect(find.textContaining('Artist'), findsOneWidget);
     expect(find.byIcon(Icons.favorite_border), findsOneWidget);
 
     await tester.tap(find.byIcon(Icons.favorite_border));
-    await tester.pump();
-    await tester.pump();
+    // The write goes through sqflite_common_ffi's background isolate.
+    // Plain pump() still drains the event loop each call (unlike
+    // pump(duration), which only fast-forwards flutter_test's simulated
+    // clock) — a handful of them is enough for the isolate round trip to
+    // land without needing runAsync()/container.listen(), both of which
+    // were observed to hang the *next* test's teardown in this Flutter
+    // version when mixed with real async I/O inside a widget test.
+    for (var i = 0; i < 30; i++) {
+      await tester.pump();
+      if (find.byIcon(Icons.favorite).evaluate().isNotEmpty) break;
+    }
 
     expect(find.byIcon(Icons.favorite), findsOneWidget);
     expect(find.byIcon(Icons.favorite_border), findsNothing);
-  });
-
-  testWidgets('onTap fires when the tile body is tapped', (tester) async {
-    var tapped = false;
-    await tester.pumpWidget(buildApp(onTap: () => tapped = true));
 
     await tester.tap(find.text('Song'));
     expect(tapped, isTrue);

@@ -37,4 +37,20 @@ void main() {
     final emission = await repository.watchFavoriteIds().first;
     expect(emission, {'track-1'});
   });
+
+  test('watchFavoriteIds emits again after a write made once already subscribed', () async {
+    final stream = repository.watchFavoriteIds();
+    final emissions = <Set<String>>[];
+    final sub = stream.listen(emissions.add);
+    addTearDown(sub.cancel);
+
+    // Let the initial (empty) emission land before writing.
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+    expect(emissions, [<String>{}]);
+
+    await repository.setFavorite('track-1', true);
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+
+    expect(emissions.last, {'track-1'});
+  });
 }

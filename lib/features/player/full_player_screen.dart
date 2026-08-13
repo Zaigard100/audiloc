@@ -34,68 +34,82 @@ class FullPlayerScreen extends ConsumerWidget {
       body: track == null
           ? const Center(child: Text('Ничего не воспроизводится'))
           : SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: Column(
-                  children: [
-                    const Spacer(),
-                    AspectRatio(
-                      aspectRatio: 1,
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(16),
-                        child: track.coverPath != null
-                            ? Image.file(File(track.coverPath!), fit: BoxFit.cover)
-                            : const ColoredBox(
-                                color: AppTheme.surfaceHigh,
-                                child: Icon(Icons.music_note, size: 96, color: AppTheme.onSurfaceMuted),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  // Cap the cover by both width and height so short
+                  // viewports (small windows, landscape phones) scroll
+                  // instead of overflowing — an AspectRatio(1) sized only
+                  // by width would force its height past whatever room is
+                  // actually left.
+                  final coverSize = (constraints.maxHeight * 0.4).clamp(120.0, constraints.maxWidth - 48);
+
+                  return SingleChildScrollView(
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(minHeight: constraints.maxHeight - 32),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          SizedBox(
+                            width: coverSize,
+                            height: coverSize,
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(16),
+                              child: track.coverPath != null
+                                  ? Image.file(File(track.coverPath!), fit: BoxFit.cover)
+                                  : const ColoredBox(
+                                      color: AppTheme.surfaceHigh,
+                                      child: Icon(Icons.music_note, size: 64, color: AppTheme.onSurfaceMuted),
+                                    ),
+                            ),
+                          ),
+                          const SizedBox(height: 32),
+                          Text(
+                            track.displayTitle,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            track.displayArtist,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(color: AppTheme.onSurfaceMuted, fontSize: 15),
+                          ),
+                          const SizedBox(height: 16),
+                          _SeekBar(position: position, onSeek: (d) => ref.read(playerServiceProvider).seek(d)),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              IconButton(
+                                icon: Icon(isFavorite ? Icons.favorite : Icons.favorite_border),
+                                color: isFavorite ? AppTheme.accent : AppTheme.onSurfaceMuted,
+                                iconSize: 28,
+                                onPressed: () => ref.read(favoritesRepositoryProvider).toggle(track.id),
                               ),
+                              IconButton(
+                                icon: const Icon(Icons.skip_previous),
+                                iconSize: 40,
+                                onPressed: () => ref.read(playerServiceProvider).previous(),
+                              ),
+                              IconButton(
+                                icon: Icon(isPlaying ? Icons.pause_circle_filled : Icons.play_circle_filled),
+                                iconSize: 64,
+                                color: AppTheme.accent,
+                                onPressed: () => ref.read(playerServiceProvider).playOrPause(),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.skip_next),
+                                iconSize: 40,
+                                onPressed: () => ref.read(playerServiceProvider).next(),
+                              ),
+                              const SizedBox(width: 28),
+                            ],
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 32),
-                    Text(
-                      track.displayTitle,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      track.displayArtist,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(color: AppTheme.onSurfaceMuted, fontSize: 15),
-                    ),
-                    const SizedBox(height: 16),
-                    _SeekBar(position: position, onSeek: (d) => ref.read(playerServiceProvider).seek(d)),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        IconButton(
-                          icon: Icon(isFavorite ? Icons.favorite : Icons.favorite_border),
-                          color: isFavorite ? AppTheme.accent : AppTheme.onSurfaceMuted,
-                          iconSize: 28,
-                          onPressed: () => ref.read(favoritesRepositoryProvider).toggle(track.id),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.skip_previous),
-                          iconSize: 40,
-                          onPressed: () => ref.read(playerServiceProvider).previous(),
-                        ),
-                        IconButton(
-                          icon: Icon(isPlaying ? Icons.pause_circle_filled : Icons.play_circle_filled),
-                          iconSize: 64,
-                          color: AppTheme.accent,
-                          onPressed: () => ref.read(playerServiceProvider).playOrPause(),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.skip_next),
-                          iconSize: 40,
-                          onPressed: () => ref.read(playerServiceProvider).next(),
-                        ),
-                        const SizedBox(width: 28),
-                      ],
-                    ),
-                    const Spacer(),
-                  ],
-                ),
+                  );
+                },
               ),
             ),
     );

@@ -60,8 +60,15 @@ flutter pub get
 # Статический анализ
 flutter analyze
 
-# Тесты (unit + widget)
-flutter test
+# Тесты: все unit-тесты разом
+flutter test test/unit/
+
+# Тесты: каждый widget-тест по отдельности — см. docs/testing-notes.md
+# (у `flutter test` без аргументов в этой Flutter-сборке есть известное
+# зависание shutdown-процесса после реальных записей в sqflite)
+flutter test test/widget/mini_player_test.dart
+flutter test test/widget/track_tile_test.dart
+flutter test test/widget/library_screen_test.dart
 
 # Запуск на Linux desktop
 flutter run -d linux
@@ -87,6 +94,10 @@ SDK и нет Windows/кросс-тулчейна) — см. `docs/roadmap.md`.
   настоящему localhost-сокету.
 - `test/widget/` — мини-плеер, тайл трека (офлайн-first тоггл
   избранного), экран библиотеки (пустое состояние / список).
+
+Все тесты проходят; про то, почему их стоит запускать директориями/файлами,
+а не одним голым `flutter test` в этой конкретной среде — см.
+[`docs/testing-notes.md`](docs/testing-notes.md).
 
 ## Структура репозитория
 
