@@ -25,6 +25,7 @@ import '../services/sync/files/file_transfer_client.dart';
 import '../services/sync/files/file_transfer_server.dart';
 import '../services/sync/metadata/metadata_sync_service.dart';
 import '../services/sync/pairing/pairing_client.dart';
+import '../services/sync/pairing/pairing_models.dart';
 import '../services/sync/pairing/pairing_server.dart';
 import '../services/sync/pairing/pairing_service.dart';
 import '../services/sync/sync_orchestrator.dart';
@@ -57,9 +58,9 @@ final profileDirProvider = Provider<Directory>(
 
 /// A `StateProvider`, not a plain `Provider` — unlike `selfDeviceProvider`
 /// et al., this one's value can legitimately change *during* a session
-/// (renaming the active profile via the switcher, or "adopting" a peer's
-/// name after pairing — see docs/adr/0013-account-profiles.md) and the
-/// UI needs to react to that without reopening the whole session.
+/// (renaming the active profile via the switcher — see
+/// docs/adr/0013-account-profiles.md) and the UI needs to react to that
+/// without reopening the whole session.
 final currentProfileProvider = StateProvider<Profile>(
   (ref) => throw UnimplementedError('currentProfileProvider must be overridden by profile_session.dart'),
 );
@@ -77,6 +78,16 @@ final profilesStoreProvider = Provider<ProfilesStore>(
 /// that owns the `ProviderContainer` lifecycle this has to replace.
 final switchProfileProvider = Provider<Future<void> Function(String profileId)>(
   (ref) => throw UnimplementedError('switchProfileProvider must be overridden by AudilocApp'),
+);
+
+/// Called by [PairingService.approve] when an incoming request's profile
+/// doesn't match this device's current one — see
+/// docs/adr/0015-profile-identity-in-pairing.md. `PairingService` itself
+/// can't switch profiles (it lives inside the very `ProviderContainer`
+/// that would need tearing down), so `AudilocApp` supplies the real
+/// implementation, same pattern as [switchProfileProvider].
+final joinProfileForPairingProvider = Provider<Future<void> Function(IncomingPairingRequest)>(
+  (ref) => throw UnimplementedError('joinProfileForPairingProvider must be overridden by AudilocApp'),
 );
 
 final tracksRepositoryProvider =
@@ -223,8 +234,13 @@ final pairingClientProvider = Provider<PairingClient>((ref) => PairingClient());
 
 /// Turns a discovered-but-unpaired peer into a `devices` row, only after
 /// both sides confirm — see docs/adr/0011-mutual-pairing-confirmation.md.
+/// "Pairing" also means "add this device to a profile"
+/// (docs/adr/0015-profile-identity-in-pairing.md) — this is why it needs
+/// [currentProfileProvider]'s hash and [joinProfileForPairingProvider],
+/// not just the sync/devices plumbing ADR 0011 needed.
 final pairingServiceProvider = Provider<PairingService>((ref) {
   final self = ref.watch(selfDeviceProvider);
+  final profile = ref.watch(currentProfileProvider);
   final service = PairingService(
     server: ref.watch(pairingServerProvider),
     client: ref.watch(pairingClientProvider),
@@ -232,6 +248,8 @@ final pairingServiceProvider = Provider<PairingService>((ref) {
     metadataSyncService: ref.watch(metadataSyncServiceProvider),
     selfId: self.id,
     selfName: self.name,
+    selfProfileHash: profile.profileHash,
+    onJoinDifferentProfile: ref.watch(joinProfileForPairingProvider),
     pairingPort: pairingPort,
     metadataSyncPort: metadataSyncPort,
   );

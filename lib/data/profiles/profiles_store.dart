@@ -34,12 +34,30 @@ class ProfilesStore {
     await _write(state.copyWith(activeProfileId: id));
   }
 
-  Future<Profile> create(String name) async {
-    final profile = Profile(id: _uuid.v4(), name: name, createdAt: DateTime.now());
+  /// [profileHash], if given, joins this profile to an existing shared
+  /// identity (docs/adr/0015) — used when this device is adopting a
+  /// profile it was just paired into. Left unset for the ordinary "brand
+  /// new profile" case, where a fresh hash is generated.
+  Future<Profile> create(String name, {String? profileHash}) async {
+    final profile = Profile(
+      id: _uuid.v4(),
+      name: name,
+      createdAt: DateTime.now(),
+      profileHash: profileHash ?? _uuid.v4(),
+    );
     await profileDir(profile.id).create(recursive: true);
     final state = await _read();
     await _write(state.copyWith(profiles: [...state.profiles, profile]));
     return profile;
+  }
+
+  /// Finds a profile this device already has a local copy of, by its
+  /// shared [profileHash] — see docs/adr/0015-profile-identity-in-pairing.md.
+  Future<Profile?> findByHash(String hash) async {
+    for (final profile in await list()) {
+      if (profile.profileHash == hash) return profile;
+    }
+    return null;
   }
 
   Future<void> rename(String id, String name) async {

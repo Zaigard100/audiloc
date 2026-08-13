@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:audiloc/data/profiles/profiles_store.dart';
@@ -141,6 +142,53 @@ void main() {
       final id = await store.resolveActiveProfileId();
 
       expect(await File(p.join(store.profileDir(id).path, 'audiloc.db')).exists(), isFalse);
+    });
+  });
+
+  group('profileHash (docs/adr/0015-profile-identity-in-pairing.md)', () {
+    test('create() without a profileHash generates a fresh one, distinct per profile', () async {
+      final a = await store.create('A');
+      final b = await store.create('B');
+
+      expect(a.profileHash, isNotEmpty);
+      expect(b.profileHash, isNotEmpty);
+      expect(a.profileHash, isNot(b.profileHash));
+    });
+
+    test('create(profileHash: ...) joins an existing shared identity instead of generating one',
+        () async {
+      final profile = await store.create('Joined Profile', profileHash: 'shared-hash-123');
+
+      expect(profile.profileHash, 'shared-hash-123');
+    });
+
+    test('findByHash finds a profile this device already has a local copy of', () async {
+      final joined = await store.create('Joined Profile', profileHash: 'shared-hash-123');
+      await store.create('Unrelated');
+
+      expect(await store.findByHash('shared-hash-123'), isNotNull);
+      expect((await store.findByHash('shared-hash-123'))!.id, joined.id);
+    });
+
+    test('findByHash returns null when no local profile matches', () async {
+      await store.create('A');
+      expect(await store.findByHash('nonexistent-hash'), isNull);
+    });
+
+    test(
+        'a profiles.json written before profileHash existed still loads — falls back to using '
+        'id as the hash, which is just as unique', () async {
+      final legacyId = 'legacy-profile-id';
+      await File(p.join(appSupportDir.path, 'profiles.json')).writeAsString(jsonEncode({
+        'profiles': [
+          {'id': legacyId, 'name': 'Old Profile', 'createdAt': DateTime.now().toIso8601String()},
+        ],
+        'activeProfileId': legacyId,
+      }));
+
+      final profile = (await store.list()).single;
+      expect(profile.id, legacyId);
+      expect(profile.profileHash, legacyId);
     });
   });
 }

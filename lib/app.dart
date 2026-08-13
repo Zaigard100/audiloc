@@ -10,12 +10,11 @@ import 'core/profile_session.dart';
 import 'core/providers.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
-import 'data/models/device.dart';
 import 'data/profiles/profiles_store.dart';
-import 'features/devices/providers/devices_providers.dart';
 import 'features/profiles/initial_profile_name_screen.dart';
 import 'services/playback/audiloc_audio_handler.dart';
 import 'services/playback/media_kit_player_service.dart';
+import 'services/sync/pairing/pairing_models.dart';
 
 /// The app's root widget and the owner of the current profile session's
 /// lifecycle (docs/adr/0013-account-profiles.md) — everything below it
@@ -39,13 +38,14 @@ class _AudilocAppState extends State<AudilocApp> {
   ProfileSessionHandle? _session;
   bool _needsInitialProfileName = false;
 
-  /// Set while this device is a placeholder profile waiting to adopt the
-  /// name of whichever device it gets paired with (the "Ждать сопряжения"
-  /// button — same-owner, second-device scenario, see
-  /// docs/adr/0013-account-profiles.md). Drives the banner in [build] and
-  /// gates the listener in [_watchForProfileAdoption].
+  /// Set while this device is a placeholder profile waiting to be paired
+  /// into an existing one (the "Ждать сопряжения" button — same-owner,
+  /// second-device scenario). Just drives the banner in [build] — the
+  /// actual adoption happens through the ordinary pairing-approve flow
+  /// (see [_joinProfileForPairing]), which always switches this device
+  /// onto the requester's profile when the hashes don't already match,
+  /// clearing this flag as a side effect of [_switchProfile].
   bool _awaitingProfileAdoption = false;
-  ProviderSubscription<AsyncValue<List<Device>>>? _adoptionSubscription;
 
   @override
   void initState() {
@@ -98,11 +98,12 @@ class _AudilocAppState extends State<AudilocApp> {
     await _openProfile(profile.id);
   }
 
-  /// "Это моё второе устройство" (see `InitialProfileNameScreen`'s doc
-  /// comment for why this is a placeholder-that-adopts-a-name rather than
-  /// literally joining an existing profile). Opens a session normally,
-  /// then starts [_watchForProfileAdoption] to pick up the paired
-  /// device's name the moment pairing actually completes.
+  /// "Это моё второе устройство" — creates an empty placeholder profile
+  /// and opens it. No bespoke watching logic needed beyond that: the
+  /// moment another device pairs *into* this one, the ordinary
+  /// approve-flow (see [_joinProfileForPairing]) finds the placeholder's
+  /// hash doesn't match the requester's, and switches this device onto
+  /// (a fresh local copy of) the requester's profile — docs/adr/0015.
   Future<void> _waitForPairing() async {
     final profile = await _profilesStore!.create('Новое устройство');
     await _profilesStore!.setActiveProfileId(profile.id);
@@ -112,52 +113,31 @@ class _AudilocAppState extends State<AudilocApp> {
       _awaitingProfileAdoption = true;
     });
     await _openProfile(profile.id);
-    _watchForProfileAdoption();
   }
 
-  /// Watches this (placeholder) profile's paired-devices list; the moment
-  /// it stops being empty, pairing succeeded (through the ordinary
-  /// confirm-on-both-sides flow — nothing here changes that, see
-  /// docs/adr/0011-mutual-pairing-confirmation.md) — adopt that peer's
-  /// name as this profile's own and stop waiting.
-  void _watchForProfileAdoption() {
-    final session = _session;
-    if (session == null) return;
-    final selfId = session.container.read(selfDeviceProvider).id;
-    _adoptionSubscription = session.container.listen<AsyncValue<List<Device>>>(
-      knownDevicesProvider,
-      (previous, next) {
-        final peer = _firstPeer(next.value, selfId);
-        if (peer != null) unawaited(_adoptProfileName(peer.name));
-      },
-      // Covers a pairing response that already arrived in the gap between
-      // the session becoming usable and this listener attaching.
-      fireImmediately: true,
-    );
-  }
+  /// Handed to [openProfileSession] as `joinProfileForPairing` — called
+  /// by `PairingService.approve()` when an incoming request's profile
+  /// doesn't match the one currently active (docs/adr/0015-profile-identity-in-pairing.md).
+  /// Finds (or creates) a local copy of the requester's profile, switches
+  /// onto it if it isn't already active, then pairs the requester in —
+  /// the switch alone is what turns "two independent libraries" into
+  /// "download the requester's library into this now-empty-or-matching
+  /// profile" via the ordinary CRDT sync that follows.
+  Future<void> _joinProfileForPairing(IncomingPairingRequest request) async {
+    final store = _profilesStore!;
+    final target = await store.findByHash(request.profileHash) ??
+        await store.create(request.fromName, profileHash: request.profileHash);
 
-  Device? _firstPeer(List<Device>? devices, String selfId) {
-    if (devices == null) return null;
-    for (final device in devices) {
-      if (device.id != selfId) return device;
+    final currentProfileId = _session?.container.read(currentProfileProvider).id;
+    if (currentProfileId != target.id) {
+      await _switchProfile(target.id);
     }
-    return null;
-  }
 
-  Future<void> _adoptProfileName(String name) async {
-    _adoptionSubscription?.close();
-    _adoptionSubscription = null;
     final session = _session;
-    if (session == null) return;
-    await applyActiveProfileRename(
-      profilesStore: _profilesStore!,
-      deviceIdentity: session.container.read(deviceIdentityServiceProvider),
-      current: session.container.read(currentProfileProvider),
-      setCurrentProfile: (p) => session.container.read(currentProfileProvider.notifier).state = p,
-      name: name,
-    );
-    if (!mounted) return;
-    setState(() => _awaitingProfileAdoption = false);
+    if (session == null) return; // shouldn't happen, but never crash on it
+    await session.container
+        .read(pairingServiceProvider)
+        .pairWithoutResponding(id: request.fromId, name: request.fromName, host: request.fromHost);
   }
 
   Future<void> _openProfile(String profileId) async {
@@ -166,6 +146,7 @@ class _AudilocAppState extends State<AudilocApp> {
       playerService: _playerService,
       profilesStore: _profilesStore!,
       switchProfile: _switchProfile,
+      joinProfileForPairing: _joinProfileForPairing,
     );
     if (!mounted) {
       await session.close();
@@ -175,8 +156,6 @@ class _AudilocAppState extends State<AudilocApp> {
   }
 
   Future<void> _switchProfile(String profileId) async {
-    _adoptionSubscription?.close();
-    _adoptionSubscription = null;
     if (_awaitingProfileAdoption) setState(() => _awaitingProfileAdoption = false);
     final old = _session;
     setState(() => _session = null); // brief loading state during the swap
@@ -190,7 +169,6 @@ class _AudilocAppState extends State<AudilocApp> {
 
   @override
   void dispose() {
-    _adoptionSubscription?.close();
     unawaited(_session?.close());
     unawaited(_playerService.dispose());
     super.dispose();

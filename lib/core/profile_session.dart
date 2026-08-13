@@ -9,6 +9,7 @@ import '../data/profiles/profiles_store.dart';
 import '../data/repositories/devices_repository.dart';
 import '../services/playback/player_service.dart';
 import '../services/sync/device_identity_service.dart';
+import '../services/sync/pairing/pairing_models.dart';
 import 'providers.dart';
 
 /// Everything that depends on which profile is active: its database, CRDT
@@ -84,6 +85,7 @@ Future<ProfileSessionHandle> openProfileSession({
   required PlayerService playerService,
   required ProfilesStore profilesStore,
   required Future<void> Function(String profileId) switchProfile,
+  required Future<void> Function(IncomingPairingRequest) joinProfileForPairing,
 }) async {
   final profiles = await profilesStore.list();
   final profile = profiles.firstWhere((p) => p.id == profileId);
@@ -109,6 +111,7 @@ Future<ProfileSessionHandle> openProfileSession({
     currentProfileProvider.overrideWith((ref) => profile),
     profilesStoreProvider.overrideWithValue(profilesStore),
     switchProfileProvider.overrideWithValue(switchProfile),
+    joinProfileForPairingProvider.overrideWithValue(joinProfileForPairing),
   ]);
 
   // The three fixed-port *bind* calls are awaited — deliberately *not*

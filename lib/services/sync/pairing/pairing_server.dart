@@ -53,21 +53,25 @@ class PairingServer {
       final body = jsonDecode(await utf8.decoder.bind(request).join()) as Map<String, Object?>;
       final id = body['id'] as String?;
       final name = body['name'] as String?;
+      final profileHash = body['profileHash'] as String?;
       // The client's own remote address, not anything the body claims —
       // this is what a pairing decision actually gets sent back to.
       final host = request.connectionInfo?.remoteAddress.address;
-      if (id == null || name == null || host == null) {
+      if (id == null || name == null || profileHash == null || host == null) {
         request.response.statusCode = HttpStatus.badRequest;
         await request.response.close();
         return;
       }
 
       if (path == '/pair/request') {
-        _requestsController.add(IncomingPairingRequest(fromId: id, fromName: name, fromHost: host));
+        _requestsController.add(
+          IncomingPairingRequest(fromId: id, fromName: name, fromHost: host, profileHash: profileHash),
+        );
       } else {
         final accepted = body['accepted'] == true;
-        _responsesController
-            .add(PairingResponse(fromId: id, fromName: name, fromHost: host, accepted: accepted));
+        _responsesController.add(
+          PairingResponse(fromId: id, fromName: name, fromHost: host, accepted: accepted, profileHash: profileHash),
+        );
       }
 
       request.response.statusCode = HttpStatus.accepted;

@@ -12,8 +12,12 @@ class PairingClient {
     required int port,
     required String fromId,
     required String fromName,
+    required String profileHash,
   }) =>
-      _dio.post<void>('http://$host:$port/pair/request', data: {'id': fromId, 'name': fromName});
+      _dio.post<void>(
+        'http://$host:$port/pair/request',
+        data: {'id': fromId, 'name': fromName, 'profileHash': profileHash},
+      );
 
   Future<void> sendResponse({
     required String host,
@@ -21,9 +25,10 @@ class PairingClient {
     required String fromId,
     required String fromName,
     required bool accepted,
+    required String profileHash,
   }) =>
       _dio.post<void>(
         'http://$host:$port/pair/response',
-        data: {'id': fromId, 'name': fromName, 'accepted': accepted},
+        data: {'id': fromId, 'name': fromName, 'accepted': accepted, 'profileHash': profileHash},
       );
 }

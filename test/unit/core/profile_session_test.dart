@@ -7,6 +7,7 @@ import 'package:audiloc/data/models/track.dart';
 import 'package:audiloc/data/profiles/profile.dart';
 import 'package:audiloc/data/profiles/profiles_store.dart';
 import 'package:audiloc/services/playback/player_service.dart';
+import 'package:audiloc/services/sync/pairing/pairing_models.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// `openProfileSession` doesn't touch playback beyond clearing the queue
@@ -44,6 +45,7 @@ class _NoopPlayerService implements PlayerService {
 }
 
 Future<void> _noopSwitch(String profileId) async {}
+Future<void> _noopJoin(IncomingPairingRequest request) async {}
 
 void main() {
   test(
@@ -66,6 +68,7 @@ void main() {
       playerService: player,
       profilesStore: store,
       switchProfile: _noopSwitch,
+      joinProfileForPairing: _noopJoin,
     );
     await first.close();
 
@@ -77,6 +80,7 @@ void main() {
       playerService: player,
       profilesStore: store,
       switchProfile: _noopSwitch,
+      joinProfileForPairing: _noopJoin,
     );
     await second.close();
   });
@@ -96,6 +100,7 @@ void main() {
       playerService: player,
       profilesStore: store,
       switchProfile: _noopSwitch,
+      joinProfileForPairing: _noopJoin,
     );
     addTearDown(session.close);
 
@@ -116,6 +121,7 @@ void main() {
       playerService: player,
       profilesStore: store,
       switchProfile: _noopSwitch,
+      joinProfileForPairing: _noopJoin,
     );
     await first.close();
 
@@ -126,6 +132,7 @@ void main() {
       playerService: player,
       profilesStore: store,
       switchProfile: _noopSwitch,
+      joinProfileForPairing: _noopJoin,
     );
     addTearDown(second.close);
 
@@ -134,8 +141,7 @@ void main() {
 
   test(
       'applyActiveProfileRename updates the registry, the self-device row, and the live '
-      "state in one call — this is what backs both the switcher's rename and adopting a "
-      'peer\'s name after "Ждать сопряжения" pairing', () async {
+      'state in one call — used by the profile switcher\'s manual rename', () async {
     final appSupportDir = await Directory.systemTemp.createTemp('audiloc_session_apply_rename_');
     addTearDown(() => appSupportDir.delete(recursive: true));
     final store = ProfilesStore(appSupportDir);
@@ -147,6 +153,7 @@ void main() {
       playerService: player,
       profilesStore: store,
       switchProfile: _noopSwitch,
+      joinProfileForPairing: _noopJoin,
     );
     addTearDown(session.close);
 

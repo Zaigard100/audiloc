@@ -62,11 +62,25 @@ class AppShell extends ConsumerWidget {
   }
 
   void _showPairingRequestDialog(BuildContext context, WidgetRef ref, IncomingPairingRequest request) {
+    // Same profile already (re-pairing a lost device, or this is the
+    // requester's own second device that already adopted its hash) —
+    // no switch is about to happen, keep the message simple. Different
+    // profile — approving will switch this device onto the requester's
+    // profile instead of merging two independent libraries together, see
+    // docs/adr/0015-profile-identity-in-pairing.md; say so plainly.
+    final sameProfile = ref.read(currentProfileProvider).profileHash == request.profileHash;
     showDialog<void>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Запрос на сопряжение'),
-        content: Text('«${request.fromName}» хочет синхронизироваться с этим устройством.'),
+        content: Text(
+          sameProfile
+              ? '«${request.fromName}» хочет синхронизироваться с этим устройством.'
+              : '«${request.fromName}» хочет добавить это устройство в свой профиль. '
+                  'Если вы согласитесь, это устройство переключится на профиль '
+                  '«${request.fromName}» и загрузит его библиотеку — ваш текущий профиль '
+                  'никуда не денется, вернуться к нему можно через переключатель профилей.',
+        ),
         actions: [
           TextButton(
             onPressed: () {
