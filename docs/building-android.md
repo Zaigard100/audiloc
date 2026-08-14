@@ -94,24 +94,38 @@ Rust-код через `cargokit` под каждый целевой ABI (`arm64
 
 ## 3. Подпись release-сборки
 
-Сейчас `android/app/build.gradle.kts` подписывает release debug-ключом
-(`signingConfig = signingConfigs.getByName("debug")`) — этого
-достаточно для локального тестирования release-сборки, но **не**
-годится для публикации. Перед реальным релизом:
+`android/app/build.gradle.kts` уже настроен на реальную подпись:
+читает `android/key.properties` (если файл существует) и подписывает
+release-сборку им; если файла нет — молча откатывается на debug-ключ,
+так что `flutter build apk --release` работает и без подписи, просто
+для распространения (Google Play, прямая установка на чужое
+устройство) не годится.
 
-1. Сгенерировать keystore:
-   ```bash
-   keytool -genkey -v -keystore ~/audiloc-release.jks \
-     -keyalg RSA -keysize 2048 -validity 10000 -alias audiloc
+Keystore уже сгенерирован (`~/audiloc-release.jks`, alias `audiloc`).
+Чтобы включить реальную подпись:
+
+1. Открыть `android/key.properties` (уже заведён, gitignored — не
+   коммитится, `android/.gitignore` это гарантирует) и заполнить два
+   пароля (`storePassword`, `keyPassword` — те, что задавали при
+   `keytool -genkey`):
    ```
-2. Завести `android/key.properties` (не коммитить — добавить в
-   `.gitignore`) со ссылкой на keystore и паролями.
-3. Подключить `key.properties` в `android/app/build.gradle.kts` и
-   заменить `signingConfig` release-варианта на новый —
-   см. [официальный гайд Flutter по подписи Android-сборок](https://docs.flutter.dev/deployment/android#signing-the-app).
+   storePassword=...
+   keyPassword=...
+   keyAlias=audiloc
+   storeFile=/home/zaigard/audiloc-release.jks
+   ```
+2. Собрать как обычно — `flutter build apk --release` или
+   `flutter build appbundle --release` теперь подписывают этим ключом
+   автоматически, никаких дополнительных флагов не нужно.
 
-Это не сделано в текущем MVP-объёме — приложение не готово к
-публикации в таком виде, только к локальной сборке/тестированию.
+Если `key.properties` нужно завести заново (потерян, новая машина) —
+[официальный гайд Flutter по подписи Android-сборок](https://docs.flutter.dev/deployment/android#signing-the-app)
+описывает тот же паттерн, которым тут всё уже подключено.
+
+**Храните `~/audiloc-release.jks` и пароли к нему отдельно от
+репозитория** (менеджер паролей, отдельный зашифрованный бэкап) — при
+потере ключа обновить уже опубликованное в Google Play приложение
+станет невозможно, придётся публиковать под новым `applicationId`.
 
 ## 4. Разрешения (уже прописаны в манифесте)
 
