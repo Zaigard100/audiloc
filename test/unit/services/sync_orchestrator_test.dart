@@ -188,7 +188,10 @@ void main() {
       );
       addTearDown(orchestrator.dispose);
 
-      await orchestrator.start(8541);
+      // A test-only port, distinct from the app's real default (8541,
+      // which other test files — profile_session_test.dart in particular —
+      // bind for real, concurrently, in the same `flutter test` run.
+      await orchestrator.start(8573);
       await orchestrator.restartDiscovery();
     });
   });
