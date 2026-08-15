@@ -4,32 +4,39 @@ import 'package:bonsoir/bonsoir.dart';
 
 import 'discovered_peer.dart';
 import 'discovery_event.dart';
+import 'peer_presence_tracker.dart';
 
 /// Finds other AudiLoc installations on the LAN via mDNS/Bonjour (ТЗ п.3,
 /// "Обнаружение устройств в LAN" → bonsoir) and advertises this one.
 ///
 /// This only does discovery — it doesn't open any sync connection itself.
 /// `MetadataSyncService` listens to [events] and decides what to do with a
-/// found/lost peer.
+/// found/lost peer. Raw bonsoir found/lost signals are debounced and
+/// replayed to late subscribers by [PeerPresenceTracker] — see its doc and
+/// docs/adr/0025-sync-and-discovery-reliability.md for why every consumer
+/// (`SyncOrchestrator`, `FileSyncService`/`CoverSyncService`, the
+/// Устройства-screen providers) needed that rather than reacting to raw
+/// bonsoir events directly.
 class DiscoveryService {
   DiscoveryService({
     required String selfDeviceId,
     required String selfDeviceName,
+    Duration lostDebounce = const Duration(seconds: 6),
   })  : _selfDeviceId = selfDeviceId,
-        _selfDeviceName = selfDeviceName;
+        _selfDeviceName = selfDeviceName,
+        _presence = PeerPresenceTracker(lostDebounce: lostDebounce);
 
   static const _serviceType = '_audiloc._tcp';
 
   final String _selfDeviceId;
   final String _selfDeviceName;
+  final PeerPresenceTracker _presence;
 
   BonsoirBroadcast? _broadcast;
   BonsoirDiscovery? _discovery;
   StreamSubscription<BonsoirDiscoveryEvent>? _discoverySub;
 
-  final _eventsController = StreamController<DiscoveryEvent>.broadcast();
-
-  Stream<DiscoveryEvent> get events => _eventsController.stream;
+  Stream<DiscoveryEvent> get events => _presence.events;
 
   /// Publishes this device on the LAN so peers can find it. [port] is the
   /// local `MetadataSyncService` WebSocket port.
@@ -75,12 +82,10 @@ class DiscoveryService {
         event.service.resolve(discovery.serviceResolver);
       case BonsoirDiscoveryServiceResolvedEvent():
         final peer = _peerFrom(event.service);
-        if (peer != null) _eventsController.add(PeerFound(peer));
+        if (peer != null) _presence.markFound(peer);
       case BonsoirDiscoveryServiceLostEvent():
         final id = event.service.attributes['id'];
-        if (id != null && id != _selfDeviceId) {
-          _eventsController.add(PeerLost(id));
-        }
+        if (id != null && id != _selfDeviceId) _presence.scheduleLost(id);
       default:
         break;
     }
@@ -101,6 +106,6 @@ class DiscoveryService {
   Future<void> dispose() async {
     await stopAdvertising();
     await stopDiscovery();
-    await _eventsController.close();
+    await _presence.dispose();
   }
 }

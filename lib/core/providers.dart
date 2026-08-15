@@ -179,6 +179,7 @@ const pairingPort = 8543;
 
 final syncOrchestratorProvider = Provider<SyncOrchestrator>((ref) {
   final orchestrator = SyncOrchestrator(
+    selfDeviceId: ref.watch(selfDeviceProvider).id,
     discoveryService: ref.watch(discoveryServiceProvider),
     metadataSyncService: ref.watch(metadataSyncServiceProvider),
     devicesRepository: ref.watch(devicesRepositoryProvider),

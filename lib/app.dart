@@ -38,6 +38,21 @@ class _AudilocAppState extends State<AudilocApp> {
   ProfileSessionHandle? _session;
   bool _needsInitialProfileName = false;
 
+  /// Set when [_bootstrap] or [_openProfile] throws — without this, an
+  /// exception anywhere in that startup chain (a port still held by a
+  /// process that hasn't released it yet, a transient filesystem error,
+  /// anything) left [_session] permanently null with nothing to show but
+  /// the loading spinner in [build] forever: no error, no retry, nothing
+  /// in the UI to tell the user (or this developer) anything went wrong.
+  /// See docs/adr/0025-sync-and-discovery-reliability.md.
+  Object? _startupError;
+
+  /// The profile id [_openProfile] was last asked to open — kept so
+  /// [_retryStartup] can retry the same profile rather than re-deriving
+  /// one, which after a mid-switch failure could resolve to the wrong
+  /// (old) profile.
+  String? _pendingProfileId;
+
   /// Set while this device is a placeholder profile waiting to be paired
   /// into an existing one (the "Ждать сопряжения" button — same-owner,
   /// second-device scenario). Drives the banner in [build], and — via
@@ -58,39 +73,57 @@ class _AudilocAppState extends State<AudilocApp> {
   }
 
   Future<void> _bootstrap() async {
-    // Notification/lock-screen controls + headset buttons (ТЗ п.3).
-    // Android only: audio_service has no Linux/Windows platform
-    // implementation, and calling AudioService.init on a platform without
-    // one throws rather than no-op-ing. Done once here, not per profile —
-    // it just mirrors whatever the (also process-lifetime) player is
-    // doing, regardless of which profile that happens to be.
-    if (Platform.isAndroid) {
-      await AudioService.init(
-        builder: () => AudilocAudioHandler(_playerService),
-        config: const AudioServiceConfig(
-          androidNotificationChannelId: 'com.audiloc.audiloc.channel.audio',
-          androidNotificationChannelName: 'AudiLoc',
-          androidNotificationOngoing: true,
-        ),
-      );
-    }
+    try {
+      // Notification/lock-screen controls + headset buttons (ТЗ п.3).
+      // Android only: audio_service has no Linux/Windows platform
+      // implementation, and calling AudioService.init on a platform without
+      // one throws rather than no-op-ing. Done once here, not per profile —
+      // it just mirrors whatever the (also process-lifetime) player is
+      // doing, regardless of which profile that happens to be.
+      if (Platform.isAndroid) {
+        await AudioService.init(
+          builder: () => AudilocAudioHandler(_playerService),
+          config: const AudioServiceConfig(
+            androidNotificationChannelId: 'com.audiloc.audiloc.channel.audio',
+            androidNotificationChannelName: 'AudiLoc',
+            androidNotificationOngoing: true,
+          ),
+        );
+      }
 
-    final appSupportDir = await getApplicationSupportDirectory();
-    final store = ProfilesStore(appSupportDir);
-    if (!mounted) return;
-    setState(() => _profilesStore = store);
-
-    // A genuinely fresh install (nothing to migrate either) — ask for a
-    // name instead of silently calling it "Профиль 1". Anyone upgrading
-    // from before profiles existed skips this entirely: their library
-    // gets migrated and reopened with zero prompts, same as always.
-    if (await store.needsInitialSetup()) {
+      final appSupportDir = await getApplicationSupportDirectory();
+      final store = ProfilesStore(appSupportDir);
       if (!mounted) return;
-      setState(() => _needsInitialProfileName = true);
-      return;
-    }
+      setState(() => _profilesStore = store);
 
-    await _openProfile(await store.resolveActiveProfileId());
+      // A genuinely fresh install (nothing to migrate either) — ask for a
+      // name instead of silently calling it "Профиль 1". Anyone upgrading
+      // from before profiles existed skips this entirely: their library
+      // gets migrated and reopened with zero prompts, same as always.
+      if (await store.needsInitialSetup()) {
+        if (!mounted) return;
+        setState(() => _needsInitialProfileName = true);
+        return;
+      }
+
+      await _openProfile(await store.resolveActiveProfileId());
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _startupError = error);
+    }
+  }
+
+  /// Bound to the "Повторить" button on the startup-error screen — retries
+  /// whatever step failed rather than making the user force-quit and
+  /// relaunch, which was previously the only way out of a failed startup.
+  Future<void> _retryStartup() async {
+    setState(() => _startupError = null);
+    final pendingId = _pendingProfileId;
+    if (pendingId != null) {
+      await _openProfile(pendingId);
+    } else {
+      await _bootstrap();
+    }
   }
 
   Future<void> _createInitialProfile(String name) async {
@@ -173,20 +206,30 @@ class _AudilocAppState extends State<AudilocApp> {
   }
 
   Future<void> _openProfile(String profileId) async {
-    final session = await openProfileSession(
-      profileId: profileId,
-      playerService: _playerService,
-      profilesStore: _profilesStore!,
-      switchProfile: _switchProfile,
-      joinProfileForPairing: _joinProfileForPairing,
-      canJoinDifferentProfile: () async => _awaitingProfileAdoption,
-      waitForPairing: _waitForPairing,
-    );
-    if (!mounted) {
-      await session.close();
-      return;
+    _pendingProfileId = profileId;
+    try {
+      final session = await openProfileSession(
+        profileId: profileId,
+        playerService: _playerService,
+        profilesStore: _profilesStore!,
+        switchProfile: _switchProfile,
+        joinProfileForPairing: _joinProfileForPairing,
+        canJoinDifferentProfile: () async => _awaitingProfileAdoption,
+        waitForPairing: _waitForPairing,
+      );
+      if (!mounted) {
+        await session.close();
+        return;
+      }
+      setState(() {
+        _session = session;
+        _startupError = null;
+        _pendingProfileId = null;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _startupError = error);
     }
-    setState(() => _session = session);
   }
 
   Future<void> _switchProfile(String profileId) async {
@@ -223,13 +266,45 @@ class _AudilocAppState extends State<AudilocApp> {
 
     final session = _session;
     if (session == null) {
+      final error = _startupError;
       return MaterialApp(
         title: 'AudiLoc',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.dark(),
         darkTheme: AppTheme.dark(),
         themeMode: ThemeMode.dark,
-        home: const Scaffold(body: Center(child: CircularProgressIndicator())),
+        home: error == null
+            ? const Scaffold(body: Center(child: CircularProgressIndicator()))
+            : Scaffold(
+                body: SafeArea(
+                  child: Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          const Icon(Icons.error_outline, size: 48, color: AppTheme.accent),
+                          const SizedBox(height: 16),
+                          const Text(
+                            'Не удалось запустить AudiLoc',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            '$error',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(color: AppTheme.onSurfaceMuted, fontSize: 13),
+                          ),
+                          const SizedBox(height: 24),
+                          FilledButton(onPressed: _retryStartup, child: const Text('Повторить')),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
       );
     }
 

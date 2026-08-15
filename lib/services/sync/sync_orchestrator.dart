@@ -2,6 +2,7 @@ import 'dart:async';
 
 import '../../data/models/device.dart';
 import '../../data/repositories/devices_repository.dart';
+import 'discovery/discovered_peer.dart';
 import 'discovery/discovery_event.dart';
 import 'discovery/discovery_service.dart';
 import 'metadata/metadata_sync_service.dart';
@@ -19,16 +20,19 @@ import 'metadata/sync_stats.dart';
 /// that already made it into that table.
 class SyncOrchestrator {
   SyncOrchestrator({
+    required String selfDeviceId,
     required DiscoveryService discoveryService,
     required MetadataSyncService metadataSyncService,
     required DevicesRepository devicesRepository,
-  })  : _discoveryService = discoveryService,
+  })  : _selfDeviceId = selfDeviceId,
+        _discoveryService = discoveryService,
         _metadataSyncService = metadataSyncService,
         _devicesRepository = devicesRepository {
     _discoverySub = _discoveryService.events.listen(_handleDiscoveryEvent);
     _statsSub = _metadataSyncService.onChangesetApplied.listen(_recentSyncController.add);
   }
 
+  final String _selfDeviceId;
   final DiscoveryService _discoveryService;
   final MetadataSyncService _metadataSyncService;
   final DevicesRepository _devicesRepository;
@@ -63,16 +67,47 @@ class SyncOrchestrator {
         // so the user can send/receive a pairing request for it instead.
         final existing = await _devicesRepository.byId(peer.deviceId);
         if (existing == null) return;
-        await _devicesRepository.upsert(Device(
-          id: peer.deviceId,
-          name: peer.name,
-          host: peer.host,
-          syncPort: peer.port,
-          lastOnlineAt: DateTime.now().millisecondsSinceEpoch,
-        ));
-        _metadataSyncService.connectToPeer(peer.deviceId, peer.metadataSyncUri);
+        await _refreshDeviceRecord(existing, peer);
+        // Both sides discover each other via mDNS and would otherwise
+        // each dial out independently, opening two redundant connections
+        // for the same pair — doubling traffic, and with 3+ mutually
+        // paired devices, doubling every hop of the relay each of those
+        // connections' server side also does for third-party changes
+        // (docs/adr/0025-sync-and-discovery-reliability.md). Only the side whose
+        // id sorts lower initiates; the other just accepts the incoming
+        // connection — both sides compute the same comparison, so exactly
+        // one of them ever dials.
+        if (_selfDeviceId.compareTo(peer.deviceId) < 0) {
+          _metadataSyncService.connectToPeer(peer.deviceId, peer.metadataSyncUri);
+        }
       case PeerLost(:final deviceId):
         await _metadataSyncService.disconnectFromPeer(deviceId);
+    }
+  }
+
+  /// `devices` is a CRDT table — any write here is synced to every paired
+  /// peer. Unconditionally upserting on every discovery event (bonsoir
+  /// re-announces each peer periodically, more often in aggregate with
+  /// more devices) turned into a steady drip of no-op "changes" rippling
+  /// around the mesh, which is most of what showed up as "endless
+  /// synchronization" with 3+ devices (docs/adr/0025-sync-and-discovery-reliability.md).
+  /// Only actually write when the address moved, or occasionally so
+  /// "last seen" stays roughly fresh for when the device does go offline.
+  Future<void> _refreshDeviceRecord(Device existing, DiscoveredPeer peer) async {
+    final addressChanged = existing.host != peer.host || existing.syncPort != peer.port;
+    if (addressChanged) {
+      await _devicesRepository.upsert(Device(
+        id: peer.deviceId,
+        name: peer.name,
+        host: peer.host,
+        syncPort: peer.port,
+        lastOnlineAt: DateTime.now().millisecondsSinceEpoch,
+      ));
+      return;
+    }
+    final lastSeen = existing.lastOnlineAtDate;
+    if (lastSeen == null || DateTime.now().difference(lastSeen) > const Duration(minutes: 5)) {
+      await _devicesRepository.touchLastOnline(peer.deviceId, DateTime.now());
     }
   }
 
