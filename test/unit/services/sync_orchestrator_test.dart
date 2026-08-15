@@ -165,5 +165,31 @@ void main() {
       final after = await devicesRepository.byId(peerId);
       expect(after!.host, '192.168.1.99');
     });
+
+    test('restartDiscovery before start() is a harmless no-op', () async {
+      final orchestrator = SyncOrchestrator(
+        selfDeviceId: 'aaa-lower-id',
+        discoveryService: discovery,
+        metadataSyncService: metadataSyncService,
+        devicesRepository: devicesRepository,
+      );
+      addTearDown(orchestrator.dispose);
+
+      // start() was never called -> no port remembered yet; must not throw.
+      await orchestrator.restartDiscovery();
+    });
+
+    test('restartDiscovery after start() restarts discovery without throwing', () async {
+      final orchestrator = SyncOrchestrator(
+        selfDeviceId: 'aaa-lower-id',
+        discoveryService: discovery,
+        metadataSyncService: metadataSyncService,
+        devicesRepository: devicesRepository,
+      );
+      addTearDown(orchestrator.dispose);
+
+      await orchestrator.start(8541);
+      await orchestrator.restartDiscovery();
+    });
   });
 }

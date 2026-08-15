@@ -42,10 +42,13 @@ class SyncOrchestrator {
 
   final _recentSyncController = StreamController<SyncStats>.broadcast();
 
+  int? _metadataSyncPort;
+
   /// Feeds the "синхронизировано N изменений" badge (ТЗ п.6.6).
   Stream<SyncStats> get recentSyncs => _recentSyncController.stream;
 
   Future<void> start(int metadataSyncPort) async {
+    _metadataSyncPort = metadataSyncPort;
     await _metadataSyncService.startServer();
     try {
       await _discoveryService.startAdvertising(metadataSyncPort);
@@ -56,6 +59,24 @@ class SyncOrchestrator {
       // binding in a test harness, whatever) shouldn't stop the rest of
       // the app from working. Sync is a bonus, not a gate (ТЗ п.7); the
       // metadata sync server above is already up regardless.
+    }
+  }
+
+  /// Bound to the manual "обновить" button on the Устройства screen —
+  /// see docs/adr/0026-manual-discovery-refresh.md. The debounce/replay in
+  /// `PeerPresenceTracker` (docs/adr/0025-sync-and-discovery-reliability.md)
+  /// already self-heals ordinary mDNS flapping automatically; this exists
+  /// for what that can't: the OS-level mDNS listener itself getting stuck
+  /// (a Wi-Fi network switch, doze/sleep, a long time backgrounded) is
+  /// invisible from inside a running discovery stream — nothing short of
+  /// actually tearing it down and starting a fresh one recovers from it.
+  Future<void> restartDiscovery() async {
+    final port = _metadataSyncPort;
+    if (port == null) return; // start() never ran yet — nothing to restart
+    try {
+      await _discoveryService.restart(port);
+    } catch (_) {
+      // Same reasoning as start() — mDNS is a bonus, not a gate.
     }
   }
 

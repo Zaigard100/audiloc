@@ -74,6 +74,22 @@ class DiscoveryService {
     _discovery = null;
   }
 
+  /// Tears down and re-establishes both advertising and discovery from
+  /// scratch. [SyncOrchestrator.restartDiscovery] is the only caller —
+  /// see its doc and docs/adr/0026-manual-discovery-refresh.md for why
+  /// this exists alongside the automatic debounce/replay in
+  /// [PeerPresenceTracker]: an OS-level mDNS listener stuck after a Wi-Fi
+  /// switch or doze/sleep never produces the found/lost events that
+  /// automatic recovery relies on in the first place, so nothing short of
+  /// an actual restart fixes it.
+  Future<void> restart(int port) async {
+    _presence.reset();
+    await stopAdvertising();
+    await stopDiscovery();
+    await startAdvertising(port);
+    await startDiscovery();
+  }
+
   void _handleEvent(BonsoirDiscoveryEvent event) {
     final discovery = _discovery;
     if (discovery == null) return;

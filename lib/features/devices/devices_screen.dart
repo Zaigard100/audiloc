@@ -32,6 +32,7 @@ class DevicesScreen extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('Устройства'),
         actions: [
+          const _RefreshDiscoveryButton(),
           IconButton(
             icon: const Icon(Icons.info_outline),
             tooltip: 'О приложении',
@@ -94,6 +95,48 @@ class DevicesScreen extends ConsumerWidget {
           const SizedBox(height: 24),
         ],
       ),
+    );
+  }
+}
+
+/// Manually restarts mDNS advertising/discovery — see
+/// `SyncOrchestrator.restartDiscovery` and
+/// docs/adr/0026-manual-discovery-refresh.md. The automatic debounce/replay
+/// (docs/adr/0025-sync-and-discovery-reliability.md) already recovers from
+/// ordinary mDNS flapping on its own; this button is for the case that
+/// doesn't self-heal — ordinary automatic recovery still runs exactly as
+/// before, this is purely additive.
+class _RefreshDiscoveryButton extends ConsumerStatefulWidget {
+  const _RefreshDiscoveryButton();
+
+  @override
+  ConsumerState<_RefreshDiscoveryButton> createState() => _RefreshDiscoveryButtonState();
+}
+
+class _RefreshDiscoveryButtonState extends ConsumerState<_RefreshDiscoveryButton> {
+  bool _restarting = false;
+
+  Future<void> _restart() async {
+    setState(() => _restarting = true);
+    try {
+      await ref.read(syncOrchestratorProvider).restartDiscovery();
+    } finally {
+      if (mounted) setState(() => _restarting = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      icon: _restarting
+          ? const SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : const Icon(Icons.refresh),
+      tooltip: 'Обновить список устройств',
+      onPressed: _restarting ? null : _restart,
     );
   }
 }

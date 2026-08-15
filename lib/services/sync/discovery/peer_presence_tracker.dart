@@ -58,6 +58,25 @@ class PeerPresenceTracker {
     });
   }
 
+  /// Immediately emits [PeerLost] for every currently-known peer and clears
+  /// all state — unlike [scheduleLost], skips the debounce entirely. For
+  /// the manual "обновить" button (docs/adr/0026-manual-discovery-refresh.md):
+  /// a deliberate reset, not a flappy blip worth waiting out. Callers are
+  /// expected to restart discovery right after, so any peer that's
+  /// genuinely still there reappears within moments via a real
+  /// [markFound]; one that doesn't was the whole point of asking.
+  void reset() {
+    for (final timer in _lostTimers.values) {
+      timer.cancel();
+    }
+    _lostTimers.clear();
+    final ids = _known.keys.toList();
+    _known.clear();
+    for (final id in ids) {
+      _eventsController.add(PeerLost(id));
+    }
+  }
+
   Future<void> dispose() async {
     for (final timer in _lostTimers.values) {
       timer.cancel();

@@ -73,5 +73,38 @@ void main() {
 
       expect(events, isEmpty);
     });
+
+    test('reset() emits PeerLost immediately, without waiting for the debounce', () async {
+      // Debounce long enough that the test would time out waiting for it —
+      // reset() must not go through scheduleLost's timer at all.
+      final tracker = PeerPresenceTracker(lostDebounce: const Duration(minutes: 1));
+      addTearDown(tracker.dispose);
+
+      final events = <DiscoveryEvent>[];
+      final sub = tracker.events.listen(events.add);
+
+      tracker.markFound(peer);
+      tracker.reset();
+      await pumpEventQueue();
+      await sub.cancel();
+
+      expect(events.whereType<PeerLost>().map((e) => e.deviceId), [peer.deviceId]);
+    });
+
+    test('a peer cleared by reset() is not replayed to a later subscriber', () async {
+      final tracker = PeerPresenceTracker();
+      addTearDown(tracker.dispose);
+
+      tracker.markFound(peer);
+      tracker.reset();
+      await pumpEventQueue();
+
+      final events = <DiscoveryEvent>[];
+      final sub = tracker.events.listen(events.add);
+      await pumpEventQueue();
+      await sub.cancel();
+
+      expect(events, isEmpty);
+    });
   });
 }
