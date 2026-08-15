@@ -73,6 +73,7 @@ void main() {
       repository: repository,
       selfDevice: device,
       currentQueueSource: () => const LibraryQueueSource(),
+      isSendEnabled: () => true,
     );
     writer.start();
   });
@@ -129,6 +130,7 @@ void main() {
       repository: repository,
       selfDevice: device,
       currentQueueSource: () => const PlaylistQueueSource('pl-1', 'Моя подборка'),
+      isSendEnabled: () => true,
     );
     player.currentTrackValue = track;
 
@@ -137,5 +139,46 @@ void main() {
     final saved = await repository.get();
     expect(saved?.queueType, PlaybackQueueType.playlist);
     expect(saved?.playlistId, 'pl-1');
+  });
+
+  test('saveCurrentState() writes nothing when the "отправлять" setting is off', () async {
+    final disabledWriter = PlaybackStateWriter(
+      playerService: player,
+      repository: repository,
+      selfDevice: device,
+      currentQueueSource: () => const LibraryQueueSource(),
+      isSendEnabled: () => false,
+    );
+    player.currentTrackValue = track;
+
+    await disabledWriter.saveCurrentState();
+
+    expect(await repository.get(), isNull);
+  });
+
+  test('a pause does not write either when "отправлять" is off — not just saveCurrentState()',
+      () async {
+    // A fresh player, not the shared `player`/`writer` from `setUp` — the
+    // outer `writer` is already listening to `player.playingStream` with
+    // `isSendEnabled: () => true`, and would itself write on the same
+    // pause edge, masking whatever this test is actually checking.
+    final isolatedPlayer = _FakePlayerService();
+    addTearDown(isolatedPlayer.dispose);
+    final disabledWriter = PlaybackStateWriter(
+      playerService: isolatedPlayer,
+      repository: repository,
+      selfDevice: device,
+      currentQueueSource: () => const LibraryQueueSource(),
+      isSendEnabled: () => false,
+    );
+    disabledWriter.start();
+    addTearDown(disabledWriter.dispose);
+    isolatedPlayer.currentTrackValue = track;
+
+    isolatedPlayer.emitPlaying(true);
+    isolatedPlayer.emitPlaying(false);
+    await Future<void>.delayed(Duration.zero);
+
+    expect(await repository.get(), isNull);
   });
 }

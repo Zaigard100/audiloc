@@ -40,7 +40,18 @@ Future<void> handleIncomingPlaybackState(BuildContext context, WidgetRef ref, Pl
   // whether any widget happens to be watching it.
   final hasLocalTrack = ref.read(playerServiceProvider).currentTrack != null;
   final self = ref.read(selfDeviceProvider);
-  if (hasLocalTrack && state.deviceId == self.id) return;
+  final isOwnState = state.deviceId == self.id;
+  if (hasLocalTrack && isOwnState) return;
+
+  // Settings "принимать" toggle — doesn't affect restoring this device's
+  // *own* last state after its own restart (`isOwnState` above already
+  // covers self-echo; a fresh cold start with nothing loaded locally
+  // reaches here with `isOwnState == true` too, and that's the whole
+  // point of the restore-after-restart feature, not something this
+  // toggle is meant to touch) — only whether a *different* device's
+  // synced pause gets acted on here at all. See
+  // docs/adr/0029-playback-state-sync.md.
+  if (!isOwnState && !ref.read(currentReceivePlaybackStateSyncProvider)) return;
 
   // The "sync order" tracks -> playlists -> playback state the ТЗ asked
   // for isn't a transport-level thing `crdt_sync` actually exposes (one

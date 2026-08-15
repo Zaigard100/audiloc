@@ -75,6 +75,20 @@ class AppLocalizationsEn extends AppLocalizations {
       'Any already-paired device will be able to control playback on this device while this is on';
 
   @override
+  String get settingsSendPlaybackStateSync => 'Send playback state';
+
+  @override
+  String get settingsSendPlaybackStateSyncSubtitle =>
+      'Experimental, may be unstable. Saves and syncs this device\'s last track position (including restore after restart)';
+
+  @override
+  String get settingsReceivePlaybackStateSync => 'Receive playback state';
+
+  @override
+  String get settingsReceivePlaybackStateSyncSubtitle =>
+      'Experimental, may be unstable. Lets a position sent by another device apply here, or prompt to continue from it';
+
+  @override
   String get deviceActionResumeHere => 'Play what\'s paused here';
 
   @override

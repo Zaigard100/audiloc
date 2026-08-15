@@ -212,6 +212,30 @@ abstract class AppLocalizations {
   /// **'Любое уже сопряжённое устройство сможет управлять воспроизведением на этом устройстве, пока включено'**
   String get settingsAllowRemoteControlSubtitle;
 
+  /// No description provided for @settingsSendPlaybackStateSync.
+  ///
+  /// In ru, this message translates to:
+  /// **'Отправлять состояние воспроизведения'**
+  String get settingsSendPlaybackStateSync;
+
+  /// No description provided for @settingsSendPlaybackStateSyncSubtitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'Экспериментально, может работать нестабильно. Сохраняет и синхронизирует позицию последнего трека этого устройства (в т.ч. восстановление после перезапуска)'**
+  String get settingsSendPlaybackStateSyncSubtitle;
+
+  /// No description provided for @settingsReceivePlaybackStateSync.
+  ///
+  /// In ru, this message translates to:
+  /// **'Принимать состояние воспроизведения'**
+  String get settingsReceivePlaybackStateSync;
+
+  /// No description provided for @settingsReceivePlaybackStateSyncSubtitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'Экспериментально, может работать нестабильно. Позволяет применять или предлагать продолжить с позиции, присланной другим устройством'**
+  String get settingsReceivePlaybackStateSyncSubtitle;
+
   /// No description provided for @deviceActionResumeHere.
   ///
   /// In ru, this message translates to:

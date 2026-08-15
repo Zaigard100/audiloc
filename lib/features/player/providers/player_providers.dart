@@ -41,6 +41,7 @@ final playbackStateWriterProvider = Provider<PlaybackStateWriter>((ref) {
     repository: ref.watch(playbackStateRepositoryProvider),
     selfDevice: ref.watch(selfDeviceProvider),
     currentQueueSource: () => ref.read(queueSourceProvider),
+    isSendEnabled: () => ref.read(currentSendPlaybackStateSyncProvider),
   );
   writer.start();
   ref.onDispose(writer.dispose);

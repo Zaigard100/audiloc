@@ -88,6 +88,11 @@ class _AudilocAppState extends State<AudilocApp> with WidgetsBindingObserver {
   /// docs/adr/0030-remote-playback-control.md.
   bool _allowRemoteControl = false;
 
+  /// Persisted via [_settingsStore], off by default — experimental, see
+  /// docs/adr/0029-playback-state-sync.md.
+  bool _sendPlaybackStateSync = false;
+  bool _receivePlaybackStateSync = false;
+
   /// Set when [_bootstrap] or [_openProfile] throws — without this, an
   /// exception anywhere in that startup chain (a port still held by a
   /// process that hasn't released it yet, a transient filesystem error,
@@ -234,6 +239,8 @@ class _AudilocAppState extends State<AudilocApp> with WidgetsBindingObserver {
       final savedThemeMode = await settingsStore.themeMode();
       final savedPlaybackShortcuts = await settingsStore.playbackShortcutsSettings();
       final savedAllowRemoteControl = await settingsStore.allowRemoteControl();
+      final savedSendPlaybackStateSync = await settingsStore.sendPlaybackStateSync();
+      final savedReceivePlaybackStateSync = await settingsStore.receivePlaybackStateSync();
       if (!mounted) return;
       setState(() {
         _profilesStore = store;
@@ -242,6 +249,8 @@ class _AudilocAppState extends State<AudilocApp> with WidgetsBindingObserver {
         _themeMode = savedThemeMode;
         _playbackShortcutsSettings = savedPlaybackShortcuts;
         _allowRemoteControl = savedAllowRemoteControl;
+        _sendPlaybackStateSync = savedSendPlaybackStateSync;
+        _receivePlaybackStateSync = savedReceivePlaybackStateSync;
       });
 
       // A genuinely fresh install (nothing to migrate either) — ask for a
@@ -337,6 +346,23 @@ class _AudilocAppState extends State<AudilocApp> with WidgetsBindingObserver {
     setState(() => _allowRemoteControl = value);
   }
 
+  /// Bound to the "отправлять"/"принимать" toggles in Settings — same
+  /// pattern as [_changeAllowRemoteControl], see
+  /// docs/adr/0029-playback-state-sync.md.
+  Future<void> _changeSendPlaybackStateSync(bool value) async {
+    await _settingsStore!.setSendPlaybackStateSync(value);
+    _session?.container.read(currentSendPlaybackStateSyncProvider.notifier).state = value;
+    if (!mounted) return;
+    setState(() => _sendPlaybackStateSync = value);
+  }
+
+  Future<void> _changeReceivePlaybackStateSync(bool value) async {
+    await _settingsStore!.setReceivePlaybackStateSync(value);
+    _session?.container.read(currentReceivePlaybackStateSyncProvider.notifier).state = value;
+    if (!mounted) return;
+    setState(() => _receivePlaybackStateSync = value);
+  }
+
   /// Bound to "Стереть все данные" in Settings, after its own double
   /// confirmation (docs/adr/0028-settings-screen-and-theming.md) — the
   /// caller is a widget inside the very [ProviderContainer] this closes,
@@ -372,6 +398,8 @@ class _AudilocAppState extends State<AudilocApp> with WidgetsBindingObserver {
       _startupError = null;
       _pendingProfileId = null;
       _allowRemoteControl = false;
+      _sendPlaybackStateSync = false;
+      _receivePlaybackStateSync = false;
     });
     await _bootstrap();
   }
@@ -475,6 +503,10 @@ class _AudilocAppState extends State<AudilocApp> with WidgetsBindingObserver {
         initialPlaybackShortcutsSettings: _playbackShortcutsSettings,
         changeAllowRemoteControl: _changeAllowRemoteControl,
         initialAllowRemoteControl: _allowRemoteControl,
+        changeSendPlaybackStateSync: _changeSendPlaybackStateSync,
+        initialSendPlaybackStateSync: _sendPlaybackStateSync,
+        changeReceivePlaybackStateSync: _changeReceivePlaybackStateSync,
+        initialReceivePlaybackStateSync: _receivePlaybackStateSync,
       );
       if (!mounted) {
         await session.close();

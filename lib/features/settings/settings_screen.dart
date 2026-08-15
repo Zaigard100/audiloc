@@ -34,6 +34,8 @@ class SettingsScreen extends ConsumerWidget {
           const _KeyboardShortcutsToggle(),
           const _SeekStepPicker(),
           const _AllowRemoteControlToggle(),
+          const _SendPlaybackStateSyncToggle(),
+          const _ReceivePlaybackStateSyncToggle(),
           const Divider(height: 1),
           ListTile(
             leading: const Icon(Icons.info_outline),
@@ -318,6 +320,48 @@ class _AllowRemoteControlToggle extends ConsumerWidget {
       subtitle: Text(l10n.settingsAllowRemoteControlSubtitle),
       value: allowed,
       onChanged: (value) => ref.read(changeAllowRemoteControlProvider)(value),
+    );
+  }
+}
+
+/// Off by default, marked experimental in its own subtitle — the user
+/// asked for this explicitly after the underlying feature needed
+/// several follow-up fixes (see docs/adr/0029-playback-state-sync.md's
+/// regression log). Off also disables this device's own
+/// restore-after-restart, not just outgoing sync — both go through the
+/// same write.
+class _SendPlaybackStateSyncToggle extends ConsumerWidget {
+  const _SendPlaybackStateSyncToggle();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = context.l10n;
+    final enabled = ref.watch(currentSendPlaybackStateSyncProvider);
+    return SwitchListTile(
+      secondary: const Icon(Icons.upload_outlined),
+      title: Text(l10n.settingsSendPlaybackStateSync),
+      subtitle: Text(l10n.settingsSendPlaybackStateSyncSubtitle),
+      value: enabled,
+      onChanged: (value) => ref.read(changeSendPlaybackStateSyncProvider)(value),
+    );
+  }
+}
+
+/// Same "off by default, experimental" reasoning as
+/// [_SendPlaybackStateSyncToggle] — see docs/adr/0029-playback-state-sync.md.
+class _ReceivePlaybackStateSyncToggle extends ConsumerWidget {
+  const _ReceivePlaybackStateSyncToggle();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = context.l10n;
+    final enabled = ref.watch(currentReceivePlaybackStateSyncProvider);
+    return SwitchListTile(
+      secondary: const Icon(Icons.download_outlined),
+      title: Text(l10n.settingsReceivePlaybackStateSync),
+      subtitle: Text(l10n.settingsReceivePlaybackStateSyncSubtitle),
+      value: enabled,
+      onChanged: (value) => ref.read(changeReceivePlaybackStateSyncProvider)(value),
     );
   }
 }

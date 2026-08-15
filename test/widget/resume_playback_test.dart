@@ -120,6 +120,12 @@ void main() {
         databaseProvider.overrideWithValue(db),
         playerServiceProvider.overrideWithValue(playerService),
         selfDeviceProvider.overrideWithValue(self),
+        // The row's deviceId ('other-device') isn't self, so
+        // handleIncomingPlaybackState now gates on the "принимать"
+        // setting before it even resolves the queue — on here since
+        // this test is specifically about that "ask first" path, not
+        // about the setting itself.
+        currentReceivePlaybackStateSyncProvider.overrideWith((ref) => true),
       ]);
       addTearDown(container.dispose);
 
@@ -156,6 +162,83 @@ void main() {
       expect(playerService.lastQueue.map((t) => t.id), ['t1']);
       expect(playerService.position, const Duration(milliseconds: 65000));
       expect(playerService.isPlaying, isTrue);
+    });
+  });
+
+  testWidgets(
+      'a state from a different device is ignored entirely when "принимать" is off — '
+      'no snackbar, nothing applied', (tester) async {
+    await tester.runAsync(() async {
+      await TracksRepository(db.crdt).upsert(track);
+      await PlaybackStateRepository(db.crdt).save(const PlaybackState(
+        trackId: 't1',
+        positionMs: 65000,
+        queueType: PlaybackQueueType.library,
+        deviceId: 'other-device',
+        deviceName: 'Телефон',
+      ));
+
+      final container = ProviderContainer(overrides: [
+        databaseProvider.overrideWithValue(db),
+        playerServiceProvider.overrideWithValue(playerService),
+        selfDeviceProvider.overrideWithValue(self),
+        currentReceivePlaybackStateSyncProvider.overrideWith((ref) => false),
+      ]);
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          locale: const Locale('ru'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: const Scaffold(body: _RestoreHarness()),
+        ),
+      ));
+
+      for (var i = 0; i < 15; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+        await tester.pump();
+      }
+
+      expect(find.text('Продолжить'), findsNothing);
+      expect(playerService.lastQueue, isEmpty);
+    });
+  });
+
+  testWidgets(
+      'this device\'s own cold-start restore still works with "принимать" off — '
+      'that setting only gates a *different* device\'s state', (tester) async {
+    await tester.runAsync(() async {
+      await TracksRepository(db.crdt).upsert(track);
+      await PlaybackStateRepository(db.crdt).save(const PlaybackState(
+        trackId: 't1',
+        positionMs: 65000,
+        queueType: PlaybackQueueType.library,
+        deviceId: 'self',
+        deviceName: 'Ноутбук',
+      ));
+
+      final container = ProviderContainer(overrides: [
+        databaseProvider.overrideWithValue(db),
+        playerServiceProvider.overrideWithValue(playerService),
+        selfDeviceProvider.overrideWithValue(self),
+        currentReceivePlaybackStateSyncProvider.overrideWith((ref) => false),
+      ]);
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(home: _RestoreHarness()),
+      ));
+
+      for (var i = 0; i < 30; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+        await tester.pump();
+        if (playerService.lastQueue.isNotEmpty) break;
+      }
+
+      expect(playerService.lastQueue.map((t) => t.id), ['t1']);
     });
   });
 }

@@ -75,6 +75,22 @@ class AppLocalizationsRu extends AppLocalizations {
       'Любое уже сопряжённое устройство сможет управлять воспроизведением на этом устройстве, пока включено';
 
   @override
+  String get settingsSendPlaybackStateSync =>
+      'Отправлять состояние воспроизведения';
+
+  @override
+  String get settingsSendPlaybackStateSyncSubtitle =>
+      'Экспериментально, может работать нестабильно. Сохраняет и синхронизирует позицию последнего трека этого устройства (в т.ч. восстановление после перезапуска)';
+
+  @override
+  String get settingsReceivePlaybackStateSync =>
+      'Принимать состояние воспроизведения';
+
+  @override
+  String get settingsReceivePlaybackStateSyncSubtitle =>
+      'Экспериментально, может работать нестабильно. Позволяет применять или предлагать продолжить с позиции, присланной другим устройством';
+
+  @override
   String get deviceActionResumeHere => 'Запустить то, что у меня на паузе';
 
   @override

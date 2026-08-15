@@ -102,6 +102,10 @@ Future<ProfileSessionHandle> openProfileSession({
   required PlaybackShortcutsSettings initialPlaybackShortcutsSettings,
   required Future<void> Function(bool) changeAllowRemoteControl,
   required bool initialAllowRemoteControl,
+  required Future<void> Function(bool) changeSendPlaybackStateSync,
+  required bool initialSendPlaybackStateSync,
+  required Future<void> Function(bool) changeReceivePlaybackStateSync,
+  required bool initialReceivePlaybackStateSync,
   Future<String> Function() platformLabel = platformDeviceLabel,
 }) async {
   final profiles = await profilesStore.list();
@@ -142,6 +146,10 @@ Future<ProfileSessionHandle> openProfileSession({
     currentPlaybackShortcutsSettingsProvider.overrideWith((ref) => initialPlaybackShortcutsSettings),
     changeAllowRemoteControlProvider.overrideWithValue(changeAllowRemoteControl),
     currentAllowRemoteControlProvider.overrideWith((ref) => initialAllowRemoteControl),
+    changeSendPlaybackStateSyncProvider.overrideWithValue(changeSendPlaybackStateSync),
+    currentSendPlaybackStateSyncProvider.overrideWith((ref) => initialSendPlaybackStateSync),
+    changeReceivePlaybackStateSyncProvider.overrideWithValue(changeReceivePlaybackStateSync),
+    currentReceivePlaybackStateSyncProvider.overrideWith((ref) => initialReceivePlaybackStateSync),
   ]);
 
   // The three fixed-port *bind* calls are awaited — deliberately *not*

@@ -72,6 +72,33 @@ class AppSettingsStore {
 
   Future<void> setAllowRemoteControl(bool value) => _write('allowRemoteControl', value);
 
+  /// Whether this device writes/syncs its own playback position at all
+  /// (docs/adr/0029-playback-state-sync.md) — **off** by default: the
+  /// user explicitly asked for this once the feature had already needed
+  /// several follow-up fixes (see the ADR's regression log), and wants
+  /// it opt-in and labeled experimental rather than on by default until
+  /// it's proven out more. Off also means this device's own
+  /// restore-after-restart stops working, not just the cross-device
+  /// sync: both go through the same CRDT row, there's no separate
+  /// "local only" write path to keep one alive without the other. See
+  /// [SettingsScreen]'s subtitle for this toggle, which spells that
+  /// trade-off out for the user.
+  Future<bool> sendPlaybackStateSync() async => (await _read())['sendPlaybackStateSync'] as bool? ?? false;
+
+  Future<void> setSendPlaybackStateSync(bool value) => _write('sendPlaybackStateSync', value);
+
+  /// Whether this device acts on an incoming playback-state row written
+  /// by a *different* device — **off** by default, same reasoning as
+  /// [sendPlaybackStateSync]. Off doesn't affect this device restoring
+  /// its own last state after its own restart (that's not "receiving a
+  /// sync from elsewhere"), only whether another device's synced pause
+  /// silently applies or prompts here at all — see
+  /// `handleIncomingPlaybackState`'s `isOwnState` check.
+  Future<bool> receivePlaybackStateSync() async =>
+      (await _read())['receivePlaybackStateSync'] as bool? ?? false;
+
+  Future<void> setReceivePlaybackStateSync(bool value) => _write('receivePlaybackStateSync', value);
+
   Future<Map<String, Object?>> _read() async {
     if (!await _file.exists()) return const {};
     return jsonDecode(await _file.readAsString()) as Map<String, Object?>;

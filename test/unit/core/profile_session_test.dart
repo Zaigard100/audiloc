@@ -63,6 +63,8 @@ Future<void> _noopChangeThemeMode(ThemeMode mode) async {}
 Future<void> _noopEraseAllData() async {}
 Future<void> _noopChangePlaybackShortcutsSettings(PlaybackShortcutsSettings settings) async {}
 Future<void> _noopChangeAllowRemoteControl(bool value) async {}
+Future<void> _noopChangeSendPlaybackStateSync(bool value) async {}
+Future<void> _noopChangeReceivePlaybackStateSync(bool value) async {}
 
 void main() {
   test(
@@ -97,6 +99,10 @@ void main() {
       initialPlaybackShortcutsSettings: const PlaybackShortcutsSettings(),
       changeAllowRemoteControl: _noopChangeAllowRemoteControl,
       initialAllowRemoteControl: false,
+      changeSendPlaybackStateSync: _noopChangeSendPlaybackStateSync,
+      initialSendPlaybackStateSync: true,
+      changeReceivePlaybackStateSync: _noopChangeReceivePlaybackStateSync,
+      initialReceivePlaybackStateSync: true,
       platformLabel: _testPlatformLabel,
     );
     await first.close();
@@ -121,6 +127,10 @@ void main() {
       initialPlaybackShortcutsSettings: const PlaybackShortcutsSettings(),
       changeAllowRemoteControl: _noopChangeAllowRemoteControl,
       initialAllowRemoteControl: false,
+      changeSendPlaybackStateSync: _noopChangeSendPlaybackStateSync,
+      initialSendPlaybackStateSync: true,
+      changeReceivePlaybackStateSync: _noopChangeReceivePlaybackStateSync,
+      initialReceivePlaybackStateSync: true,
       platformLabel: _testPlatformLabel,
     );
     await second.close();
@@ -154,6 +164,10 @@ void main() {
       initialPlaybackShortcutsSettings: const PlaybackShortcutsSettings(),
       changeAllowRemoteControl: _noopChangeAllowRemoteControl,
       initialAllowRemoteControl: false,
+      changeSendPlaybackStateSync: _noopChangeSendPlaybackStateSync,
+      initialSendPlaybackStateSync: true,
+      changeReceivePlaybackStateSync: _noopChangeReceivePlaybackStateSync,
+      initialReceivePlaybackStateSync: true,
       platformLabel: _testPlatformLabel,
     );
     addTearDown(session.close);
@@ -187,6 +201,10 @@ void main() {
       initialPlaybackShortcutsSettings: const PlaybackShortcutsSettings(),
       changeAllowRemoteControl: _noopChangeAllowRemoteControl,
       initialAllowRemoteControl: false,
+      changeSendPlaybackStateSync: _noopChangeSendPlaybackStateSync,
+      initialSendPlaybackStateSync: true,
+      changeReceivePlaybackStateSync: _noopChangeReceivePlaybackStateSync,
+      initialReceivePlaybackStateSync: true,
       platformLabel: _testPlatformLabel,
     );
     await first.close();
@@ -210,6 +228,10 @@ void main() {
       initialPlaybackShortcutsSettings: const PlaybackShortcutsSettings(),
       changeAllowRemoteControl: _noopChangeAllowRemoteControl,
       initialAllowRemoteControl: false,
+      changeSendPlaybackStateSync: _noopChangeSendPlaybackStateSync,
+      initialSendPlaybackStateSync: true,
+      changeReceivePlaybackStateSync: _noopChangeReceivePlaybackStateSync,
+      initialReceivePlaybackStateSync: true,
       platformLabel: _testPlatformLabel,
     );
     addTearDown(second.close);
@@ -243,6 +265,10 @@ void main() {
       initialPlaybackShortcutsSettings: const PlaybackShortcutsSettings(),
       changeAllowRemoteControl: _noopChangeAllowRemoteControl,
       initialAllowRemoteControl: false,
+      changeSendPlaybackStateSync: _noopChangeSendPlaybackStateSync,
+      initialSendPlaybackStateSync: true,
+      changeReceivePlaybackStateSync: _noopChangeReceivePlaybackStateSync,
+      initialReceivePlaybackStateSync: true,
       platformLabel: _testPlatformLabel,
     );
     addTearDown(session.close);

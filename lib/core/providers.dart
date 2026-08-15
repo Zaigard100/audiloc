@@ -182,6 +182,32 @@ final currentAllowRemoteControlProvider = StateProvider<bool>(
       throw UnimplementedError('currentAllowRemoteControlProvider must be overridden by profile_session.dart'),
 );
 
+/// Same pattern again — see docs/adr/0029-playback-state-sync.md's
+/// send/receive toggles. [changeSendPlaybackStateSyncProvider] gates
+/// `PlaybackStateWriter.saveCurrentState()` itself (both the
+/// pause-triggered write and the app-lifecycle "closed without pausing"
+/// one); [changeReceivePlaybackStateSyncProvider] gates whether
+/// `handleIncomingPlaybackState` acts on a row written by a *different*
+/// device.
+final changeSendPlaybackStateSyncProvider = Provider<Future<void> Function(bool)>(
+  (ref) => throw UnimplementedError('changeSendPlaybackStateSyncProvider must be overridden by AudilocApp'),
+);
+
+final currentSendPlaybackStateSyncProvider = StateProvider<bool>(
+  (ref) => throw UnimplementedError(
+      'currentSendPlaybackStateSyncProvider must be overridden by profile_session.dart'),
+);
+
+final changeReceivePlaybackStateSyncProvider = Provider<Future<void> Function(bool)>(
+  (ref) =>
+      throw UnimplementedError('changeReceivePlaybackStateSyncProvider must be overridden by AudilocApp'),
+);
+
+final currentReceivePlaybackStateSyncProvider = StateProvider<bool>(
+  (ref) => throw UnimplementedError(
+      'currentReceivePlaybackStateSyncProvider must be overridden by profile_session.dart'),
+);
+
 final tracksRepositoryProvider =
     Provider((ref) => TracksRepository(ref.watch(databaseProvider).crdt));
 

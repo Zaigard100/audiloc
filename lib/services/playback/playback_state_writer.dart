@@ -22,15 +22,23 @@ class PlaybackStateWriter {
     required PlaybackStateRepository repository,
     required Device selfDevice,
     required QueueSource? Function() currentQueueSource,
+    required bool Function() isSendEnabled,
   })  : _playerService = playerService,
         _repository = repository,
         _selfDevice = selfDevice,
-        _currentQueueSource = currentQueueSource;
+        _currentQueueSource = currentQueueSource,
+        _isSendEnabled = isSendEnabled;
 
   final PlayerService _playerService;
   final PlaybackStateRepository _repository;
   final Device _selfDevice;
   final QueueSource? Function() _currentQueueSource;
+
+  /// The Settings "отправлять" toggle — read fresh on every call (not
+  /// captured once at construction), same pattern as
+  /// `RemoteControlServer`'s `isAllowed`. See
+  /// docs/adr/0029-playback-state-sync.md.
+  final bool Function() _isSendEnabled;
 
   StreamSubscription<bool>? _sub;
   bool? _wasPlaying;
@@ -56,6 +64,7 @@ class PlaybackStateWriter {
   /// mid-playback rather than pausing first — see
   /// docs/adr/0029-playback-state-sync.md. A no-op if nothing's loaded.
   Future<void> saveCurrentState() async {
+    if (!_isSendEnabled()) return;
     final track = _playerService.currentTrack;
     if (track == null) return;
 

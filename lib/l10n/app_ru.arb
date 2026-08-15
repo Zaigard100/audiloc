@@ -26,6 +26,11 @@
   "settingsAllowRemoteControl": "Разрешить удалённое управление",
   "settingsAllowRemoteControlSubtitle": "Любое уже сопряжённое устройство сможет управлять воспроизведением на этом устройстве, пока включено",
 
+  "settingsSendPlaybackStateSync": "Отправлять состояние воспроизведения",
+  "settingsSendPlaybackStateSyncSubtitle": "Экспериментально, может работать нестабильно. Сохраняет и синхронизирует позицию последнего трека этого устройства (в т.ч. восстановление после перезапуска)",
+  "settingsReceivePlaybackStateSync": "Принимать состояние воспроизведения",
+  "settingsReceivePlaybackStateSyncSubtitle": "Экспериментально, может работать нестабильно. Позволяет применять или предлагать продолжить с позиции, присланной другим устройством",
+
   "deviceActionResumeHere": "Запустить то, что у меня на паузе",
   "deviceActionNothingLoaded": "Ничего не загружено",
   "deviceActionPickTrack": "Выбрать трек и запустить",
