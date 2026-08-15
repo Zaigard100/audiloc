@@ -139,7 +139,14 @@ class _AudilocAppState extends State<AudilocApp> with WidgetsBindingObserver {
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.detached ||
         state == AppLifecycleState.hidden) {
-      unawaited(_savePlaybackStateBestEffort());
+      // `onlyIfPaused: true` — none of these three actually mean
+      // playback stopped. Android in particular keeps a foreground
+      // service (`AudilocAudioHandler`/`audio_service`) running exactly
+      // so music keeps playing after the user leaves; `paused`/`detached`
+      // fire regardless. A minimized-but-not-closed desktop window
+      // (`hidden`) behaves the same way — the process, and its audio,
+      // both keep running. See [_savePlaybackStateBestEffort]'s doc.
+      unawaited(_savePlaybackStateBestEffort(onlyIfPaused: true));
     }
   }
 
@@ -149,16 +156,33 @@ class _AudilocAppState extends State<AudilocApp> with WidgetsBindingObserver {
   /// for this `Future` before letting the process die, so this is the
   /// only trigger that can *guarantee* the write (and, best-effort, some
   /// time for the outgoing sync push) lands before exit rather than
-  /// racing it.
+  /// racing it. `onlyIfPaused: false` here — unlike backgrounding, this
+  /// really does mean playback is about to stop (there's no desktop
+  /// equivalent of Android's background-audio foreground service), so
+  /// this is exactly the "closed without pausing first" case worth
+  /// bookmarking regardless of play state.
   Future<AppExitResponse> _handleExitRequested() async {
-    await _savePlaybackStateBestEffort();
+    await _savePlaybackStateBestEffort(onlyIfPaused: false);
     return AppExitResponse.exit;
   }
 
   /// Shared by both lifecycle hooks above. Errors are swallowed
   /// deliberately — a failed bookmark write must never be the reason the
   /// app fails to close.
-  Future<void> _savePlaybackStateBestEffort() async {
+  ///
+  /// [onlyIfPaused] guards against writing (and syncing out) a "paused
+  /// at X" bookmark while the track is actually still playing — that
+  /// bookmark would be stale the instant it's written (playback keeps
+  /// moving past that position on this same device right afterward), and
+  /// any peer that restores it would land somewhere the user never
+  /// actually stopped. The ordinary pause-triggered writer already
+  /// covers "the user actually paused" on its own; this method exists
+  /// for the *other* case (leaving/closing without an explicit pause) —
+  /// and that case only makes sense to bookmark when playback has
+  /// genuinely stopped, which callers indicate per-trigger (see their
+  /// docs above).
+  Future<void> _savePlaybackStateBestEffort({required bool onlyIfPaused}) async {
+    if (onlyIfPaused && _playerService.isPlaying) return;
     final container = _session?.container;
     if (container == null) return;
     try {
