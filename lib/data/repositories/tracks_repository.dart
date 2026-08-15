@@ -192,6 +192,22 @@ class TracksRepository {
     return rows.map((r) => r['node_id']! as String).toList();
   }
 
+  /// Tracks [nodeId] itself has a local copy of — used to filter the
+  /// remote-control "выбрать трек и запустить" picker
+  /// (docs/adr/0030-remote-playback-control.md) down to tracks that
+  /// actually stand a chance of playing on that specific device, instead
+  /// of offering ones it would just reject as unavailable.
+  Future<List<Track>> availableOnDevice(String nodeId) async {
+    final rows = await _crdt.query('''
+      SELECT t.*, tl.path AS path, tl.cover_path AS cover_path
+      FROM tracks t
+      JOIN track_locations tl ON tl.id = t.id || ':' || ?1 AND tl.is_deleted = 0
+      WHERE t.is_deleted = 0 AND tl.path IS NOT NULL
+      ORDER BY t.artist, t.album, t.title
+    ''', [nodeId]);
+    return rows.map(Track.fromRow).toList();
+  }
+
   /// Tracks with cover art known to exist somewhere (`tracks.cover_path`
   /// non-null — used purely as a boolean hint here, see the class doc)
   /// and the audio file already local, but no locally cached cover yet —

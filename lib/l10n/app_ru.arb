@@ -23,6 +23,13 @@
   "settingsSeekStep": "Шаг перемотки",
   "settingsSeekStepSeconds": "{seconds} с",
   "@settingsSeekStepSeconds": {"placeholders": {"seconds": {"type": "int"}}},
+  "settingsAllowRemoteControl": "Разрешить удалённое управление",
+  "settingsAllowRemoteControlSubtitle": "Любое уже сопряжённое устройство сможет управлять воспроизведением на этом устройстве, пока включено",
+
+  "deviceActionResumeHere": "Запустить то, что у меня на паузе",
+  "deviceActionNothingLoaded": "Ничего не загружено",
+  "deviceActionPickTrack": "Выбрать трек и запустить",
+  "deviceActionNoTracksAvailable": "На этом устройстве нет доступных треков",
 
   "searchHint": "Название, исполнитель, альбом…",
   "searchStartTyping": "Начните вводить запрос",

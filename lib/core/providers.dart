@@ -20,6 +20,7 @@ import '../services/library_import/library_import_service.dart';
 import '../services/library_import/tag_reader.dart';
 import '../services/playback/media_kit_player_service.dart';
 import '../services/playback/player_service.dart';
+import '../services/remote_control/remote_control_server.dart';
 import '../services/sync/device_identity_service.dart';
 import '../services/sync/discovery/discovery_service.dart';
 import '../services/sync/files/cover_sync_service.dart';
@@ -167,6 +168,18 @@ final changePlaybackShortcutsSettingsProvider = Provider<Future<void> Function(P
 final currentPlaybackShortcutsSettingsProvider = StateProvider<PlaybackShortcutsSettings>(
   (ref) => throw UnimplementedError(
       'currentPlaybackShortcutsSettingsProvider must be overridden by profile_session.dart'),
+);
+
+/// Same pattern as [changeThemeModeProvider]/[currentThemeModeProvider] —
+/// see docs/adr/0030-remote-playback-control.md. Device-level, off by
+/// default, not part of CRDT-synced profile data.
+final changeAllowRemoteControlProvider = Provider<Future<void> Function(bool)>(
+  (ref) => throw UnimplementedError('changeAllowRemoteControlProvider must be overridden by AudilocApp'),
+);
+
+final currentAllowRemoteControlProvider = StateProvider<bool>(
+  (ref) =>
+      throw UnimplementedError('currentAllowRemoteControlProvider must be overridden by profile_session.dart'),
 );
 
 final tracksRepositoryProvider =
@@ -368,4 +381,22 @@ final shareServiceProvider = Provider<ShareService>((ref) {
     fileTransferPort: fileTransferPort,
   );
   return service;
+});
+
+const remoteControlPort = 8546;
+
+/// Listens for controllers on every device, always — whether a connection
+/// is actually accepted depends on [currentAllowRemoteControlProvider] and
+/// pairing status, checked per-connection by the server itself. See
+/// docs/adr/0030-remote-playback-control.md.
+final remoteControlServerProvider = Provider<RemoteControlServer>((ref) {
+  final server = RemoteControlServer(
+    playerService: ref.watch(playerServiceProvider),
+    devicesRepository: ref.watch(devicesRepositoryProvider),
+    tracksRepository: ref.watch(tracksRepositoryProvider),
+    isAllowed: () => ref.read(currentAllowRemoteControlProvider),
+    port: remoteControlPort,
+  );
+  ref.onDispose(server.dispose);
+  return server;
 });

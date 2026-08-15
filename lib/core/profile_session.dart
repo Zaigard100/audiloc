@@ -55,6 +55,7 @@ class ProfileSessionHandle {
     await _step('pairingService', () => container.read(pairingServiceProvider).dispose());
     await _step('pairingServer', () => container.read(pairingServerProvider).dispose());
     await _step('shareServer', () => container.read(shareServerProvider).dispose());
+    await _step('remoteControlServer', () => container.read(remoteControlServerProvider).dispose());
     await _step('fileTransferServer', () => container.read(fileTransferServerProvider).dispose());
     await _step(
         'fileSyncService', () async => (await container.read(fileSyncServiceProvider.future)).dispose());
@@ -99,6 +100,8 @@ Future<ProfileSessionHandle> openProfileSession({
   required Future<void> Function() eraseAllData,
   required Future<void> Function(PlaybackShortcutsSettings) changePlaybackShortcutsSettings,
   required PlaybackShortcutsSettings initialPlaybackShortcutsSettings,
+  required Future<void> Function(bool) changeAllowRemoteControl,
+  required bool initialAllowRemoteControl,
   Future<String> Function() platformLabel = platformDeviceLabel,
 }) async {
   final profiles = await profilesStore.list();
@@ -137,6 +140,8 @@ Future<ProfileSessionHandle> openProfileSession({
     eraseAllDataProvider.overrideWithValue(eraseAllData),
     changePlaybackShortcutsSettingsProvider.overrideWithValue(changePlaybackShortcutsSettings),
     currentPlaybackShortcutsSettingsProvider.overrideWith((ref) => initialPlaybackShortcutsSettings),
+    changeAllowRemoteControlProvider.overrideWithValue(changeAllowRemoteControl),
+    currentAllowRemoteControlProvider.overrideWith((ref) => initialAllowRemoteControl),
   ]);
 
   // The three fixed-port *bind* calls are awaited — deliberately *not*
@@ -162,6 +167,7 @@ Future<ProfileSessionHandle> openProfileSession({
   unawaited(container.read(syncOrchestratorProvider).start(metadataSyncPort));
   await container.read(pairingServerProvider).start();
   await container.read(shareServerProvider).start();
+  await container.read(remoteControlServerProvider).start();
   await container.read(fileTransferServerProvider).start();
   // Forces PairingService to exist now rather than whenever some widget
   // first reads it — its constructor is what subscribes to the (broadcast,

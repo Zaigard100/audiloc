@@ -68,6 +68,26 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get settingsAllowRemoteControl => 'Allow remote control';
+
+  @override
+  String get settingsAllowRemoteControlSubtitle =>
+      'Any already-paired device will be able to control playback on this device while this is on';
+
+  @override
+  String get deviceActionResumeHere => 'Play what\'s paused here';
+
+  @override
+  String get deviceActionNothingLoaded => 'Nothing loaded';
+
+  @override
+  String get deviceActionPickTrack => 'Pick a track and play';
+
+  @override
+  String get deviceActionNoTracksAvailable =>
+      'No tracks available on this device';
+
+  @override
   String get searchHint => 'Title, artist, album…';
 
   @override

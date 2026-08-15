@@ -23,6 +23,13 @@
   "settingsSeekStep": "Seek step",
   "settingsSeekStepSeconds": "{seconds}s",
   "@settingsSeekStepSeconds": {"placeholders": {"seconds": {"type": "int"}}},
+  "settingsAllowRemoteControl": "Allow remote control",
+  "settingsAllowRemoteControlSubtitle": "Any already-paired device will be able to control playback on this device while this is on",
+
+  "deviceActionResumeHere": "Play what's paused here",
+  "deviceActionNothingLoaded": "Nothing loaded",
+  "deviceActionPickTrack": "Pick a track and play",
+  "deviceActionNoTracksAvailable": "No tracks available on this device",
 
   "searchHint": "Title, artist, album…",
   "searchStartTyping": "Start typing to search",

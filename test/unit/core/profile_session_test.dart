@@ -62,6 +62,7 @@ Future<void> _noopChangeLanguage(Locale? locale) async {}
 Future<void> _noopChangeThemeMode(ThemeMode mode) async {}
 Future<void> _noopEraseAllData() async {}
 Future<void> _noopChangePlaybackShortcutsSettings(PlaybackShortcutsSettings settings) async {}
+Future<void> _noopChangeAllowRemoteControl(bool value) async {}
 
 void main() {
   test(
@@ -94,6 +95,8 @@ void main() {
       eraseAllData: _noopEraseAllData,
       changePlaybackShortcutsSettings: _noopChangePlaybackShortcutsSettings,
       initialPlaybackShortcutsSettings: const PlaybackShortcutsSettings(),
+      changeAllowRemoteControl: _noopChangeAllowRemoteControl,
+      initialAllowRemoteControl: false,
       platformLabel: _testPlatformLabel,
     );
     await first.close();
@@ -116,6 +119,8 @@ void main() {
       eraseAllData: _noopEraseAllData,
       changePlaybackShortcutsSettings: _noopChangePlaybackShortcutsSettings,
       initialPlaybackShortcutsSettings: const PlaybackShortcutsSettings(),
+      changeAllowRemoteControl: _noopChangeAllowRemoteControl,
+      initialAllowRemoteControl: false,
       platformLabel: _testPlatformLabel,
     );
     await second.close();
@@ -147,6 +152,8 @@ void main() {
       eraseAllData: _noopEraseAllData,
       changePlaybackShortcutsSettings: _noopChangePlaybackShortcutsSettings,
       initialPlaybackShortcutsSettings: const PlaybackShortcutsSettings(),
+      changeAllowRemoteControl: _noopChangeAllowRemoteControl,
+      initialAllowRemoteControl: false,
       platformLabel: _testPlatformLabel,
     );
     addTearDown(session.close);
@@ -178,6 +185,8 @@ void main() {
       eraseAllData: _noopEraseAllData,
       changePlaybackShortcutsSettings: _noopChangePlaybackShortcutsSettings,
       initialPlaybackShortcutsSettings: const PlaybackShortcutsSettings(),
+      changeAllowRemoteControl: _noopChangeAllowRemoteControl,
+      initialAllowRemoteControl: false,
       platformLabel: _testPlatformLabel,
     );
     await first.close();
@@ -199,6 +208,8 @@ void main() {
       eraseAllData: _noopEraseAllData,
       changePlaybackShortcutsSettings: _noopChangePlaybackShortcutsSettings,
       initialPlaybackShortcutsSettings: const PlaybackShortcutsSettings(),
+      changeAllowRemoteControl: _noopChangeAllowRemoteControl,
+      initialAllowRemoteControl: false,
       platformLabel: _testPlatformLabel,
     );
     addTearDown(second.close);
@@ -230,6 +241,8 @@ void main() {
       eraseAllData: _noopEraseAllData,
       changePlaybackShortcutsSettings: _noopChangePlaybackShortcutsSettings,
       initialPlaybackShortcutsSettings: const PlaybackShortcutsSettings(),
+      changeAllowRemoteControl: _noopChangeAllowRemoteControl,
+      initialAllowRemoteControl: false,
       platformLabel: _testPlatformLabel,
     );
     addTearDown(session.close);

@@ -68,6 +68,26 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
+  String get settingsAllowRemoteControl => 'Разрешить удалённое управление';
+
+  @override
+  String get settingsAllowRemoteControlSubtitle =>
+      'Любое уже сопряжённое устройство сможет управлять воспроизведением на этом устройстве, пока включено';
+
+  @override
+  String get deviceActionResumeHere => 'Запустить то, что у меня на паузе';
+
+  @override
+  String get deviceActionNothingLoaded => 'Ничего не загружено';
+
+  @override
+  String get deviceActionPickTrack => 'Выбрать трек и запустить';
+
+  @override
+  String get deviceActionNoTracksAvailable =>
+      'На этом устройстве нет доступных треков';
+
+  @override
   String get searchHint => 'Название, исполнитель, альбом…';
 
   @override

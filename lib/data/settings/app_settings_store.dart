@@ -64,6 +64,14 @@ class AppSettingsStore {
     }));
   }
 
+  /// Off by default — remote control is sensitive (any already-paired
+  /// device could otherwise change what's playing here), so each device
+  /// opts in individually, not the profile as a whole. See
+  /// docs/adr/0030-remote-playback-control.md.
+  Future<bool> allowRemoteControl() async => (await _read())['allowRemoteControl'] as bool? ?? false;
+
+  Future<void> setAllowRemoteControl(bool value) => _write('allowRemoteControl', value);
+
   Future<Map<String, Object?>> _read() async {
     if (!await _file.exists()) return const {};
     return jsonDecode(await _file.readAsString()) as Map<String, Object?>;

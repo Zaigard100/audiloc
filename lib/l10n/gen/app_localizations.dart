@@ -200,6 +200,42 @@ abstract class AppLocalizations {
   /// **'{seconds} с'**
   String settingsSeekStepSeconds(int seconds);
 
+  /// No description provided for @settingsAllowRemoteControl.
+  ///
+  /// In ru, this message translates to:
+  /// **'Разрешить удалённое управление'**
+  String get settingsAllowRemoteControl;
+
+  /// No description provided for @settingsAllowRemoteControlSubtitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'Любое уже сопряжённое устройство сможет управлять воспроизведением на этом устройстве, пока включено'**
+  String get settingsAllowRemoteControlSubtitle;
+
+  /// No description provided for @deviceActionResumeHere.
+  ///
+  /// In ru, this message translates to:
+  /// **'Запустить то, что у меня на паузе'**
+  String get deviceActionResumeHere;
+
+  /// No description provided for @deviceActionNothingLoaded.
+  ///
+  /// In ru, this message translates to:
+  /// **'Ничего не загружено'**
+  String get deviceActionNothingLoaded;
+
+  /// No description provided for @deviceActionPickTrack.
+  ///
+  /// In ru, this message translates to:
+  /// **'Выбрать трек и запустить'**
+  String get deviceActionPickTrack;
+
+  /// No description provided for @deviceActionNoTracksAvailable.
+  ///
+  /// In ru, this message translates to:
+  /// **'На этом устройстве нет доступных треков'**
+  String get deviceActionNoTracksAvailable;
+
   /// No description provided for @searchHint.
   ///
   /// In ru, this message translates to:

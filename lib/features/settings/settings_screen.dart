@@ -33,6 +33,7 @@ class SettingsScreen extends ConsumerWidget {
           ),
           const _KeyboardShortcutsToggle(),
           const _SeekStepPicker(),
+          const _AllowRemoteControlToggle(),
           const Divider(height: 1),
           ListTile(
             leading: const Icon(Icons.info_outline),
@@ -298,5 +299,25 @@ class _SeekStepPicker extends ConsumerWidget {
     );
     if (chosen == null) return;
     await ref.read(changePlaybackShortcutsSettingsProvider)(settings.copyWith(seekStepSeconds: chosen));
+  }
+}
+
+/// See docs/adr/0030-remote-playback-control.md — off by default,
+/// device-level (not synced): any already-paired device can control
+/// playback here while this is on.
+class _AllowRemoteControlToggle extends ConsumerWidget {
+  const _AllowRemoteControlToggle();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = context.l10n;
+    final allowed = ref.watch(currentAllowRemoteControlProvider);
+    return SwitchListTile(
+      secondary: const Icon(Icons.settings_remote_outlined),
+      title: Text(l10n.settingsAllowRemoteControl),
+      subtitle: Text(l10n.settingsAllowRemoteControlSubtitle),
+      value: allowed,
+      onChanged: (value) => ref.read(changeAllowRemoteControlProvider)(value),
+    );
   }
 }

@@ -6,7 +6,10 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/models/device.dart';
 import '../../../l10n/l10n.dart';
+import '../../../services/remote_control/remote_control_models.dart';
 import '../../../services/sync/discovery/discovered_peer.dart';
+import '../providers/remote_control_providers.dart';
+import 'device_actions_sheet.dart';
 
 class DeviceTile extends ConsumerWidget {
   const DeviceTile({super.key, required this.device, required this.isOnline});
@@ -17,7 +20,14 @@ class DeviceTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = context.l10n;
-    return ListTile(
+    // Only attempted while online — nearbyPeersProvider (which the
+    // connection provider watches) never has an entry for an offline
+    // device anyway, but gating here too skips creating the family entry
+    // at all for the common case of a paired-but-offline device.
+    final remote = isOnline ? ref.watch(remoteControlConnectionProvider(device.id)).value : null;
+    final canControl = remote?.status == RemoteControlStatus.accepted;
+
+    final tile = ListTile(
       leading: CircleAvatar(
         backgroundColor: context.colors.surfaceHigh,
         child: Icon(
@@ -43,6 +53,20 @@ class DeviceTile extends ConsumerWidget {
           ),
         ],
       ),
+      onLongPress: canControl ? () => showDeviceActionsSheet(context, ref, device) : null,
+    );
+
+    if (!canControl) return tile;
+    return Column(
+      children: [
+        // Right-click opens the same menu as long-press — desktop has no
+        // long-press gesture (same pattern as TrackTile/PlaylistTile).
+        GestureDetector(
+          onSecondaryTap: () => showDeviceActionsSheet(context, ref, device),
+          child: tile,
+        ),
+        _RemoteControls(deviceId: device.id, state: remote!.state),
+      ],
     );
   }
 
@@ -88,5 +112,72 @@ class DeviceTile extends ConsumerWidget {
       port: device.syncPort!,
     );
     ref.read(metadataSyncServiceProvider).connectToPeer(device.id, peer.metadataSyncUri);
+  }
+}
+
+/// Inline play/pause/next/previous + a read-only progress bar for a
+/// device that's confirmed to allow remote control — see
+/// docs/adr/0030-remote-playback-control.md. Deliberately a
+/// `LinearProgressIndicator`, not a `Slider`: display only, no seeking
+/// from here (that's what the "запустить то, что у меня на паузе"/
+/// "выбрать трек" actions in [showDeviceActionsSheet] are for).
+class _RemoteControls extends ConsumerWidget {
+  const _RemoteControls({required this.deviceId, required this.state});
+
+  final String deviceId;
+  final RemoteState? state;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final controller = ref.read(remoteControlControllerProvider(deviceId));
+    final isPlaying = state?.isPlaying ?? false;
+    final positionMs = state?.positionMs ?? 0;
+    final durationMs = state?.durationMs ?? 0;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(72, 0, 16, 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.skip_previous),
+                visualDensity: VisualDensity.compact,
+                onPressed: controller.previous,
+              ),
+              IconButton(
+                icon: Icon(isPlaying ? Icons.pause : Icons.play_arrow),
+                visualDensity: VisualDensity.compact,
+                onPressed: isPlaying ? controller.pause : controller.play,
+              ),
+              IconButton(
+                icon: const Icon(Icons.skip_next),
+                visualDensity: VisualDensity.compact,
+                onPressed: controller.next,
+              ),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Text(
+                  state?.title ?? '',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 12, color: context.colors.onSurfaceMuted),
+                ),
+              ),
+            ],
+          ),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: durationMs == 0 ? 0 : positionMs / durationMs,
+              minHeight: 3,
+              color: AppTheme.accent,
+              backgroundColor: context.colors.surfaceHigh,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
