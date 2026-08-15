@@ -75,11 +75,18 @@ class AppLocalizationsEn extends AppLocalizations {
       'Any already-paired device will be able to control playback on this device while this is on';
 
   @override
+  String get settingsSaveLocalSession => 'Save previous session state';
+
+  @override
+  String get settingsSaveLocalSessionSubtitle =>
+      'This device only, never sent anywhere. Remembers the last track and position and continues from them next launch';
+
+  @override
   String get settingsSendPlaybackStateSync => 'Send playback state';
 
   @override
   String get settingsSendPlaybackStateSyncSubtitle =>
-      'Experimental, may be unstable. Saves and syncs this device\'s last track position (including restore after restart)';
+      'Experimental, may be unstable. Syncs this device\'s last track position to other devices';
 
   @override
   String get settingsReceivePlaybackStateSync => 'Receive playback state';

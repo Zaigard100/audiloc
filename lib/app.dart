@@ -88,10 +88,15 @@ class _AudilocAppState extends State<AudilocApp> with WidgetsBindingObserver {
   /// docs/adr/0030-remote-playback-control.md.
   bool _allowRemoteControl = false;
 
-  /// Persisted via [_settingsStore], off by default — experimental, see
-  /// docs/adr/0029-playback-state-sync.md.
+  /// Persisted via [_settingsStore], off by default — experimental,
+  /// cross-device sync (docs/adr/0029-playback-state-sync.md).
   bool _sendPlaybackStateSync = false;
   bool _receivePlaybackStateSync = false;
+
+  /// Persisted via [_settingsStore], **on** by default — purely local
+  /// (never synced), independent of the two above. See
+  /// docs/adr/0029-playback-state-sync.md.
+  bool _saveLocalSession = true;
 
   /// Set when [_bootstrap] or [_openProfile] throws — without this, an
   /// exception anywhere in that startup chain (a port still held by a
@@ -241,6 +246,7 @@ class _AudilocAppState extends State<AudilocApp> with WidgetsBindingObserver {
       final savedAllowRemoteControl = await settingsStore.allowRemoteControl();
       final savedSendPlaybackStateSync = await settingsStore.sendPlaybackStateSync();
       final savedReceivePlaybackStateSync = await settingsStore.receivePlaybackStateSync();
+      final savedSaveLocalSession = await settingsStore.saveLocalSession();
       if (!mounted) return;
       setState(() {
         _profilesStore = store;
@@ -251,6 +257,7 @@ class _AudilocAppState extends State<AudilocApp> with WidgetsBindingObserver {
         _allowRemoteControl = savedAllowRemoteControl;
         _sendPlaybackStateSync = savedSendPlaybackStateSync;
         _receivePlaybackStateSync = savedReceivePlaybackStateSync;
+        _saveLocalSession = savedSaveLocalSession;
       });
 
       // A genuinely fresh install (nothing to migrate either) — ask for a
@@ -363,6 +370,16 @@ class _AudilocAppState extends State<AudilocApp> with WidgetsBindingObserver {
     setState(() => _receivePlaybackStateSync = value);
   }
 
+  /// Bound to the "сохранять состояние прошлой сессии" toggle in
+  /// Settings — same pattern as [_changeSendPlaybackStateSync], see
+  /// docs/adr/0029-playback-state-sync.md.
+  Future<void> _changeSaveLocalSession(bool value) async {
+    await _settingsStore!.setSaveLocalSession(value);
+    _session?.container.read(currentSaveLocalSessionProvider.notifier).state = value;
+    if (!mounted) return;
+    setState(() => _saveLocalSession = value);
+  }
+
   /// Bound to "Стереть все данные" in Settings, after its own double
   /// confirmation (docs/adr/0028-settings-screen-and-theming.md) — the
   /// caller is a widget inside the very [ProviderContainer] this closes,
@@ -400,6 +417,7 @@ class _AudilocAppState extends State<AudilocApp> with WidgetsBindingObserver {
       _allowRemoteControl = false;
       _sendPlaybackStateSync = false;
       _receivePlaybackStateSync = false;
+      _saveLocalSession = true;
     });
     await _bootstrap();
   }
@@ -507,6 +525,8 @@ class _AudilocAppState extends State<AudilocApp> with WidgetsBindingObserver {
         initialSendPlaybackStateSync: _sendPlaybackStateSync,
         changeReceivePlaybackStateSync: _changeReceivePlaybackStateSync,
         initialReceivePlaybackStateSync: _receivePlaybackStateSync,
+        changeSaveLocalSession: _changeSaveLocalSession,
+        initialSaveLocalSession: _saveLocalSession,
       );
       if (!mounted) {
         await session.close();

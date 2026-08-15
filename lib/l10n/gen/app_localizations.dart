@@ -212,6 +212,18 @@ abstract class AppLocalizations {
   /// **'Любое уже сопряжённое устройство сможет управлять воспроизведением на этом устройстве, пока включено'**
   String get settingsAllowRemoteControlSubtitle;
 
+  /// No description provided for @settingsSaveLocalSession.
+  ///
+  /// In ru, this message translates to:
+  /// **'Сохранять состояние прошлой сессии'**
+  String get settingsSaveLocalSession;
+
+  /// No description provided for @settingsSaveLocalSessionSubtitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'Только на этом устройстве, никуда не отправляется. Запоминает последний трек и позицию и продолжает с них при следующем запуске'**
+  String get settingsSaveLocalSessionSubtitle;
+
   /// No description provided for @settingsSendPlaybackStateSync.
   ///
   /// In ru, this message translates to:
@@ -221,7 +233,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsSendPlaybackStateSyncSubtitle.
   ///
   /// In ru, this message translates to:
-  /// **'Экспериментально, может работать нестабильно. Сохраняет и синхронизирует позицию последнего трека этого устройства (в т.ч. восстановление после перезапуска)'**
+  /// **'Экспериментально, может работать нестабильно. Синхронизирует позицию последнего трека этого устройства на другие устройства'**
   String get settingsSendPlaybackStateSyncSubtitle;
 
   /// No description provided for @settingsReceivePlaybackStateSync.

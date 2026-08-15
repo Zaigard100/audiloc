@@ -34,6 +34,7 @@ class SettingsScreen extends ConsumerWidget {
           const _KeyboardShortcutsToggle(),
           const _SeekStepPicker(),
           const _AllowRemoteControlToggle(),
+          const _SaveLocalSessionToggle(),
           const _SendPlaybackStateSyncToggle(),
           const _ReceivePlaybackStateSyncToggle(),
           const Divider(height: 1),
@@ -324,12 +325,32 @@ class _AllowRemoteControlToggle extends ConsumerWidget {
   }
 }
 
+/// **On** by default, unlike the two cross-device toggles below — purely
+/// local (`LocalPlaybackStateStore`), nothing here is ever sent
+/// anywhere, so it doesn't carry the same "still experimental" risk. See
+/// docs/adr/0029-playback-state-sync.md.
+class _SaveLocalSessionToggle extends ConsumerWidget {
+  const _SaveLocalSessionToggle();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = context.l10n;
+    final enabled = ref.watch(currentSaveLocalSessionProvider);
+    return SwitchListTile(
+      secondary: const Icon(Icons.history_outlined),
+      title: Text(l10n.settingsSaveLocalSession),
+      subtitle: Text(l10n.settingsSaveLocalSessionSubtitle),
+      value: enabled,
+      onChanged: (value) => ref.read(changeSaveLocalSessionProvider)(value),
+    );
+  }
+}
+
 /// Off by default, marked experimental in its own subtitle — the user
 /// asked for this explicitly after the underlying feature needed
 /// several follow-up fixes (see docs/adr/0029-playback-state-sync.md's
-/// regression log). Off also disables this device's own
-/// restore-after-restart, not just outgoing sync — both go through the
-/// same write.
+/// regression log). Independent of [_SaveLocalSessionToggle] — this
+/// device's own restore-after-restart no longer depends on this at all.
 class _SendPlaybackStateSyncToggle extends ConsumerWidget {
   const _SendPlaybackStateSyncToggle();
 

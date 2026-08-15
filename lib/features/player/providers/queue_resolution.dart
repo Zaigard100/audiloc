@@ -1,5 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../data/models/playback_state.dart';
+import '../../../data/models/playlist.dart';
 import '../../../data/models/track.dart';
 import '../../library/providers/library_providers.dart';
 import '../../playlists/providers/playlists_providers.dart';
@@ -47,4 +49,40 @@ Future<List<Track>> resolveQueueTracks(WidgetRef ref, QueueSource? source) async
       await awaitFirstValue(ref, libraryTracksProvider);
       return ref.read(sortedLibraryTracksProvider);
   }
+}
+
+/// Rebuilds the ordered queue a saved/synced [PlaybackState] (or the
+/// equivalent fields from `LocalPlaybackStateStore`'s local session
+/// bookmark) was playing from, and finds its track in it — `null` if the
+/// queue or the track itself isn't resolvable on this device yet
+/// (playlist not synced, track not synced, or synced but its file hasn't
+/// been downloaded here). Shared by `resume_playback_prompt.dart`
+/// (cross-device sync) and `local_session_restore.dart` (this device's
+/// own last session) — both need exactly this, just from different
+/// sources of the three fields. See docs/adr/0029-playback-state-sync.md.
+Future<(List<Track>, int, QueueSource)?> resolvePlaybackStateQueue(
+  WidgetRef ref, {
+  required PlaybackQueueType queueType,
+  required String? playlistId,
+  required String trackId,
+}) async {
+  final QueueSource source;
+  switch (queueType) {
+    case PlaybackQueueType.library:
+      source = const LibraryQueueSource();
+    case PlaybackQueueType.favorites:
+      source = const FavoritesQueueSource();
+    case PlaybackQueueType.playlist:
+      if (playlistId == null) return null;
+      final playlists = await awaitFirstValue(ref, playlistsProvider);
+      final playlist =
+          playlists.cast<Playlist?>().firstWhere((p) => p?.id == playlistId, orElse: () => null);
+      if (playlist == null) return null;
+      source = PlaylistQueueSource(playlistId, playlist.name);
+  }
+
+  final tracks = await resolveQueueTracks(ref, source);
+  final index = tracks.indexWhere((t) => t.id == trackId && t.isAvailableLocally);
+  if (index < 0) return null;
+  return (tracks, index, source);
 }

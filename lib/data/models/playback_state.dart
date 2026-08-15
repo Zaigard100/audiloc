@@ -43,4 +43,25 @@ class PlaybackState {
         deviceId: row['device_id']! as String,
         deviceName: row['device_name']! as String,
       );
+
+  /// Plain-file encoding for `LocalPlaybackStateStore` — a *local*,
+  /// unsynced counterpart to [fromRow]/the CRDT `playback_state` table.
+  /// See docs/adr/0029-playback-state-sync.md.
+  Map<String, Object?> toJson() => {
+        'trackId': trackId,
+        'positionMs': positionMs,
+        'queueType': queueType.name,
+        'playlistId': playlistId,
+        'deviceId': deviceId,
+        'deviceName': deviceName,
+      };
+
+  factory PlaybackState.fromJson(Map<String, Object?> json) => PlaybackState(
+        trackId: json['trackId']! as String,
+        positionMs: json['positionMs']! as int,
+        queueType: PlaybackQueueType.values.byName(json['queueType']! as String),
+        playlistId: json['playlistId'] as String?,
+        deviceId: json['deviceId']! as String,
+        deviceName: json['deviceName']! as String,
+      );
 }

@@ -14,10 +14,13 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'fake_player_service.dart';
 
-/// Reproduces exactly what `AppShell.initState()` does — subscribes to
-/// `playbackStateProvider` with `fireImmediately: true`, same as the real
-/// app — without pulling in all of `AppShell`'s other unrelated
+/// Reproduces exactly what `AppShell.initState()` does for the
+/// cross-device half of docs/adr/0029-playback-state-sync.md — subscribes
+/// to `playbackStateProvider` with `fireImmediately: true`, same as the
+/// real app — without pulling in all of `AppShell`'s other unrelated
 /// providers (pairing/share-offer listeners, the four tab screens, ...).
+/// Restoring *this* device's own last session is a separate mechanism now
+/// — see `local_session_restore_test.dart`.
 class _RestoreHarness extends ConsumerStatefulWidget {
   const _RestoreHarness();
 
@@ -57,9 +60,8 @@ void main() {
   });
 
   testWidgets(
-      'a playback_state row already in the DB at cold start gets restored — '
-      'regression: the library had not finished loading yet when this ran, so '
-      'the queue resolved to an empty list and the restore was silently dropped',
+      'a row this same device wrote is never applied through the cross-device path — '
+      "restoring this device's own session is local_session_restore.dart's job now",
       (tester) async {
     await tester.runAsync(() async {
       await TracksRepository(db.crdt).upsert(track);
@@ -75,6 +77,7 @@ void main() {
         databaseProvider.overrideWithValue(db),
         playerServiceProvider.overrideWithValue(playerService),
         selfDeviceProvider.overrideWithValue(self),
+        currentReceivePlaybackStateSyncProvider.overrideWith((ref) => true),
       ]);
       addTearDown(container.dispose);
 
@@ -83,17 +86,12 @@ void main() {
         child: const MaterialApp(home: _RestoreHarness()),
       ));
 
-      for (var i = 0; i < 30; i++) {
+      for (var i = 0; i < 15; i++) {
         await Future<void>.delayed(const Duration(milliseconds: 10));
         await tester.pump();
-        if (playerService.lastQueue.isNotEmpty) break;
       }
 
-      expect(playerService.lastQueue.map((t) => t.id), ['t1']);
-      expect(playerService.lastStartIndex, 0);
-      expect(playerService.position, const Duration(milliseconds: 65000));
-      // Restored paused, not auto-played — see docs/adr/0029.
-      expect(playerService.isPlaying, isFalse);
+      expect(playerService.lastQueue, isEmpty);
     });
   });
 
@@ -203,42 +201,6 @@ void main() {
 
       expect(find.text('Продолжить'), findsNothing);
       expect(playerService.lastQueue, isEmpty);
-    });
-  });
-
-  testWidgets(
-      'this device\'s own cold-start restore still works with "принимать" off — '
-      'that setting only gates a *different* device\'s state', (tester) async {
-    await tester.runAsync(() async {
-      await TracksRepository(db.crdt).upsert(track);
-      await PlaybackStateRepository(db.crdt).save(const PlaybackState(
-        trackId: 't1',
-        positionMs: 65000,
-        queueType: PlaybackQueueType.library,
-        deviceId: 'self',
-        deviceName: 'Ноутбук',
-      ));
-
-      final container = ProviderContainer(overrides: [
-        databaseProvider.overrideWithValue(db),
-        playerServiceProvider.overrideWithValue(playerService),
-        selfDeviceProvider.overrideWithValue(self),
-        currentReceivePlaybackStateSyncProvider.overrideWith((ref) => false),
-      ]);
-      addTearDown(container.dispose);
-
-      await tester.pumpWidget(UncontrolledProviderScope(
-        container: container,
-        child: const MaterialApp(home: _RestoreHarness()),
-      ));
-
-      for (var i = 0; i < 30; i++) {
-        await Future<void>.delayed(const Duration(milliseconds: 10));
-        await tester.pump();
-        if (playerService.lastQueue.isNotEmpty) break;
-      }
-
-      expect(playerService.lastQueue.map((t) => t.id), ['t1']);
     });
   });
 }

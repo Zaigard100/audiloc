@@ -75,12 +75,19 @@ class AppLocalizationsRu extends AppLocalizations {
       'Любое уже сопряжённое устройство сможет управлять воспроизведением на этом устройстве, пока включено';
 
   @override
+  String get settingsSaveLocalSession => 'Сохранять состояние прошлой сессии';
+
+  @override
+  String get settingsSaveLocalSessionSubtitle =>
+      'Только на этом устройстве, никуда не отправляется. Запоминает последний трек и позицию и продолжает с них при следующем запуске';
+
+  @override
   String get settingsSendPlaybackStateSync =>
       'Отправлять состояние воспроизведения';
 
   @override
   String get settingsSendPlaybackStateSyncSubtitle =>
-      'Экспериментально, может работать нестабильно. Сохраняет и синхронизирует позицию последнего трека этого устройства (в т.ч. восстановление после перезапуска)';
+      'Экспериментально, может работать нестабильно. Синхронизирует позицию последнего трека этого устройства на другие устройства';
 
   @override
   String get settingsReceivePlaybackStateSync =>

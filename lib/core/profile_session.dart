@@ -106,6 +106,8 @@ Future<ProfileSessionHandle> openProfileSession({
   required bool initialSendPlaybackStateSync,
   required Future<void> Function(bool) changeReceivePlaybackStateSync,
   required bool initialReceivePlaybackStateSync,
+  required Future<void> Function(bool) changeSaveLocalSession,
+  required bool initialSaveLocalSession,
   Future<String> Function() platformLabel = platformDeviceLabel,
 }) async {
   final profiles = await profilesStore.list();
@@ -150,6 +152,8 @@ Future<ProfileSessionHandle> openProfileSession({
     currentSendPlaybackStateSyncProvider.overrideWith((ref) => initialSendPlaybackStateSync),
     changeReceivePlaybackStateSyncProvider.overrideWithValue(changeReceivePlaybackStateSync),
     currentReceivePlaybackStateSyncProvider.overrideWith((ref) => initialReceivePlaybackStateSync),
+    changeSaveLocalSessionProvider.overrideWithValue(changeSaveLocalSession),
+    currentSaveLocalSessionProvider.overrideWith((ref) => initialSaveLocalSession),
   ]);
 
   // The three fixed-port *bind* calls are awaited — deliberately *not*

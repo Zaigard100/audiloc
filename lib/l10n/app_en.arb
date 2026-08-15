@@ -26,8 +26,10 @@
   "settingsAllowRemoteControl": "Allow remote control",
   "settingsAllowRemoteControlSubtitle": "Any already-paired device will be able to control playback on this device while this is on",
 
+  "settingsSaveLocalSession": "Save previous session state",
+  "settingsSaveLocalSessionSubtitle": "This device only, never sent anywhere. Remembers the last track and position and continues from them next launch",
   "settingsSendPlaybackStateSync": "Send playback state",
-  "settingsSendPlaybackStateSyncSubtitle": "Experimental, may be unstable. Saves and syncs this device's last track position (including restore after restart)",
+  "settingsSendPlaybackStateSyncSubtitle": "Experimental, may be unstable. Syncs this device's last track position to other devices",
   "settingsReceivePlaybackStateSync": "Receive playback state",
   "settingsReceivePlaybackStateSyncSubtitle": "Experimental, may be unstable. Lets a position sent by another device apply here, or prompt to continue from it",
 

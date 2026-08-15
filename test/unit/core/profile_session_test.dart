@@ -65,6 +65,7 @@ Future<void> _noopChangePlaybackShortcutsSettings(PlaybackShortcutsSettings sett
 Future<void> _noopChangeAllowRemoteControl(bool value) async {}
 Future<void> _noopChangeSendPlaybackStateSync(bool value) async {}
 Future<void> _noopChangeReceivePlaybackStateSync(bool value) async {}
+Future<void> _noopChangeSaveLocalSession(bool value) async {}
 
 void main() {
   test(
@@ -103,6 +104,8 @@ void main() {
       initialSendPlaybackStateSync: true,
       changeReceivePlaybackStateSync: _noopChangeReceivePlaybackStateSync,
       initialReceivePlaybackStateSync: true,
+      changeSaveLocalSession: _noopChangeSaveLocalSession,
+      initialSaveLocalSession: true,
       platformLabel: _testPlatformLabel,
     );
     await first.close();
@@ -131,6 +134,8 @@ void main() {
       initialSendPlaybackStateSync: true,
       changeReceivePlaybackStateSync: _noopChangeReceivePlaybackStateSync,
       initialReceivePlaybackStateSync: true,
+      changeSaveLocalSession: _noopChangeSaveLocalSession,
+      initialSaveLocalSession: true,
       platformLabel: _testPlatformLabel,
     );
     await second.close();
@@ -168,6 +173,8 @@ void main() {
       initialSendPlaybackStateSync: true,
       changeReceivePlaybackStateSync: _noopChangeReceivePlaybackStateSync,
       initialReceivePlaybackStateSync: true,
+      changeSaveLocalSession: _noopChangeSaveLocalSession,
+      initialSaveLocalSession: true,
       platformLabel: _testPlatformLabel,
     );
     addTearDown(session.close);
@@ -205,6 +212,8 @@ void main() {
       initialSendPlaybackStateSync: true,
       changeReceivePlaybackStateSync: _noopChangeReceivePlaybackStateSync,
       initialReceivePlaybackStateSync: true,
+      changeSaveLocalSession: _noopChangeSaveLocalSession,
+      initialSaveLocalSession: true,
       platformLabel: _testPlatformLabel,
     );
     await first.close();
@@ -232,6 +241,8 @@ void main() {
       initialSendPlaybackStateSync: true,
       changeReceivePlaybackStateSync: _noopChangeReceivePlaybackStateSync,
       initialReceivePlaybackStateSync: true,
+      changeSaveLocalSession: _noopChangeSaveLocalSession,
+      initialSaveLocalSession: true,
       platformLabel: _testPlatformLabel,
     );
     addTearDown(second.close);
@@ -269,6 +280,8 @@ void main() {
       initialSendPlaybackStateSync: true,
       changeReceivePlaybackStateSync: _noopChangeReceivePlaybackStateSync,
       initialReceivePlaybackStateSync: true,
+      changeSaveLocalSession: _noopChangeSaveLocalSession,
+      initialSaveLocalSession: true,
       platformLabel: _testPlatformLabel,
     );
     addTearDown(session.close);

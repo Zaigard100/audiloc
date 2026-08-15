@@ -39,9 +39,11 @@ final playbackStateWriterProvider = Provider<PlaybackStateWriter>((ref) {
   final writer = PlaybackStateWriter(
     playerService: ref.watch(playerServiceProvider),
     repository: ref.watch(playbackStateRepositoryProvider),
+    localStore: ref.watch(localPlaybackStateStoreProvider),
     selfDevice: ref.watch(selfDeviceProvider),
     currentQueueSource: () => ref.read(queueSourceProvider),
     isSendEnabled: () => ref.read(currentSendPlaybackStateSyncProvider),
+    isLocalSaveEnabled: () => ref.read(currentSaveLocalSessionProvider),
   );
   writer.start();
   ref.onDispose(writer.dispose);

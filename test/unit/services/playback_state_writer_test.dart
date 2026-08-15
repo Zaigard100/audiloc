@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:audiloc/data/db/audiloc_database.dart';
+import 'package:audiloc/data/local_playback_state_store.dart';
 import 'package:audiloc/data/models/device.dart';
 import 'package:audiloc/data/models/playback_state.dart';
 import 'package:audiloc/data/models/track.dart';
@@ -58,6 +60,8 @@ class _FakePlayerService implements PlayerService {
 void main() {
   late AudilocDatabase db;
   late PlaybackStateRepository repository;
+  late Directory profileDir;
+  late LocalPlaybackStateStore localStore;
   late _FakePlayerService player;
   late PlaybackStateWriter writer;
 
@@ -67,13 +71,17 @@ void main() {
   setUp(() async {
     db = await AudilocDatabase.openInMemory();
     repository = PlaybackStateRepository(db.crdt);
+    profileDir = await Directory.systemTemp.createTemp('audiloc_playback_writer_test_');
+    localStore = LocalPlaybackStateStore(profileDir);
     player = _FakePlayerService();
     writer = PlaybackStateWriter(
       playerService: player,
       repository: repository,
+      localStore: localStore,
       selfDevice: device,
       currentQueueSource: () => const LibraryQueueSource(),
       isSendEnabled: () => true,
+      isLocalSaveEnabled: () => true,
     );
     writer.start();
   });
@@ -82,9 +90,10 @@ void main() {
     await writer.dispose();
     await player.dispose();
     await db.close();
+    await profileDir.delete(recursive: true);
   });
 
-  test('a playing -> paused edge saves the current track and position', () async {
+  test('a playing -> paused edge saves the current track and position to both stores', () async {
     player.currentTrackValue = track;
     player.positionValue = const Duration(seconds: 42);
 
@@ -96,6 +105,10 @@ void main() {
     expect(saved?.trackId, 't1');
     expect(saved?.positionMs, 42000);
     expect(saved?.deviceId, 'device-a');
+
+    final local = await localStore.read();
+    expect(local?.trackId, 't1');
+    expect(local?.positionMs, 42000);
   });
 
   test('starting or resuming playback does not save anything', () async {
@@ -104,6 +117,7 @@ void main() {
     await Future<void>.delayed(Duration.zero);
 
     expect(await repository.get(), isNull);
+    expect(await localStore.read(), isNull);
   });
 
   test('saveCurrentState() writes regardless of playing/paused — used when the app is '
@@ -122,15 +136,18 @@ void main() {
   test('saveCurrentState() is a no-op when nothing is loaded', () async {
     await writer.saveCurrentState();
     expect(await repository.get(), isNull);
+    expect(await localStore.read(), isNull);
   });
 
   test('saveCurrentState() records the playlist id for a playlist queue', () async {
     final playlistWriter = PlaybackStateWriter(
       playerService: player,
       repository: repository,
+      localStore: localStore,
       selfDevice: device,
       currentQueueSource: () => const PlaylistQueueSource('pl-1', 'Моя подборка'),
       isSendEnabled: () => true,
+      isLocalSaveEnabled: () => true,
     );
     player.currentTrackValue = track;
 
@@ -141,35 +158,77 @@ void main() {
     expect(saved?.playlistId, 'pl-1');
   });
 
-  test('saveCurrentState() writes nothing when the "отправлять" setting is off', () async {
+  test('saveCurrentState() writes nothing to either store when both toggles are off', () async {
     final disabledWriter = PlaybackStateWriter(
       playerService: player,
       repository: repository,
+      localStore: localStore,
       selfDevice: device,
       currentQueueSource: () => const LibraryQueueSource(),
       isSendEnabled: () => false,
+      isLocalSaveEnabled: () => false,
     );
     player.currentTrackValue = track;
 
     await disabledWriter.saveCurrentState();
 
     expect(await repository.get(), isNull);
+    expect(await localStore.read(), isNull);
   });
 
-  test('a pause does not write either when "отправлять" is off — not just saveCurrentState()',
+  test('"отправлять" and "сохранять локально" are independent — send off, local on, '
+      'only writes locally', () async {
+    final localOnlyWriter = PlaybackStateWriter(
+      playerService: player,
+      repository: repository,
+      localStore: localStore,
+      selfDevice: device,
+      currentQueueSource: () => const LibraryQueueSource(),
+      isSendEnabled: () => false,
+      isLocalSaveEnabled: () => true,
+    );
+    player.currentTrackValue = track;
+
+    await localOnlyWriter.saveCurrentState();
+
+    expect(await repository.get(), isNull);
+    expect((await localStore.read())?.trackId, 't1');
+  });
+
+  test('local on, send off — the other way around, only writes to the CRDT table', () async {
+    final sendOnlyWriter = PlaybackStateWriter(
+      playerService: player,
+      repository: repository,
+      localStore: localStore,
+      selfDevice: device,
+      currentQueueSource: () => const LibraryQueueSource(),
+      isSendEnabled: () => true,
+      isLocalSaveEnabled: () => false,
+    );
+    player.currentTrackValue = track;
+
+    await sendOnlyWriter.saveCurrentState();
+
+    expect((await repository.get())?.trackId, 't1');
+    expect(await localStore.read(), isNull);
+  });
+
+  test('a pause does not write either when both toggles are off — not just saveCurrentState()',
       () async {
     // A fresh player, not the shared `player`/`writer` from `setUp` — the
     // outer `writer` is already listening to `player.playingStream` with
-    // `isSendEnabled: () => true`, and would itself write on the same
-    // pause edge, masking whatever this test is actually checking.
+    // both toggles on, and would itself write on the same pause edge,
+    // masking whatever this test is actually checking.
     final isolatedPlayer = _FakePlayerService();
     addTearDown(isolatedPlayer.dispose);
     final disabledWriter = PlaybackStateWriter(
       playerService: isolatedPlayer,
       repository: repository,
+      localStore: localStore,
       selfDevice: device,
       currentQueueSource: () => const LibraryQueueSource(),
       isSendEnabled: () => false,
+      isLocalSaveEnabled: () => false,
     );
     disabledWriter.start();
     addTearDown(disabledWriter.dispose);
@@ -180,5 +239,6 @@ void main() {
     await Future<void>.delayed(Duration.zero);
 
     expect(await repository.get(), isNull);
+    expect(await localStore.read(), isNull);
   });
 }

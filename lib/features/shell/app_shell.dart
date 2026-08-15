@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -10,6 +12,7 @@ import '../devices/providers/devices_providers.dart';
 import '../library/library_screen.dart';
 import '../player/mini_player.dart';
 import '../player/providers/player_providers.dart';
+import '../player/widgets/local_session_restore.dart';
 import '../player/widgets/resume_playback_prompt.dart';
 import '../playlists/playlists_screen.dart';
 import '../search/search_screen.dart';
@@ -48,11 +51,17 @@ class _AppShellState extends ConsumerState<AppShell> {
   void initState() {
     super.initState();
     _pageController = PageController(initialPage: _index);
+    // Purely local — this device's own last session, independent of any
+    // cross-device sync setting. Started first (though both are async;
+    // see `local_session_restore.dart`'s doc for why the ordering isn't
+    // actually load-bearing) so that if a genuine cross-device update
+    // also lands moments later, it correctly finds something already
+    // loaded here and asks before overwriting it.
+    unawaited(restoreLocalSession(ref));
     // `listenManual` (not `ref.listen` in build) specifically so
-    // `fireImmediately` is available — a state already sitting in the DB
-    // when this profile session opens (this device's own last session, or
-    // synced in before this device ever opened the app) needs to be
-    // restored too, not just live updates that arrive after this
+    // `fireImmediately` is available — a cross-device row already
+    // sitting in the DB when this profile session opens needs to be
+    // acted on too, not just live updates that arrive after this
     // subscription already exists. See docs/adr/0029-playback-state-sync.md.
     ref.listenManual(playbackStateProvider, (previous, next) {
       final state = next.value;

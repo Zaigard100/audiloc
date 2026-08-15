@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/legacy.dart';
 import 'package:path/path.dart' as p;
 
 import '../data/db/audiloc_database.dart';
+import '../data/local_playback_state_store.dart';
 import '../data/models/device.dart';
 import '../data/profiles/profile.dart';
 import '../data/profiles/profiles_store.dart';
@@ -206,6 +207,25 @@ final changeReceivePlaybackStateSyncProvider = Provider<Future<void> Function(bo
 final currentReceivePlaybackStateSyncProvider = StateProvider<bool>(
   (ref) => throw UnimplementedError(
       'currentReceivePlaybackStateSyncProvider must be overridden by profile_session.dart'),
+);
+
+/// Separate from send/receive above — this one's purely local (see
+/// [LocalPlaybackStateStore]/`local_session_restore.dart`), on by
+/// default (unlike the cross-device toggles): restoring this device's
+/// own last session never leaves the device, so it isn't the same
+/// "experimental, still shaking out bugs" trade-off the network-facing
+/// ones are.
+final changeSaveLocalSessionProvider = Provider<Future<void> Function(bool)>(
+  (ref) => throw UnimplementedError('changeSaveLocalSessionProvider must be overridden by AudilocApp'),
+);
+
+final currentSaveLocalSessionProvider = StateProvider<bool>(
+  (ref) =>
+      throw UnimplementedError('currentSaveLocalSessionProvider must be overridden by profile_session.dart'),
+);
+
+final localPlaybackStateStoreProvider = Provider<LocalPlaybackStateStore>(
+  (ref) => LocalPlaybackStateStore(ref.watch(profileDirProvider)),
 );
 
 final tracksRepositoryProvider =

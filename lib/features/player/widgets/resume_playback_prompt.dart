@@ -5,53 +5,43 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/providers.dart';
 import '../../../data/models/playback_state.dart';
-import '../../../data/models/playlist.dart';
 import '../../../data/models/track.dart';
 import '../../../l10n/l10n.dart';
-import '../../playlists/providers/playlists_providers.dart';
 import '../models/queue_source.dart';
 import '../providers/player_providers.dart';
 import '../providers/queue_resolution.dart';
 
-/// Reacts to [playbackStateProvider] — see
-/// docs/adr/0029-playback-state-sync.md. Two cases:
-/// - Nothing loaded locally yet (a cold start, or the player's just been
-///   idle since) — silently restore, paused, ready to resume with a tap.
-/// - Something's already loaded here (playing or paused) — a synced
-///   update from elsewhere doesn't get to yank control away
-///   unannounced; ask first.
-///
-/// Only skips [state] as "our own write, ignore it" when something's
-/// *already* loaded locally — at cold start (nothing loaded yet)
-/// restoring is exactly the point even when this same device wrote the
-/// row last (that's the actual "state isn't kept across a restart"
-/// complaint this exists to fix); mid-session, reacting to this
-/// device's own pause a moment ago (already reflected in the UI) would
-/// just be a pointless self-echo.
+/// Reacts to [playbackStateProvider] — the *cross-device* sync half of
+/// docs/adr/0029-playback-state-sync.md. Restoring this device's own
+/// last session after its own restart is a separate, purely local
+/// mechanism now (`local_session_restore.dart`,
+/// `LocalPlaybackStateStore`) — this function only ever concerns itself
+/// with a row written by a genuinely *different* device, gated by the
+/// "принимать" setting:
+/// - Nothing loaded locally yet — silently apply, paused, ready to
+///   resume with a tap.
+/// - Something's already loaded here (playing or paused, whether from
+///   the local-session restore or the user just having started
+///   something) — doesn't get yanked away unannounced; ask first.
 Future<void> handleIncomingPlaybackState(BuildContext context, WidgetRef ref, PlaybackState state) async {
+  final self = ref.read(selfDeviceProvider);
+  // Our own writes never need acting on here — restoring this device's
+  // own last session is `local_session_restore.dart`'s job now, entirely
+  // independent of whether cross-device sync is even on.
+  if (state.deviceId == self.id) return;
+
+  // Settings "принимать" toggle.
+  if (!ref.read(currentReceivePlaybackStateSyncProvider)) return;
+
   // `playerService.currentTrack` (a plain synchronous getter), not
   // `ref.read(currentTrackProvider).value` — the latter goes through a
   // `StreamProvider`, which Riverpod 3 pauses while nothing's actively
-  // watching it (same underlying issue as `_awaitFirstValue`'s doc
-  // below); relying on it here would risk a false "nothing loaded"
+  // watching it; relying on it here would risk a false "nothing loaded"
   // reading right at the moment this function needs the real answer,
   // silently overwriting whatever's actually already playing instead of
   // asking first. The player's own field reflects reality regardless of
   // whether any widget happens to be watching it.
   final hasLocalTrack = ref.read(playerServiceProvider).currentTrack != null;
-  final self = ref.read(selfDeviceProvider);
-  final isOwnState = state.deviceId == self.id;
-  if (hasLocalTrack && isOwnState) return;
-
-  // Settings "принимать" toggle — doesn't affect restoring this device's
-  // *own* last state after its own restart (`isOwnState` above already
-  // covers self-echo; a fresh cold start with nothing loaded locally
-  // reaches here with `isOwnState == true` too, and that's the whole
-  // point of the restore-after-restart feature, not something this
-  // toggle is meant to touch) — only whether a *different* device's
-  // synced pause gets acted on here at all. See
-  // docs/adr/0029-playback-state-sync.md.
-  if (!isOwnState && !ref.read(currentReceivePlaybackStateSyncProvider)) return;
 
   // The "sync order" tracks -> playlists -> playback state the ТЗ asked
   // for isn't a transport-level thing `crdt_sync` actually exposes (one
@@ -63,7 +53,12 @@ Future<void> handleIncomingPlaybackState(BuildContext context, WidgetRef ref, Pl
   // half-known state — nothing about this row changes again on its own,
   // but in practice the reference and its target always arrive in the
   // same merge, so this is a safety net, not the primary mechanism.
-  final resolved = await _resolveQueue(ref, state);
+  final resolved = await resolvePlaybackStateQueue(
+    ref,
+    queueType: state.queueType,
+    playlistId: state.playlistId,
+    trackId: state.trackId,
+  );
   if (resolved == null) return;
   final (tracks, startIndex, source) = resolved;
 
@@ -120,34 +115,6 @@ Future<void> _applyResume(
   // `MediaKitPlayerService.setQueue`'s doc.
   await playerService.setQueue(tracks, startIndex: startIndex, autoPlay: autoPlay, seekTo: state.position);
   ref.read(queueSourceProvider.notifier).state = source;
-}
-
-/// Rebuilds the ordered track list [state] was playing from, and finds
-/// [PlaybackState.trackId] in it — `null` if the queue or the track
-/// itself isn't resolvable on this device yet (playlist not synced,
-/// track not synced, or synced but its file hasn't been downloaded
-/// here).
-Future<(List<Track>, int, QueueSource)?> _resolveQueue(WidgetRef ref, PlaybackState state) async {
-  final QueueSource source;
-  switch (state.queueType) {
-    case PlaybackQueueType.library:
-      source = const LibraryQueueSource();
-    case PlaybackQueueType.favorites:
-      source = const FavoritesQueueSource();
-    case PlaybackQueueType.playlist:
-      final playlistId = state.playlistId;
-      if (playlistId == null) return null;
-      final playlists = await awaitFirstValue(ref, playlistsProvider);
-      final playlist =
-          playlists.cast<Playlist?>().firstWhere((p) => p?.id == playlistId, orElse: () => null);
-      if (playlist == null) return null;
-      source = PlaylistQueueSource(playlistId, playlist.name);
-  }
-
-  final tracks = await resolveQueueTracks(ref, source);
-  final index = tracks.indexWhere((t) => t.id == state.trackId && t.isAvailableLocally);
-  if (index < 0) return null;
-  return (tracks, index, source);
 }
 
 String _formatPosition(Duration d) {
