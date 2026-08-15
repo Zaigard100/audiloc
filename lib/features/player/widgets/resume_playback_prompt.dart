@@ -85,19 +85,22 @@ Future<(List<Track>, int, QueueSource)?> _resolveQueue(WidgetRef ref, PlaybackSt
   final QueueSource source;
   switch (state.queueType) {
     case PlaybackQueueType.library:
+      await _awaitFirstValue(ref, libraryTracksProvider);
       tracks = ref.read(sortedLibraryTracksProvider);
       source = const LibraryQueueSource();
     case PlaybackQueueType.favorites:
+      await _awaitFirstValue(ref, libraryTracksProvider);
+      await _awaitFirstValue(ref, favoritedAtProvider);
       tracks = ref.read(favoriteTracksProvider);
       source = const FavoritesQueueSource();
     case PlaybackQueueType.playlist:
       final playlistId = state.playlistId;
       if (playlistId == null) return null;
-      final playlists = ref.read(playlistsProvider).value ?? const [];
+      final playlists = await _awaitFirstValue(ref, playlistsProvider);
       final playlist =
           playlists.cast<Playlist?>().firstWhere((p) => p?.id == playlistId, orElse: () => null);
       if (playlist == null) return null;
-      final items = await ref.read(playlistItemsProvider(playlistId).future);
+      final items = await _awaitFirstValue(ref, playlistItemsProvider(playlistId));
       if (items.isEmpty) return null;
       tracks = items.map((e) => e.track).toList();
       source = PlaylistQueueSource(playlistId, playlist.name);
@@ -106,6 +109,24 @@ Future<(List<Track>, int, QueueSource)?> _resolveQueue(WidgetRef ref, PlaybackSt
   final index = tracks.indexWhere((t) => t.id == state.trackId && t.isAvailableLocally);
   if (index < 0) return null;
   return (tracks, index, source);
+}
+
+/// Waits for [provider]'s first emission — **not** just `ref.read(provider.future)`
+/// on its own, which isn't enough: Riverpod 3 pauses a `StreamProvider`'s
+/// underlying `StreamSubscription` while nothing is actively listening to
+/// it (see `riverpod`'s CHANGELOG — "StreamProvider now pauses its
+/// StreamSubscription when the provider is not actively listened"). This
+/// function typically runs from `AppShell.initState`, with no guarantee
+/// anything else is watching e.g. `libraryTracksProvider` at that exact
+/// moment — a bare `.future` read would then await a paused stream that
+/// never emits, and the whole restore would silently do nothing forever.
+/// `listenManual` with a no-op callback is what actually keeps the
+/// subscription unpaused for the moment it takes to get a first value;
+/// closed again immediately after, so this doesn't keep the provider
+/// alive past what it would be anyway.
+Future<T> _awaitFirstValue<T>(WidgetRef ref, StreamProvider<T> provider) {
+  final sub = ref.listenManual(provider, (_, __) {});
+  return ref.read(provider.future).whenComplete(sub.close);
 }
 
 String _formatPosition(Duration d) {
