@@ -197,12 +197,31 @@ void main() {
     addTearDown(client.dispose);
     await client.connect(host: '127.0.0.1', port: port, selfId: controllerId, selfName: 'Controller');
 
-    client.loadAndPlay('t1', const Duration(seconds: 42));
+    client.loadAndPlay(['t1'], 0, const Duration(seconds: 42));
     await Future<void>.delayed(const Duration(milliseconds: 100));
 
     expect(player.lastQueue?.map((t) => t.id), ['t1']);
     expect(player.lastSeekTo, const Duration(seconds: 42));
     expect(player.isPlaying, isTrue);
+  });
+
+  test('loadAndPlay resolves the whole queue, dropping tracks not available locally, so '
+      "next/previous have something to move through", () async {
+    await devicesRepository.upsert(const Device(id: controllerId, name: 'Controller'));
+    await tracksRepository.upsert(track);
+    const other = Track(id: 't2', path: '/b.mp3', title: 'Other');
+    await tracksRepository.upsert(other);
+    final client = RemoteControlClient();
+    addTearDown(client.dispose);
+    await client.connect(host: '127.0.0.1', port: port, selfId: controllerId, selfName: 'Controller');
+
+    // 'missing' isn't in the local library at all — dropped, but the
+    // requested start track (t2) is still found and started correctly.
+    client.loadAndPlay(['t1', 'missing', 't2'], 2, Duration.zero);
+    await Future<void>.delayed(const Duration(milliseconds: 100));
+
+    expect(player.lastQueue?.map((t) => t.id), ['t1', 't2']);
+    expect(player.currentTrack?.id, 't2');
   });
 
   test('loadAndPlay for a track this device does not have locally does nothing', () async {
@@ -214,7 +233,7 @@ void main() {
     addTearDown(client.dispose);
     await client.connect(host: '127.0.0.1', port: port, selfId: controllerId, selfName: 'Controller');
 
-    client.loadAndPlay('does-not-exist', Duration.zero);
+    client.loadAndPlay(['does-not-exist'], 0, Duration.zero);
     await Future<void>.delayed(const Duration(milliseconds: 100));
 
     expect(player.lastQueue, isNull);

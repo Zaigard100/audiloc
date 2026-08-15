@@ -43,11 +43,14 @@ class RemoteState {
 }
 
 /// What a controller can ask the controlled device to do. `loadAndPlay`
-/// deliberately carries only a track id + position, never a file — the
-/// target device must already have the file locally
+/// deliberately carries only track ids + a position, never a file — the
+/// target device must already have each file locally
 /// (`Track.isAvailableLocally`); there's no live audio streaming here,
 /// matching how every other part of this app treats "the file isn't here
-/// yet" (see docs/adr/0010-built-in-file-transfer.md).
+/// yet" (see docs/adr/0010-built-in-file-transfer.md). It carries the
+/// *whole* queue the controller had loaded, not just the one track being
+/// jumped to — a single-track queue would leave `next`/`previous`
+/// (docs/adr/0030-remote-playback-control.md) with nothing to move to.
 sealed class RemoteCommand {
   const RemoteCommand();
 
@@ -58,8 +61,9 @@ sealed class RemoteCommand {
         'pause' => const RemotePause(),
         'next' => const RemoteNext(),
         'previous' => const RemotePrevious(),
-        'loadAndPlay' when json['trackId'] is String => RemoteLoadAndPlay(
-            trackId: json['trackId']! as String,
+        'loadAndPlay' when json['trackIds'] is List => RemoteLoadAndPlay(
+            trackIds: (json['trackIds']! as List).cast<String>(),
+            startIndex: json['startIndex'] as int? ?? 0,
             positionMs: json['positionMs'] as int? ?? 0,
           ),
         _ => null,
@@ -91,12 +95,18 @@ class RemotePrevious extends RemoteCommand {
 }
 
 class RemoteLoadAndPlay extends RemoteCommand {
-  const RemoteLoadAndPlay({required this.trackId, required this.positionMs});
+  const RemoteLoadAndPlay({required this.trackIds, required this.startIndex, required this.positionMs});
 
-  final String trackId;
+  final List<String> trackIds;
+  final int startIndex;
   final int positionMs;
 
   @override
-  Map<String, Object?> toJson() =>
-      {'type': 'command', 'action': 'loadAndPlay', 'trackId': trackId, 'positionMs': positionMs};
+  Map<String, Object?> toJson() => {
+        'type': 'command',
+        'action': 'loadAndPlay',
+        'trackIds': trackIds,
+        'startIndex': startIndex,
+        'positionMs': positionMs,
+      };
 }

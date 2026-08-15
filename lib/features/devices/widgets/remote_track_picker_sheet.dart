@@ -47,9 +47,12 @@ class _RemoteTrackPickerSheet extends ConsumerWidget {
                     subtitle: Text(track.displayArtist, maxLines: 1, overflow: TextOverflow.ellipsis),
                     onTap: () {
                       Navigator.of(context).pop();
+                      // The whole filtered list, not just the tapped
+                      // track — otherwise the target device's next/previous
+                      // would have nothing to move to (docs/adr/0030).
                       ref
                           .read(remoteControlControllerProvider(deviceId))
-                          .loadAndPlay(track.id, Duration.zero);
+                          .loadAndPlay(tracks.map((t) => t.id).toList(), index, Duration.zero);
                     },
                   );
                 },

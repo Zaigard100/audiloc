@@ -99,8 +99,16 @@ class RemoteControlClient {
   void pause() => _send(const RemotePause());
   void next() => _send(const RemoteNext());
   void previous() => _send(const RemotePrevious());
-  void loadAndPlay(String trackId, Duration position) =>
-      _send(RemoteLoadAndPlay(trackId: trackId, positionMs: position.inMilliseconds));
+
+  /// [trackIds] is the *whole* queue to load, [startIndex] which entry to
+  /// start at and seek to [position] — a single-track queue would leave
+  /// the target device's `next`/`previous` with nothing to move to (see
+  /// docs/adr/0030-remote-playback-control.md).
+  void loadAndPlay(List<String> trackIds, int startIndex, Duration position) => _send(RemoteLoadAndPlay(
+        trackIds: trackIds,
+        startIndex: startIndex,
+        positionMs: position.inMilliseconds,
+      ));
 
   Future<void> dispose() async {
     await _sub?.cancel();

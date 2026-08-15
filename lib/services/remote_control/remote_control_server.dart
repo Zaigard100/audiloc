@@ -155,14 +155,28 @@ class RemoteControlServer {
         await _playerService.next();
       case RemotePrevious():
         await _playerService.previous();
-      case RemoteLoadAndPlay(:final trackId, :final positionMs):
-        final track = await _tracksRepository.byId(trackId);
-        if (track == null || !track.isAvailableLocally) {
+      case RemoteLoadAndPlay(:final trackIds, :final startIndex, :final positionMs):
+        if (startIndex < 0 || startIndex >= trackIds.length) return;
+        final startId = trackIds[startIndex];
+        // Resolve the whole queue, not just the one track being jumped
+        // to — a single-track queue would leave next/previous with
+        // nothing to move to. Tracks this device doesn't have locally
+        // are dropped (same rule `MediaKitPlayerService.setQueue` already
+        // applies to every queue), which can shift which index the
+        // requested track ends up at — re-found by id, not position.
+        final tracks = <Track>[];
+        for (final id in trackIds) {
+          final track = await _tracksRepository.byId(id);
+          if (track != null && track.isAvailableLocally) tracks.add(track);
+        }
+        final resolvedIndex = tracks.indexWhere((t) => t.id == startId);
+        if (resolvedIndex < 0) {
           _send(connection.socket, const {'type': 'error', 'reason': 'track_not_available'});
           return;
         }
         await _playerService.setQueue(
-          [track],
+          tracks,
+          startIndex: resolvedIndex,
           autoPlay: true,
           seekTo: Duration(milliseconds: positionMs),
         );

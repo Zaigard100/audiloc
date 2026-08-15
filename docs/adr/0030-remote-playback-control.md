@@ -49,12 +49,25 @@ HTTP POST-запросов — один WebSocket на подключение ч
    таймеру для позиции (не на каждый тик — тот же урок про
    write/push-storm, что уже применялся к `playback_state`, ADR 0029).
    Клиент шлёт команды `{"type":"command","action":"play"|"pause"|"next"|"previous"}`
-   или `{"type":"command","action":"loadAndPlay","trackId":...,"positionMs":...}`
-   — последняя резолвит трек через `TracksRepository.byId`, и если
-   `!track.isAvailableLocally`, отвечает
-   `{"type":"error","reason":"track_not_available"}` вместо каких-либо
-   попыток передать сам файл по сети (трек должен быть уже локально —
-   та же модель, что и везде в приложении, см. ADR 0010).
+   или `{"type":"command","action":"loadAndPlay","trackIds":[...],"startIndex":...,"positionMs":...}`
+   — последняя резолвит **весь** список через `TracksRepository.byId`,
+   отбрасывая треки без `isAvailableLocally` (файл должен быть уже
+   локально — та же модель, что и везде в приложении, см. ADR 0010), и
+   находит запрошенный стартовый трек в уже отфильтрованном списке по
+   id (не по индексу — после отбрасывания недоступных треков индексы
+   сдвигаются); если стартовый трек сам недоступен — отвечает
+   `{"type":"error","reason":"track_not_available"}`.
+
+   Регрессия, найденная сразу после первого прохода: `loadAndPlay`
+   изначально нёс только **один** трек — next/previous после этого
+   были нечем двигать (плейлист из одного элемента). Исправлено: и
+   "запустить то, что у меня на паузе" (берёт весь текущий
+   `queueSourceProvider` управляющего устройства через новый общий
+   `resolveQueueTracks`, `lib/features/player/providers/queue_resolution.dart`
+   — вынесен из `resume_playback_prompt.dart`, который раньше решал
+   ту же задачу только для одного, узкого случая), и "выбрать трек"
+   (шлёт весь отфильтрованный список из пикера, не только выбранный
+   трек) теперь шлют полную очередь.
 
 Реализационная деталь, из-за которой пришлось переделывать первый
 черновик и клиента, и сервера: `dart:io`'s `WebSocket` —
@@ -148,7 +161,7 @@ online-устройства смотрит `remoteControlConnectionProvider(devi
 ## Верификация
 
 1. `flutter analyze` — 0 ошибок.
-2. `flutter test test/unit/` — новый `remote_control_test.dart` (7
+2. `flutter test test/unit/` — новый `remote_control_test.dart` (8
    тестов) зелёный вместе с остальными.
 3. `flutter test test/widget/` — существующие проходят без изменений.
 4. `flutter build linux` и `flutter build apk --debug` — успешно.

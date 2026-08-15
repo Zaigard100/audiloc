@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/providers.dart';
 import '../../../data/models/device.dart';
 import '../../../l10n/l10n.dart';
+import '../../player/providers/player_providers.dart';
+import '../../player/providers/queue_resolution.dart';
 import '../providers/remote_control_providers.dart';
 import 'remote_track_picker_sheet.dart';
 
@@ -36,7 +38,7 @@ Future<void> showDeviceActionsSheet(BuildContext context, WidgetRef ref, Device 
                 ? null
                 : () {
                     Navigator.of(sheetContext).pop();
-                    controller.loadAndPlay(currentTrack.id, playerService.position);
+                    _resumeHere(ref, controller, currentTrack.id, playerService.position);
                   },
           ),
           ListTile(
@@ -51,4 +53,28 @@ Future<void> showDeviceActionsSheet(BuildContext context, WidgetRef ref, Device 
       ),
     ),
   );
+}
+
+/// Rebuilds the *whole* queue this device currently has loaded
+/// (`queueSourceProvider`) rather than sending just [currentTrackId] on
+/// its own — a single-track queue would leave the target device's
+/// next/previous with nothing to move to (see
+/// docs/adr/0030-remote-playback-control.md).
+Future<void> _resumeHere(
+  WidgetRef ref,
+  RemoteControlController controller,
+  String currentTrackId,
+  Duration position,
+) async {
+  final source = ref.read(queueSourceProvider);
+  final tracks = await resolveQueueTracks(ref, source);
+  final index = tracks.indexWhere((t) => t.id == currentTrackId);
+  if (index < 0) {
+    // The current track somehow isn't in its own queue's resolved list
+    // (e.g. a playlist edited out from under it) — fall back to just
+    // that one track rather than doing nothing.
+    controller.loadAndPlay([currentTrackId], 0, position);
+    return;
+  }
+  controller.loadAndPlay(tracks.map((t) => t.id).toList(), index, position);
 }

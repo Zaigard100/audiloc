@@ -22,7 +22,8 @@ class RemoteControlController {
   void pause() => client.pause();
   void next() => client.next();
   void previous() => client.previous();
-  void loadAndPlay(String trackId, Duration position) => client.loadAndPlay(trackId, position);
+  void loadAndPlay(List<String> trackIds, int startIndex, Duration position) =>
+      client.loadAndPlay(trackIds, startIndex, position);
 }
 
 final remoteControlControllerProvider =
