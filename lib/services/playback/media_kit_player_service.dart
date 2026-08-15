@@ -54,7 +54,12 @@ class MediaKitPlayerService implements PlayerService {
   Duration get position => _player.state.position;
 
   @override
-  Future<void> setQueue(List<Track> tracks, {int startIndex = 0, bool autoPlay = true}) async {
+  Future<void> setQueue(
+    List<Track> tracks, {
+    int startIndex = 0,
+    bool autoPlay = true,
+    Duration? seekTo,
+  }) async {
     // Tracks known only through synced metadata (file not downloaded to
     // this device yet, see Track.isAvailableLocally) have no path to
     // play — drop them rather than hand mpv a queue it can't open.
@@ -77,25 +82,51 @@ class MediaKitPlayerService implements PlayerService {
       index: effectiveStart,
     );
 
-    if (autoPlay) {
-      await _player.open(playlist, play: true);
+    if (seekTo == null) {
+      await _player.open(playlist, play: autoPlay);
     } else {
-      // media_kit/libmpv loads media asynchronously even after `open()`
-      // itself resolves — a caller that immediately follows this with
-      // `seek()` (restoring a saved/synced position, see
-      // docs/adr/0029-playback-state-sync.md) can race mpv's own
-      // in-progress load, which resets position back to 0 once loading
-      // actually finishes, silently discarding the seek. Waiting for the
-      // *next* real `duration` event — subscribed before calling `open`,
-      // so it can't be a stale value left over from whatever was loaded
-      // before — is the usual way to know mpv has actually finished
-      // preparing the new media and a seek will actually stick.
-      final ready = _player.stream.duration.first;
+      // Always open paused first, seek, *then* play — opening straight
+      // into `play: true` and seeking afterward is audible: a brief
+      // moment of the track playing from 0 before the seek lands. See
+      // [_seekAfterOpen] for why the seek itself needs retrying rather
+      // than a single call.
       await _player.open(playlist, play: false);
-      await ready.timeout(const Duration(seconds: 5), onTimeout: () => Duration.zero);
+      await _seekAfterOpen(seekTo);
+      if (autoPlay) await _player.play();
     }
     _currentTrack = playable[effectiveStart];
     _currentTrackController.add(_currentTrack);
+  }
+
+  /// media_kit/libmpv loads media **asynchronously** even after `open()`
+  /// itself resolves — a `seek()` issued right after can race mpv's own
+  /// in-progress load, which resets position back to 0 once loading
+  /// actually finishes, silently discarding the seek (see
+  /// docs/adr/0029-playback-state-sync.md, the "restore a saved/synced
+  /// playback position" flow this exists for).
+  ///
+  /// An earlier version of this waited for the *next* `duration` stream
+  /// event before seeking — doesn't work: every stream `PlayerStream`
+  /// exposes is `.distinct()`-filtered at the source (see media_kit's
+  /// `platform_player.dart`), so re-opening a track with the exact same
+  /// duration as whatever was playing before — which is the *common*
+  /// case here, since "restore a saved position" usually means reopening
+  /// the very same track — never re-emits `duration` at all, and the
+  /// wait just runs out its timeout every time.
+  ///
+  /// Verifying against the actually observed position instead sidesteps
+  /// that entirely: seek, wait a beat, check how far `_player.state.position`
+  /// actually landed from [target]; if mpv's own load-reset raced and won,
+  /// it'll show as position snapping back near 0, and the loop just
+  /// seeks again. Bounded to ~1.2s total so a track that's somehow never
+  /// going to accept the seek doesn't hang the caller.
+  Future<void> _seekAfterOpen(Duration target) async {
+    if (target <= Duration.zero) return;
+    for (var attempt = 0; attempt < 8; attempt++) {
+      await _player.seek(target);
+      await Future<void>.delayed(const Duration(milliseconds: 150));
+      if ((_player.state.position - target).abs() < const Duration(milliseconds: 500)) return;
+    }
   }
 
   @override

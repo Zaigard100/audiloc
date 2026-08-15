@@ -29,7 +29,16 @@ import '../providers/player_providers.dart';
 /// device's own pause a moment ago (already reflected in the UI) would
 /// just be a pointless self-echo.
 Future<void> handleIncomingPlaybackState(BuildContext context, WidgetRef ref, PlaybackState state) async {
-  final hasLocalTrack = ref.read(currentTrackProvider).value != null;
+  // `playerService.currentTrack` (a plain synchronous getter), not
+  // `ref.read(currentTrackProvider).value` — the latter goes through a
+  // `StreamProvider`, which Riverpod 3 pauses while nothing's actively
+  // watching it (same underlying issue as `_awaitFirstValue`'s doc
+  // below); relying on it here would risk a false "nothing loaded"
+  // reading right at the moment this function needs the real answer,
+  // silently overwriting whatever's actually already playing instead of
+  // asking first. The player's own field reflects reality regardless of
+  // whether any widget happens to be watching it.
+  final hasLocalTrack = ref.read(playerServiceProvider).currentTrack != null;
   final self = ref.read(selfDeviceProvider);
   if (hasLocalTrack && state.deviceId == self.id) return;
 
@@ -72,13 +81,17 @@ Future<void> handleIncomingPlaybackState(BuildContext context, WidgetRef ref, Pl
       behavior: SnackBarBehavior.floating,
       action: SnackBarAction(
         label: l10n.resumePlaybackContinue,
-        onPressed: () => unawaited(_applyResume(ref, tracks, startIndex, source, state)),
+        // Tapping "Продолжить" is an explicit, deliberate choice to
+        // resume right now — unlike the silent cold-start restore below,
+        // there's no reason to land paused and make the user press play
+        // a second time.
+        onPressed: () => unawaited(_applyResume(ref, tracks, startIndex, source, state, autoPlay: true)),
       ),
     ));
     return;
   }
 
-  await _applyResume(ref, tracks, startIndex, source, state);
+  await _applyResume(ref, tracks, startIndex, source, state, autoPlay: false);
 }
 
 Future<void> _applyResume(
@@ -86,11 +99,15 @@ Future<void> _applyResume(
   List<Track> tracks,
   int startIndex,
   QueueSource source,
-  PlaybackState state,
-) async {
+  PlaybackState state, {
+  required bool autoPlay,
+}) async {
   final playerService = ref.read(playerServiceProvider);
-  await playerService.setQueue(tracks, startIndex: startIndex, autoPlay: false);
-  await playerService.seek(state.position);
+  // `seekTo` (not a separate `seek()` call after `setQueue`) — a plain
+  // follow-up `seek()` raced the engine's own asynchronous media loading
+  // and silently lost, always landing back at 0. See
+  // `MediaKitPlayerService.setQueue`'s doc.
+  await playerService.setQueue(tracks, startIndex: startIndex, autoPlay: autoPlay, seekTo: state.position);
   ref.read(queueSourceProvider.notifier).state = source;
 }
 

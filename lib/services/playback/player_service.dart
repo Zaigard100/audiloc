@@ -34,7 +34,14 @@ abstract class PlayerService {
   /// playback position (docs/adr/0029-playback-state-sync.md), which
   /// should land paused exactly where it left off, not immediately start
   /// making sound.
-  Future<void> setQueue(List<Track> tracks, {int startIndex = 0, bool autoPlay = true});
+  ///
+  /// [seekTo], when given, is where playback should actually start from
+  /// (also for the resume flow) — handled here rather than via a
+  /// separate external `seek()` call right after, because a plain
+  /// `seek()` issued immediately after this returns can race the
+  /// engine's own asynchronous media loading and silently lose the seek
+  /// once loading finishes (see `MediaKitPlayerService.setQueue`'s doc).
+  Future<void> setQueue(List<Track> tracks, {int startIndex = 0, bool autoPlay = true, Duration? seekTo});
 
   Future<void> play();
   Future<void> pause();

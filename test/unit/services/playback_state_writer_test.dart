@@ -31,7 +31,12 @@ class _FakePlayerService implements PlayerService {
   @override
   Duration get position => positionValue;
   @override
-  Future<void> setQueue(List<Track> tracks, {int startIndex = 0, bool autoPlay = true}) async {}
+  Future<void> setQueue(
+    List<Track> tracks, {
+    int startIndex = 0,
+    bool autoPlay = true,
+    Duration? seekTo,
+  }) async {}
   @override
   Future<void> play() async {}
   @override
