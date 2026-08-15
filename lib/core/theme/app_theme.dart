@@ -85,6 +85,23 @@ class AppTheme {
         iconColor: colors.onSurfaceMuted,
         textColor: colors.onSurface,
       ),
+      // Material 3's default SnackBar deliberately inverts relative to
+      // the surrounding theme (dark text on a light bar in a light
+      // theme, and vice versa) — its exact colors come from
+      // `ColorScheme.inverseSurface`/`onInverseSurface`/`inversePrimary`,
+      // none of which the plain `ColorScheme(...)` constructor above sets
+      // explicitly, so they fell back to Material's own defaults instead
+      // of this app's palette — the "Продолжить" resume-playback action
+      // text ended up unreadable against its own background in dark mode
+      // (docs/adr/0029-playback-state-sync.md). Explicit theme instead:
+      // themed like the rest of the app (not inverted), so it's readable
+      // by construction in both modes.
+      snackBarTheme: SnackBarThemeData(
+        backgroundColor: colors.surfaceHigh,
+        contentTextStyle: TextStyle(color: colors.onSurface),
+        actionTextColor: accent,
+        behavior: SnackBarBehavior.floating,
+      ),
     );
   }
 }
