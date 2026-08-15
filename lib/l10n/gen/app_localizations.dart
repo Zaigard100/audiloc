@@ -158,18 +158,6 @@ abstract class AppLocalizations {
   /// **'Разрешить'**
   String get commonAllow;
 
-  /// No description provided for @commonNo.
-  ///
-  /// In ru, this message translates to:
-  /// **'Нет'**
-  String get commonNo;
-
-  /// No description provided for @resumePlaybackTitle.
-  ///
-  /// In ru, this message translates to:
-  /// **'Продолжить воспроизведение?'**
-  String get resumePlaybackTitle;
-
   /// No description provided for @resumePlaybackBody.
   ///
   /// In ru, this message translates to:

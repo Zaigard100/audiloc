@@ -12,9 +12,7 @@
   "fieldName": "Название",
   "commonDecline": "Отклонить",
   "commonAllow": "Разрешить",
-  "commonNo": "Нет",
 
-  "resumePlaybackTitle": "Продолжить воспроизведение?",
   "resumePlaybackBody": "Хотите продолжить с «{trackTitle}», {time}, {device}?",
   "@resumePlaybackBody": {"placeholders": {"trackTitle": {"type": "String"}, "time": {"type": "String"}, "device": {"type": "String"}}},
   "resumePlaybackContinue": "Продолжить",

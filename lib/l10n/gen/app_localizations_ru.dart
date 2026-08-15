@@ -42,12 +42,6 @@ class AppLocalizationsRu extends AppLocalizations {
   String get commonAllow => 'Разрешить';
 
   @override
-  String get commonNo => 'Нет';
-
-  @override
-  String get resumePlaybackTitle => 'Продолжить воспроизведение?';
-
-  @override
   String resumePlaybackBody(String trackTitle, String time, String device) {
     return 'Хотите продолжить с «$trackTitle», $time, $device?';
   }

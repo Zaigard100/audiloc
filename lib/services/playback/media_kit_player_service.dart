@@ -76,7 +76,24 @@ class MediaKitPlayerService implements PlayerService {
       [for (final track in playable) Media(track.path!, extras: {'trackId': track.id})],
       index: effectiveStart,
     );
-    await _player.open(playlist, play: autoPlay);
+
+    if (autoPlay) {
+      await _player.open(playlist, play: true);
+    } else {
+      // media_kit/libmpv loads media asynchronously even after `open()`
+      // itself resolves — a caller that immediately follows this with
+      // `seek()` (restoring a saved/synced position, see
+      // docs/adr/0029-playback-state-sync.md) can race mpv's own
+      // in-progress load, which resets position back to 0 once loading
+      // actually finishes, silently discarding the seek. Waiting for the
+      // *next* real `duration` event — subscribed before calling `open`,
+      // so it can't be a stale value left over from whatever was loaded
+      // before — is the usual way to know mpv has actually finished
+      // preparing the new media and a seek will actually stick.
+      final ready = _player.stream.duration.first;
+      await _player.open(playlist, play: false);
+      await ready.timeout(const Duration(seconds: 5), onTimeout: () => Duration.zero);
+    }
     _currentTrack = playable[effectiveStart];
     _currentTrackController.add(_currentTrack);
   }

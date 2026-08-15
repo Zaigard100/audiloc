@@ -42,12 +42,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get commonAllow => 'Allow';
 
   @override
-  String get commonNo => 'No';
-
-  @override
-  String get resumePlaybackTitle => 'Resume playback?';
-
-  @override
   String resumePlaybackBody(String trackTitle, String time, String device) {
     return 'Continue with “$trackTitle”, $time, $device?';
   }

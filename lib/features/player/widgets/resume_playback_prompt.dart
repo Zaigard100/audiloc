@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -46,29 +48,46 @@ Future<void> handleIncomingPlaybackState(BuildContext context, WidgetRef ref, Pl
   final (tracks, startIndex, source) = resolved;
 
   if (hasLocalTrack) {
+    // A modal `AlertDialog` here blocked the whole app until answered —
+    // too intrusive for something that arrives unprompted while the
+    // user's in the middle of doing something else. A `SnackBar` is the
+    // opposite: non-blocking (the rest of the UI stays fully usable
+    // underneath it), swipe-to-dismiss by default
+    // (`SnackBar.dismissDirection`, `DismissDirection.down`), and simply
+    // times out and disappears on its own if ignored — "увидел,
+    // смахнул/забыл" is exactly its normal behavior, no explicit "Нет"
+    // button needed for that. Only tapping the action actually applies
+    // the incoming state; doing nothing leaves local playback untouched.
     if (!context.mounted) return;
     final l10n = context.l10n;
-    final proceed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(l10n.resumePlaybackTitle),
-        content: Text(l10n.resumePlaybackBody(
-          tracks[startIndex].displayTitle,
-          _formatPosition(state.position),
-          state.deviceName,
-        )),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: Text(l10n.commonNo)),
-          FilledButton(
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: Text(l10n.resumePlaybackContinue),
-          ),
-        ],
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(SnackBar(
+      content: Text(l10n.resumePlaybackBody(
+        tracks[startIndex].displayTitle,
+        _formatPosition(state.position),
+        state.deviceName,
+      )),
+      duration: const Duration(seconds: 8),
+      behavior: SnackBarBehavior.floating,
+      action: SnackBarAction(
+        label: l10n.resumePlaybackContinue,
+        onPressed: () => unawaited(_applyResume(ref, tracks, startIndex, source, state)),
       ),
-    );
-    if (proceed != true) return;
+    ));
+    return;
   }
 
+  await _applyResume(ref, tracks, startIndex, source, state);
+}
+
+Future<void> _applyResume(
+  WidgetRef ref,
+  List<Track> tracks,
+  int startIndex,
+  QueueSource source,
+  PlaybackState state,
+) async {
   final playerService = ref.read(playerServiceProvider);
   await playerService.setQueue(tracks, startIndex: startIndex, autoPlay: false);
   await playerService.seek(state.position);
