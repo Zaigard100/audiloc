@@ -1040,17 +1040,119 @@ abstract class AppLocalizations {
   /// **'Версия {version}'**
   String aboutVersion(String version);
 
-  /// No description provided for @aboutLanguage.
+  /// No description provided for @aboutDescription.
   ///
   /// In ru, this message translates to:
-  /// **'Язык'**
-  String get aboutLanguage;
+  /// **'AudiLoc — P2P музыкальный плеер с автосинхронизацией библиотеки в локальной сети, без облака и без центрального сервера.'**
+  String get aboutDescription;
 
-  /// No description provided for @aboutLanguageSystem.
+  /// No description provided for @aboutGithubLink.
+  ///
+  /// In ru, this message translates to:
+  /// **'Исходный код на GitHub'**
+  String get aboutGithubLink;
+
+  /// No description provided for @settingsTitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'Настройки'**
+  String get settingsTitle;
+
+  /// No description provided for @settingsTheme.
+  ///
+  /// In ru, this message translates to:
+  /// **'Тема'**
+  String get settingsTheme;
+
+  /// No description provided for @settingsThemeSystem.
   ///
   /// In ru, this message translates to:
   /// **'Как в системе'**
-  String get aboutLanguageSystem;
+  String get settingsThemeSystem;
+
+  /// No description provided for @settingsThemeLight.
+  ///
+  /// In ru, this message translates to:
+  /// **'Светлая'**
+  String get settingsThemeLight;
+
+  /// No description provided for @settingsThemeDark.
+  ///
+  /// In ru, this message translates to:
+  /// **'Тёмная'**
+  String get settingsThemeDark;
+
+  /// No description provided for @settingsLanguage.
+  ///
+  /// In ru, this message translates to:
+  /// **'Язык'**
+  String get settingsLanguage;
+
+  /// No description provided for @settingsLanguageSystem.
+  ///
+  /// In ru, this message translates to:
+  /// **'Как в системе'**
+  String get settingsLanguageSystem;
+
+  /// No description provided for @settingsAbout.
+  ///
+  /// In ru, this message translates to:
+  /// **'О приложении'**
+  String get settingsAbout;
+
+  /// No description provided for @settingsEraseData.
+  ///
+  /// In ru, this message translates to:
+  /// **'Стереть все данные'**
+  String get settingsEraseData;
+
+  /// No description provided for @settingsEraseDataSubtitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'Удаляет все профили и настройки — приложение станет как только что установленное'**
+  String get settingsEraseDataSubtitle;
+
+  /// No description provided for @settingsEraseDataWarningTitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'Стереть все данные?'**
+  String get settingsEraseDataWarningTitle;
+
+  /// No description provided for @settingsEraseDataWarningBody.
+  ///
+  /// In ru, this message translates to:
+  /// **'Будут безвозвратно удалены все профили на этом устройстве — вся библиотека, плейлисты, обложки, список сопряжённых устройств у каждого из них — и настройки языка/темы. Это затрагивает все профили, не только текущий. Отменить это будет нельзя.'**
+  String get settingsEraseDataWarningBody;
+
+  /// No description provided for @settingsEraseDataWarningContinue.
+  ///
+  /// In ru, this message translates to:
+  /// **'Продолжить'**
+  String get settingsEraseDataWarningContinue;
+
+  /// No description provided for @settingsEraseDataFinalTitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'Последнее подтверждение'**
+  String get settingsEraseDataFinalTitle;
+
+  /// No description provided for @settingsEraseDataFinalBody.
+  ///
+  /// In ru, this message translates to:
+  /// **'Чтобы подтвердить, введите «{keyword}»:'**
+  String settingsEraseDataFinalBody(String keyword);
+
+  /// No description provided for @settingsEraseDataFinalKeyword.
+  ///
+  /// In ru, this message translates to:
+  /// **'УДАЛИТЬ'**
+  String get settingsEraseDataFinalKeyword;
+
+  /// No description provided for @settingsEraseDataFinalButton.
+  ///
+  /// In ru, this message translates to:
+  /// **'Стереть всё безвозвратно'**
+  String get settingsEraseDataFinalButton;
 }
 
 class _AppLocalizationsDelegate

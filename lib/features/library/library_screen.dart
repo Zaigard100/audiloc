@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/providers.dart';
-import '../../core/theme/app_theme.dart';
+import '../../core/theme/app_colors.dart';
 import '../../l10n/l10n.dart';
 import '../../services/library_import/library_import_service.dart';
 import '../player/models/queue_source.dart';
@@ -177,14 +177,14 @@ class _EmptyLibrary extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.library_music_outlined, size: 64, color: AppTheme.onSurfaceMuted),
+            Icon(Icons.library_music_outlined, size: 64, color: context.colors.onSurfaceMuted),
             const SizedBox(height: 16),
             Text(context.l10n.libraryEmptyTitle, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
             const SizedBox(height: 8),
             Text(
               context.l10n.libraryEmptyBody,
               textAlign: TextAlign.center,
-              style: const TextStyle(color: AppTheme.onSurfaceMuted),
+              style: TextStyle(color: context.colors.onSurfaceMuted),
             ),
             const SizedBox(height: 20),
             FilledButton.icon(

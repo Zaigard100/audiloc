@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../../l10n/l10n.dart';
 
@@ -93,7 +94,7 @@ class _InitialProfileNameScreenState extends State<InitialProfileNameScreen> {
         Text(
           l10n.onboardingWelcomeSubtitle,
           textAlign: TextAlign.center,
-          style: const TextStyle(color: AppTheme.onSurfaceMuted, fontSize: 13),
+          style: TextStyle(color: context.colors.onSurfaceMuted, fontSize: 13),
         ),
         const SizedBox(height: 24),
         FilledButton.icon(
@@ -130,7 +131,7 @@ class _InitialProfileNameScreenState extends State<InitialProfileNameScreen> {
         Text(
           l10n.onboardingNameSubtitle,
           textAlign: TextAlign.center,
-          style: const TextStyle(color: AppTheme.onSurfaceMuted, fontSize: 13),
+          style: TextStyle(color: context.colors.onSurfaceMuted, fontSize: 13),
         ),
         const SizedBox(height: 24),
         TextField(

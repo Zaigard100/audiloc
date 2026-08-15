@@ -1,4 +1,5 @@
 import 'package:audiloc/core/providers.dart';
+import 'package:audiloc/core/theme/app_theme.dart';
 import 'package:audiloc/data/db/audiloc_database.dart';
 import 'package:audiloc/data/models/track.dart';
 import 'package:audiloc/features/library/widgets/track_tile.dart';
@@ -20,6 +21,7 @@ void main() {
     await tester.pumpWidget(UncontrolledProviderScope(
       container: container,
       child: MaterialApp(
+        theme: AppTheme.dark(),
         locale: const Locale('ru'),
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,

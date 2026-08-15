@@ -214,6 +214,25 @@
   "aboutGuideProfilesBody": "Несколько человек могут делить одно устройство — у каждого своя библиотека и свой список сопряжённых устройств; переключение — карточка профиля на вкладке «Устройства» → «Сменить». Если это, наоборот, второе устройство одного и того же человека — кнопка «Ждать сопряжения» (при создании профиля или из переключателя) делает его копией уже существующего. Удаление профиля необратимо и требует ввода его имени для подтверждения; удалить можно только неактивный профиль.",
   "aboutVersion": "Версия {version}",
   "@aboutVersion": {"placeholders": {"version": {"type": "String"}}},
-  "aboutLanguage": "Язык",
-  "aboutLanguageSystem": "Как в системе"
+  "aboutDescription": "AudiLoc — P2P музыкальный плеер с автосинхронизацией библиотеки в локальной сети, без облака и без центрального сервера.",
+  "aboutGithubLink": "Исходный код на GitHub",
+
+  "settingsTitle": "Настройки",
+  "settingsTheme": "Тема",
+  "settingsThemeSystem": "Как в системе",
+  "settingsThemeLight": "Светлая",
+  "settingsThemeDark": "Тёмная",
+  "settingsLanguage": "Язык",
+  "settingsLanguageSystem": "Как в системе",
+  "settingsAbout": "О приложении",
+  "settingsEraseData": "Стереть все данные",
+  "settingsEraseDataSubtitle": "Удаляет все профили и настройки — приложение станет как только что установленное",
+  "settingsEraseDataWarningTitle": "Стереть все данные?",
+  "settingsEraseDataWarningBody": "Будут безвозвратно удалены все профили на этом устройстве — вся библиотека, плейлисты, обложки, список сопряжённых устройств у каждого из них — и настройки языка/темы. Это затрагивает все профили, не только текущий. Отменить это будет нельзя.",
+  "settingsEraseDataWarningContinue": "Продолжить",
+  "settingsEraseDataFinalTitle": "Последнее подтверждение",
+  "settingsEraseDataFinalBody": "Чтобы подтвердить, введите «{keyword}»:",
+  "@settingsEraseDataFinalBody": {"placeholders": {"keyword": {"type": "String"}}},
+  "settingsEraseDataFinalKeyword": "УДАЛИТЬ",
+  "settingsEraseDataFinalButton": "Стереть всё безвозвратно"
 }

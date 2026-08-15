@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/providers.dart';
-import '../../core/theme/app_theme.dart';
+import '../../core/theme/app_colors.dart';
 import '../../l10n/l10n.dart';
 import '../library/providers/library_providers.dart';
 import '../library/widgets/track_tile.dart';
@@ -33,7 +33,7 @@ class FavoritesScreen extends ConsumerWidget {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.favorite_border, size: 64, color: AppTheme.onSurfaceMuted),
+                    Icon(Icons.favorite_border, size: 64, color: context.colors.onSurfaceMuted),
                     const SizedBox(height: 16),
                     Text(
                       l10n.favoritesEmptyTitle,
@@ -43,7 +43,7 @@ class FavoritesScreen extends ConsumerWidget {
                     Text(
                       l10n.favoritesEmptyBody,
                       textAlign: TextAlign.center,
-                      style: const TextStyle(color: AppTheme.onSurfaceMuted),
+                      style: TextStyle(color: context.colors.onSurfaceMuted),
                     ),
                   ],
                 ),

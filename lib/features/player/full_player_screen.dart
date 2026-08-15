@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/providers.dart';
+import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../../l10n/l10n.dart';
 import '../../services/playback/player_service.dart';
@@ -61,9 +62,9 @@ class FullPlayerScreen extends ConsumerWidget {
                               borderRadius: BorderRadius.circular(16),
                               child: track.coverPath != null
                                   ? Image.file(File(track.coverPath!), fit: BoxFit.cover)
-                                  : const ColoredBox(
-                                      color: AppTheme.surfaceHigh,
-                                      child: Icon(Icons.music_note, size: 64, color: AppTheme.onSurfaceMuted),
+                                  : ColoredBox(
+                                      color: context.colors.surfaceHigh,
+                                      child: Icon(Icons.music_note, size: 64, color: context.colors.onSurfaceMuted),
                                     ),
                             ),
                           ),
@@ -77,14 +78,14 @@ class FullPlayerScreen extends ConsumerWidget {
                           Text(
                             track.displayArtist,
                             textAlign: TextAlign.center,
-                            style: const TextStyle(color: AppTheme.onSurfaceMuted, fontSize: 15),
+                            style: TextStyle(color: context.colors.onSurfaceMuted, fontSize: 15),
                           ),
                           if (_sourceLabel(l10n, queueSource) case final label?) ...[
                             const SizedBox(height: 8),
                             Text(
                               label,
                               textAlign: TextAlign.center,
-                              style: const TextStyle(color: AppTheme.onSurfaceMuted, fontSize: 12),
+                              style: TextStyle(color: context.colors.onSurfaceMuted, fontSize: 12),
                             ),
                           ],
                           const SizedBox(height: 16),
@@ -94,7 +95,7 @@ class FullPlayerScreen extends ConsumerWidget {
                             children: [
                               IconButton(
                                 icon: Icon(isFavorite ? Icons.favorite : Icons.favorite_border),
-                                color: isFavorite ? AppTheme.accent : AppTheme.onSurfaceMuted,
+                                color: isFavorite ? AppTheme.accent : context.colors.onSurfaceMuted,
                                 iconSize: 28,
                                 onPressed: () => ref.read(favoritesRepositoryProvider).toggle(track.id),
                               ),
@@ -161,8 +162,8 @@ class _SeekBar extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(_format(current), style: const TextStyle(color: AppTheme.onSurfaceMuted, fontSize: 12)),
-              Text(_format(total), style: const TextStyle(color: AppTheme.onSurfaceMuted, fontSize: 12)),
+              Text(_format(current), style: TextStyle(color: context.colors.onSurfaceMuted, fontSize: 12)),
+              Text(_format(total), style: TextStyle(color: context.colors.onSurfaceMuted, fontSize: 12)),
             ],
           ),
         ),

@@ -9,7 +9,9 @@ import 'package:path_provider/path_provider.dart';
 import 'core/profile_session.dart';
 import 'core/providers.dart';
 import 'core/router/app_router.dart';
+import 'core/theme/app_colors.dart';
 import 'core/theme/app_theme.dart';
+import 'data/directory_erase.dart';
 import 'data/profiles/profiles_store.dart';
 import 'data/settings/app_settings_store.dart';
 import 'features/profiles/initial_profile_name_screen.dart';
@@ -37,6 +39,12 @@ class AudilocApp extends StatefulWidget {
 
 class _AudilocAppState extends State<AudilocApp> {
   late final MediaKitPlayerService _playerService;
+
+  /// See [_bootstrap]'s doc — `AudioService.init` may only ever run once
+  /// per process, but [_bootstrap] itself can now run more than once
+  /// (erase-all-data re-triggers it), so this can't just be "did
+  /// `_bootstrap` run yet".
+  bool _audioServiceInitialized = false;
   ProfilesStore? _profilesStore;
   AppSettingsStore? _settingsStore;
   ProfileSessionHandle? _session;
@@ -56,6 +64,10 @@ class _AudilocAppState extends State<AudilocApp> {
   /// from "О приложении"), and persisted via [_settingsStore] so it
   /// survives restarts.
   Locale? _locale;
+
+  /// Persisted via [_settingsStore], defaults to [ThemeMode.system] — see
+  /// docs/adr/0028-settings-screen-and-theming.md.
+  ThemeMode _themeMode = ThemeMode.system;
 
   /// Set when [_bootstrap] or [_openProfile] throws — without this, an
   /// exception anywhere in that startup chain (a port still held by a
@@ -98,8 +110,14 @@ class _AudilocAppState extends State<AudilocApp> {
       // implementation, and calling AudioService.init on a platform without
       // one throws rather than no-op-ing. Done once here, not per profile —
       // it just mirrors whatever the (also process-lifetime) player is
-      // doing, regardless of which profile that happens to be.
-      if (Platform.isAndroid) {
+      // doing, regardless of which profile that happens to be. Guarded by
+      // [_audioServiceInitialized]: [_bootstrap] itself isn't necessarily
+      // once-per-process anymore — "Стереть все данные" re-runs it — but
+      // `AudioService.init` asserts it's never called twice in the same
+      // process (`assert(_cacheManager == null)`), so a second run must
+      // skip this step even though everything else in [_bootstrap] does
+      // need to redo its work.
+      if (Platform.isAndroid && !_audioServiceInitialized) {
         await AudioService.init(
           builder: () => AudilocAudioHandler(_playerService),
           config: const AudioServiceConfig(
@@ -108,17 +126,20 @@ class _AudilocAppState extends State<AudilocApp> {
             androidNotificationOngoing: true,
           ),
         );
+        _audioServiceInitialized = true;
       }
 
       final appSupportDir = await getApplicationSupportDirectory();
       final store = ProfilesStore(appSupportDir);
       final settingsStore = AppSettingsStore(appSupportDir);
       final savedLocale = await settingsStore.languageLocale();
+      final savedThemeMode = await settingsStore.themeMode();
       if (!mounted) return;
       setState(() {
         _profilesStore = store;
         _settingsStore = settingsStore;
         _locale = savedLocale;
+        _themeMode = savedThemeMode;
       });
 
       // A genuinely fresh install (nothing to migrate either) — ask for a
@@ -185,6 +206,53 @@ class _AudilocAppState extends State<AudilocApp> {
     _session?.container.read(currentLocaleProvider.notifier).state = locale;
     if (!mounted) return;
     setState(() => _locale = locale);
+  }
+
+  /// Bound to the theme picker in Settings — same pattern as
+  /// [_changeLanguage], see docs/adr/0028-settings-screen-and-theming.md.
+  Future<void> _changeThemeMode(ThemeMode mode) async {
+    await _settingsStore!.setThemeMode(mode);
+    _session?.container.read(currentThemeModeProvider.notifier).state = mode;
+    if (!mounted) return;
+    setState(() => _themeMode = mode);
+  }
+
+  /// Bound to "Стереть все данные" in Settings, after its own double
+  /// confirmation (docs/adr/0028-settings-screen-and-theming.md) — the
+  /// caller is a widget inside the very [ProviderContainer] this closes,
+  /// so this can't return until well after the `onPressed` that triggered
+  /// it has already torn down the tree it's running in; that's fine, the
+  /// call itself doesn't touch `context` after `close()`.
+  ///
+  /// Order matters: [ProfileSessionHandle.close] first (a still-open CRDT
+  /// database file inside [appSupportDir] would make deleting it flaky at
+  /// best, corrupt the on-disk file at worst), *then* the actual erase,
+  /// *then** resetting every field back to the same blank state
+  /// [_AudilocAppState] starts in, so [_bootstrap] re-derives a genuinely
+  /// fresh install from scratch — same code path an actual first launch
+  /// takes, not a special-cased "post-erase" branch that could drift from
+  /// it over time.
+  Future<void> _eraseAllData() async {
+    final appSupportDir = _profilesStore?.appSupportDir;
+    final session = _session;
+    setState(() => _session = null);
+    await _playerService.setQueue(const []);
+    if (session != null) await session.close();
+    if (appSupportDir != null) await eraseDirectoryBestEffort(appSupportDir);
+
+    if (!mounted) return;
+    setState(() {
+      _profilesStore = null;
+      _settingsStore = null;
+      _locale = null;
+      _themeMode = ThemeMode.system;
+      _needsLanguageChoice = false;
+      _needsInitialProfileName = false;
+      _awaitingProfileAdoption = false;
+      _startupError = null;
+      _pendingProfileId = null;
+    });
+    await _bootstrap();
   }
 
   Future<void> _createInitialProfile(String name) async {
@@ -279,6 +347,9 @@ class _AudilocAppState extends State<AudilocApp> {
         waitForPairing: _waitForPairing,
         changeLanguage: _changeLanguage,
         initialLocale: _locale,
+        changeThemeMode: _changeThemeMode,
+        initialThemeMode: _themeMode,
+        eraseAllData: _eraseAllData,
       );
       if (!mounted) {
         await session.close();
@@ -320,9 +391,9 @@ class _AudilocAppState extends State<AudilocApp> {
       return MaterialApp(
         title: 'AudiLoc',
         debugShowCheckedModeBanner: false,
-        theme: AppTheme.dark(),
+        theme: AppTheme.light(),
         darkTheme: AppTheme.dark(),
-        themeMode: ThemeMode.dark,
+        themeMode: _themeMode,
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         locale: _locale,
@@ -334,9 +405,9 @@ class _AudilocAppState extends State<AudilocApp> {
       return MaterialApp(
         title: 'AudiLoc',
         debugShowCheckedModeBanner: false,
-        theme: AppTheme.dark(),
+        theme: AppTheme.light(),
         darkTheme: AppTheme.dark(),
-        themeMode: ThemeMode.dark,
+        themeMode: _themeMode,
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         locale: _locale,
@@ -350,9 +421,9 @@ class _AudilocAppState extends State<AudilocApp> {
       return MaterialApp(
         title: 'AudiLoc',
         debugShowCheckedModeBanner: false,
-        theme: AppTheme.dark(),
+        theme: AppTheme.light(),
         darkTheme: AppTheme.dark(),
-        themeMode: ThemeMode.dark,
+        themeMode: _themeMode,
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         locale: _locale,
@@ -367,9 +438,9 @@ class _AudilocAppState extends State<AudilocApp> {
       child: MaterialApp.router(
         title: 'AudiLoc',
         debugShowCheckedModeBanner: false,
-        theme: AppTheme.dark(),
+        theme: AppTheme.light(),
         darkTheme: AppTheme.dark(),
-        themeMode: ThemeMode.dark,
+        themeMode: _themeMode,
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         locale: _locale,
@@ -447,7 +518,7 @@ class _StartupErrorScreen extends StatelessWidget {
                 Text(
                   '$error',
                   textAlign: TextAlign.center,
-                  style: const TextStyle(color: AppTheme.onSurfaceMuted, fontSize: 13),
+                  style: TextStyle(color: context.colors.onSurfaceMuted, fontSize: 13),
                 ),
                 const SizedBox(height: 24),
                 FilledButton(onPressed: onRetry, child: Text(context.l10n.commonRetry)),

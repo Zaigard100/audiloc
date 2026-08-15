@@ -1,4 +1,5 @@
 import 'package:audiloc/core/providers.dart';
+import 'package:audiloc/core/theme/app_theme.dart';
 import 'package:audiloc/data/db/audiloc_database.dart';
 import 'package:audiloc/data/models/device.dart';
 import 'package:audiloc/data/models/track.dart';
@@ -30,11 +31,12 @@ void main() {
           selfDeviceProvider.overrideWithValue(const Device(id: 'self', name: 'Test device')),
           playerServiceProvider.overrideWithValue(playerService),
         ],
-        child: const MaterialApp(
-          locale: Locale('ru'),
+        child: MaterialApp(
+          theme: AppTheme.dark(),
+          locale: const Locale('ru'),
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
-          home: Scaffold(body: SizedBox.shrink(), bottomNavigationBar: MiniPlayer()),
+          home: const Scaffold(body: SizedBox.shrink(), bottomNavigationBar: MiniPlayer()),
         ),
       );
 

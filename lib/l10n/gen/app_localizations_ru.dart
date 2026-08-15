@@ -573,8 +573,64 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
-  String get aboutLanguage => 'Язык';
+  String get aboutDescription =>
+      'AudiLoc — P2P музыкальный плеер с автосинхронизацией библиотеки в локальной сети, без облака и без центрального сервера.';
 
   @override
-  String get aboutLanguageSystem => 'Как в системе';
+  String get aboutGithubLink => 'Исходный код на GitHub';
+
+  @override
+  String get settingsTitle => 'Настройки';
+
+  @override
+  String get settingsTheme => 'Тема';
+
+  @override
+  String get settingsThemeSystem => 'Как в системе';
+
+  @override
+  String get settingsThemeLight => 'Светлая';
+
+  @override
+  String get settingsThemeDark => 'Тёмная';
+
+  @override
+  String get settingsLanguage => 'Язык';
+
+  @override
+  String get settingsLanguageSystem => 'Как в системе';
+
+  @override
+  String get settingsAbout => 'О приложении';
+
+  @override
+  String get settingsEraseData => 'Стереть все данные';
+
+  @override
+  String get settingsEraseDataSubtitle =>
+      'Удаляет все профили и настройки — приложение станет как только что установленное';
+
+  @override
+  String get settingsEraseDataWarningTitle => 'Стереть все данные?';
+
+  @override
+  String get settingsEraseDataWarningBody =>
+      'Будут безвозвратно удалены все профили на этом устройстве — вся библиотека, плейлисты, обложки, список сопряжённых устройств у каждого из них — и настройки языка/темы. Это затрагивает все профили, не только текущий. Отменить это будет нельзя.';
+
+  @override
+  String get settingsEraseDataWarningContinue => 'Продолжить';
+
+  @override
+  String get settingsEraseDataFinalTitle => 'Последнее подтверждение';
+
+  @override
+  String settingsEraseDataFinalBody(String keyword) {
+    return 'Чтобы подтвердить, введите «$keyword»:';
+  }
+
+  @override
+  String get settingsEraseDataFinalKeyword => 'УДАЛИТЬ';
+
+  @override
+  String get settingsEraseDataFinalButton => 'Стереть всё безвозвратно';
 }

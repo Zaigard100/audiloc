@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/providers.dart';
+import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../../l10n/l10n.dart';
 import 'favorites_screen.dart';
@@ -52,7 +53,7 @@ class PlaylistsScreen extends ConsumerWidget {
             _PlaylistTile(
               label: l10n.trashTitle,
               icon: Icons.delete_outline,
-              color: AppTheme.surfaceHigh,
+              color: context.colors.surfaceHigh,
               onTap: () =>
                   Navigator.of(context).push(MaterialPageRoute(builder: (_) => const TrashScreen())),
             ),
@@ -60,7 +61,7 @@ class PlaylistsScreen extends ConsumerWidget {
               _PlaylistTile(
                 label: playlist.name,
                 icon: Icons.queue_music,
-                color: AppTheme.surfaceHigh,
+                color: context.colors.surfaceHigh,
                 coverPath: playlist.coverPath,
                 onTap: () => context.push('/playlists/${playlist.id}', extra: playlist),
                 // Right-click on desktop opens the same menu as long-press
@@ -172,7 +173,7 @@ class _PlaylistTile extends StatelessWidget {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(icon, size: 40, color: isAccent ? Colors.white : AppTheme.onSurfaceMuted),
+                    Icon(icon, size: 40, color: isAccent ? Colors.white : context.colors.onSurfaceMuted),
                     const SizedBox(height: 10),
                     Text(
                       label,

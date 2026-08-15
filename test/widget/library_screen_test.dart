@@ -1,4 +1,5 @@
 import 'package:audiloc/core/providers.dart';
+import 'package:audiloc/core/theme/app_theme.dart';
 import 'package:audiloc/data/db/audiloc_database.dart';
 import 'package:audiloc/data/models/track.dart';
 import 'package:audiloc/data/repositories/tracks_repository.dart';
@@ -17,11 +18,12 @@ void main() {
 
     await tester.pumpWidget(UncontrolledProviderScope(
       container: container,
-      child: const MaterialApp(
-        locale: Locale('ru'),
+      child: MaterialApp(
+        theme: AppTheme.dark(),
+        locale: const Locale('ru'),
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
-        home: LibraryScreen(),
+        home: const LibraryScreen(),
       ),
     ));
     // Plain pump() drains the event loop each call, letting the

@@ -214,6 +214,25 @@
   "aboutGuideProfilesBody": "Several people can share one device — each with their own library and their own list of paired devices; switch via the profile card on the Devices tab → “Switch”. If instead this is a second device belonging to the same person, the “Wait for pairing” button (when creating a profile, or from the switcher) makes it a copy of the existing one. Deleting a profile is irreversible and requires typing its name to confirm; only an inactive profile can be deleted.",
   "aboutVersion": "Version {version}",
   "@aboutVersion": {"placeholders": {"version": {"type": "String"}}},
-  "aboutLanguage": "Language",
-  "aboutLanguageSystem": "Follow system"
+  "aboutDescription": "AudiLoc — a P2P music player with automatic library sync over the local network, no cloud, no central server.",
+  "aboutGithubLink": "Source code on GitHub",
+
+  "settingsTitle": "Settings",
+  "settingsTheme": "Theme",
+  "settingsThemeSystem": "Follow system",
+  "settingsThemeLight": "Light",
+  "settingsThemeDark": "Dark",
+  "settingsLanguage": "Language",
+  "settingsLanguageSystem": "Follow system",
+  "settingsAbout": "About",
+  "settingsEraseData": "Erase all data",
+  "settingsEraseDataSubtitle": "Deletes every profile and setting — the app becomes like a fresh install",
+  "settingsEraseDataWarningTitle": "Erase all data?",
+  "settingsEraseDataWarningBody": "Every profile on this device will be permanently deleted — its whole library, playlists, covers, list of paired devices — along with language/theme settings. This affects every profile, not just the current one. This cannot be undone.",
+  "settingsEraseDataWarningContinue": "Continue",
+  "settingsEraseDataFinalTitle": "Final confirmation",
+  "settingsEraseDataFinalBody": "To confirm, type “{keyword}”:",
+  "@settingsEraseDataFinalBody": {"placeholders": {"keyword": {"type": "String"}}},
+  "settingsEraseDataFinalKeyword": "DELETE",
+  "settingsEraseDataFinalButton": "Erase everything permanently"
 }

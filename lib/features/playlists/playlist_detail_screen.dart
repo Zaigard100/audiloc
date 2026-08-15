@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/providers.dart';
-import '../../core/theme/app_theme.dart';
+import '../../core/theme/app_colors.dart';
 import '../../data/models/playlist.dart';
 import '../../data/models/playlist_track.dart';
 import '../../l10n/l10n.dart';
@@ -38,7 +38,7 @@ class PlaylistDetailScreen extends ConsumerWidget {
       body: itemsAsync.when(
         data: (items) => items.isEmpty
             ? Center(
-                child: Text(l10n.playlistEmptyTracks, style: const TextStyle(color: AppTheme.onSurfaceMuted)),
+                child: Text(l10n.playlistEmptyTracks, style: TextStyle(color: context.colors.onSurfaceMuted)),
               )
             : ReorderableListView.builder(
                 itemCount: items.length,
@@ -56,7 +56,7 @@ class PlaylistDetailScreen extends ConsumerWidget {
                     },
                     trailing: IconButton(
                       icon: const Icon(Icons.remove_circle_outline),
-                      color: AppTheme.onSurfaceMuted,
+                      color: context.colors.onSurfaceMuted,
                       onPressed: () => ref.read(playlistsRepositoryProvider).removeEntry(item.entryId),
                     ),
                   );
@@ -154,7 +154,7 @@ class _AddTracksSheetState extends ConsumerState<_AddTracksSheet> {
                   ? Center(
                       child: Text(
                         query.isEmpty ? l10n.playlistAllTracksAdded : l10n.playlistNothingFound,
-                        style: const TextStyle(color: AppTheme.onSurfaceMuted),
+                        style: TextStyle(color: context.colors.onSurfaceMuted),
                       ),
                     )
                   : ListView.builder(

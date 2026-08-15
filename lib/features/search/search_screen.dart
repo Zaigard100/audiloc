@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/providers.dart';
-import '../../core/theme/app_theme.dart';
+import '../../core/theme/app_colors.dart';
 import '../../l10n/l10n.dart';
 import '../library/providers/library_providers.dart';
 import '../library/widgets/track_tile.dart';
@@ -39,10 +39,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         title: TextField(
           controller: _controller,
           autofocus: false,
-          style: const TextStyle(color: Colors.white),
+          style: TextStyle(color: context.colors.onSurface),
           decoration: InputDecoration(
             hintText: l10n.searchHint,
-            hintStyle: const TextStyle(color: AppTheme.onSurfaceMuted),
+            hintStyle: TextStyle(color: context.colors.onSurfaceMuted),
             border: InputBorder.none,
           ),
           onChanged: (value) => ref.read(librarySearchQueryProvider.notifier).state = value,
@@ -50,10 +50,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       ),
       body: query.isEmpty
           ? Center(
-              child: Text(l10n.searchStartTyping, style: const TextStyle(color: AppTheme.onSurfaceMuted)),
+              child: Text(l10n.searchStartTyping, style: TextStyle(color: context.colors.onSurfaceMuted)),
             )
           : results.isEmpty
-              ? Center(child: Text(l10n.searchNothingFound, style: const TextStyle(color: AppTheme.onSurfaceMuted)))
+              ? Center(child: Text(l10n.searchNothingFound, style: TextStyle(color: context.colors.onSurfaceMuted)))
               : ListView.builder(
                   itemCount: results.length,
                   itemBuilder: (context, index) {

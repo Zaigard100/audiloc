@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/providers.dart';
+import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../../data/models/track.dart';
 import '../../l10n/l10n.dart';
@@ -30,7 +31,7 @@ class TrashScreen extends ConsumerWidget {
         data: (tracks) {
           if (tracks.isEmpty) {
             return Center(
-              child: Text(l10n.trashEmpty, style: const TextStyle(color: AppTheme.onSurfaceMuted)),
+              child: Text(l10n.trashEmpty, style: TextStyle(color: context.colors.onSurfaceMuted)),
             );
           }
           return ListView.builder(
@@ -52,7 +53,7 @@ class TrashScreen extends ConsumerWidget {
                     IconButton(
                       icon: const Icon(Icons.delete_forever_outlined),
                       tooltip: l10n.trashEraseForeverTooltip,
-                      color: AppTheme.onSurfaceMuted,
+                      color: context.colors.onSurfaceMuted,
                       onPressed: () => _confirmErase(context, ref, track),
                     ),
                   ],

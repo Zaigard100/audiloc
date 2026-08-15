@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/providers.dart';
+import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/models/track.dart';
 import '../../../l10n/l10n.dart';
@@ -41,9 +42,9 @@ class TrackTile extends ConsumerWidget {
           height: 48,
           child: track.coverPath != null
               ? Image.file(File(track.coverPath!), fit: BoxFit.cover)
-              : const ColoredBox(
-                  color: AppTheme.surfaceHigh,
-                  child: Icon(Icons.music_note, color: AppTheme.onSurfaceMuted),
+              : ColoredBox(
+                  color: context.colors.surfaceHigh,
+                  child: Icon(Icons.music_note, color: context.colors.onSurfaceMuted),
                 ),
         ),
       ),
@@ -55,7 +56,7 @@ class TrackTile extends ConsumerWidget {
               height: 14,
               child: isTransferring
                   ? CircularProgressIndicator(strokeWidth: 2, value: fraction, color: AppTheme.accent)
-                  : const Icon(Icons.cloud_download_outlined, size: 14, color: AppTheme.onSurfaceMuted),
+                  : Icon(Icons.cloud_download_outlined, size: 14, color: context.colors.onSurfaceMuted),
             ),
             const SizedBox(width: 4),
           ],
@@ -75,7 +76,7 @@ class TrackTile extends ConsumerWidget {
       trailing: trailing ??
           IconButton(
             icon: Icon(isFavorite ? Icons.favorite : Icons.favorite_border),
-            color: isFavorite ? AppTheme.accent : AppTheme.onSurfaceMuted,
+            color: isFavorite ? AppTheme.accent : context.colors.onSurfaceMuted,
             onPressed: () => ref.read(favoritesRepositoryProvider).toggle(track.id),
           ),
     );

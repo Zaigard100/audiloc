@@ -6,7 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 
 import '../../../core/providers.dart';
-import '../../../core/theme/app_theme.dart';
+import '../../../core/theme/app_colors.dart';
 import '../../../data/models/track.dart';
 import '../../../l10n/l10n.dart';
 
@@ -66,9 +66,9 @@ Future<void> showEditTrackDialog(BuildContext context, WidgetRef ref, Track trac
                       height: 96,
                       child: coverPath != null
                           ? Image.file(File(coverPath!), fit: BoxFit.cover)
-                          : const ColoredBox(
-                              color: AppTheme.surfaceHigh,
-                              child: Icon(Icons.add_photo_alternate_outlined, color: AppTheme.onSurfaceMuted),
+                          : ColoredBox(
+                              color: context.colors.surfaceHigh,
+                              child: Icon(Icons.add_photo_alternate_outlined, color: context.colors.onSurfaceMuted),
                             ),
                     ),
                   ),

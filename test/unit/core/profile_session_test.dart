@@ -8,7 +8,7 @@ import 'package:audiloc/data/profiles/profile.dart';
 import 'package:audiloc/data/profiles/profiles_store.dart';
 import 'package:audiloc/services/playback/player_service.dart';
 import 'package:audiloc/services/sync/pairing/pairing_models.dart';
-import 'package:flutter/widgets.dart' show Locale;
+import 'package:flutter/material.dart' show Locale, ThemeMode;
 import 'package:flutter_test/flutter_test.dart';
 
 /// `openProfileSession` doesn't touch playback beyond clearing the queue
@@ -51,6 +51,8 @@ Future<String> _testPlatformLabel() async => 'TestOS';
 Future<bool> _noopCanJoin() async => false;
 Future<void> _noopWaitForPairing() async {}
 Future<void> _noopChangeLanguage(Locale? locale) async {}
+Future<void> _noopChangeThemeMode(ThemeMode mode) async {}
+Future<void> _noopEraseAllData() async {}
 
 void main() {
   test(
@@ -78,6 +80,9 @@ void main() {
       waitForPairing: _noopWaitForPairing,
       changeLanguage: _noopChangeLanguage,
       initialLocale: null,
+      changeThemeMode: _noopChangeThemeMode,
+      initialThemeMode: ThemeMode.system,
+      eraseAllData: _noopEraseAllData,
       platformLabel: _testPlatformLabel,
     );
     await first.close();
@@ -95,6 +100,9 @@ void main() {
       waitForPairing: _noopWaitForPairing,
       changeLanguage: _noopChangeLanguage,
       initialLocale: null,
+      changeThemeMode: _noopChangeThemeMode,
+      initialThemeMode: ThemeMode.system,
+      eraseAllData: _noopEraseAllData,
       platformLabel: _testPlatformLabel,
     );
     await second.close();
@@ -121,6 +129,9 @@ void main() {
       waitForPairing: _noopWaitForPairing,
       changeLanguage: _noopChangeLanguage,
       initialLocale: null,
+      changeThemeMode: _noopChangeThemeMode,
+      initialThemeMode: ThemeMode.system,
+      eraseAllData: _noopEraseAllData,
       platformLabel: _testPlatformLabel,
     );
     addTearDown(session.close);
@@ -147,6 +158,9 @@ void main() {
       waitForPairing: _noopWaitForPairing,
       changeLanguage: _noopChangeLanguage,
       initialLocale: null,
+      changeThemeMode: _noopChangeThemeMode,
+      initialThemeMode: ThemeMode.system,
+      eraseAllData: _noopEraseAllData,
       platformLabel: _testPlatformLabel,
     );
     await first.close();
@@ -163,6 +177,9 @@ void main() {
       waitForPairing: _noopWaitForPairing,
       changeLanguage: _noopChangeLanguage,
       initialLocale: null,
+      changeThemeMode: _noopChangeThemeMode,
+      initialThemeMode: ThemeMode.system,
+      eraseAllData: _noopEraseAllData,
       platformLabel: _testPlatformLabel,
     );
     addTearDown(second.close);
@@ -189,6 +206,9 @@ void main() {
       waitForPairing: _noopWaitForPairing,
       changeLanguage: _noopChangeLanguage,
       initialLocale: null,
+      changeThemeMode: _noopChangeThemeMode,
+      initialThemeMode: ThemeMode.system,
+      eraseAllData: _noopEraseAllData,
       platformLabel: _testPlatformLabel,
     );
     addTearDown(session.close);

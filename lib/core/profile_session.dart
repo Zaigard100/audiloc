@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter/widgets.dart' show Locale;
+import 'package:flutter/material.dart' show Locale, ThemeMode;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 
@@ -92,6 +92,9 @@ Future<ProfileSessionHandle> openProfileSession({
   required Future<void> Function() waitForPairing,
   required Future<void> Function(Locale?) changeLanguage,
   required Locale? initialLocale,
+  required Future<void> Function(ThemeMode) changeThemeMode,
+  required ThemeMode initialThemeMode,
+  required Future<void> Function() eraseAllData,
   Future<String> Function() platformLabel = platformDeviceLabel,
 }) async {
   final profiles = await profilesStore.list();
@@ -125,6 +128,9 @@ Future<ProfileSessionHandle> openProfileSession({
     waitForPairingProvider.overrideWithValue(waitForPairing),
     changeLanguageProvider.overrideWithValue(changeLanguage),
     currentLocaleProvider.overrideWith((ref) => initialLocale),
+    changeThemeModeProvider.overrideWithValue(changeThemeMode),
+    currentThemeModeProvider.overrideWith((ref) => initialThemeMode),
+    eraseAllDataProvider.overrideWithValue(eraseAllData),
   ]);
 
   // The three fixed-port *bind* calls are awaited — deliberately *not*

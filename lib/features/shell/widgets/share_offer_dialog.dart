@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/providers.dart';
-import '../../../core/theme/app_theme.dart';
+import '../../../core/theme/app_colors.dart';
 import '../../../l10n/l10n.dart';
 import '../../../services/sync/share/share_models.dart';
 
@@ -91,10 +91,10 @@ class _ShareOfferDialogState extends ConsumerState<_ShareOfferDialog> {
               child: _cover != null
                   ? Image.file(_cover!, fit: BoxFit.cover)
                   : ColoredBox(
-                      color: AppTheme.surfaceHigh,
+                      color: context.colors.surfaceHigh,
                       child: Icon(
                         _coverLoadFailed ? Icons.music_note : Icons.hourglass_empty,
-                        color: AppTheme.onSurfaceMuted,
+                        color: context.colors.onSurfaceMuted,
                       ),
                     ),
             ),
@@ -108,7 +108,7 @@ class _ShareOfferDialogState extends ConsumerState<_ShareOfferDialog> {
             overflow: TextOverflow.ellipsis,
           ),
           if (first.artist != null)
-            Text(first.artist!, textAlign: TextAlign.center, style: const TextStyle(color: AppTheme.onSurfaceMuted)),
+            Text(first.artist!, textAlign: TextAlign.center, style: TextStyle(color: context.colors.onSurfaceMuted)),
           const SizedBox(height: 8),
           Text(description, textAlign: TextAlign.center),
         ],

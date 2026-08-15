@@ -94,6 +94,9 @@ dependencies:
   # платформенно, не дублируется вручную
   package_info_plus: ^8.3.1
 
+  # Ссылка на GitHub-репозиторий на экране "О приложении"
+  url_launcher: ^6.3.2
+
 # audiotags 1.4.5's android/build.gradle hardcodes compileSdkVersion 31,
 # below what its own transitive AndroidX deps require (34+) on current
 # tooling — build fails with "AAR metadata" errors. Not fixed upstream as

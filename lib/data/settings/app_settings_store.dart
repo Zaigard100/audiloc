@@ -1,14 +1,15 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
 
-/// Device-level app settings — currently just the chosen UI language.
-/// Deliberately separate from [ProfilesStore]: language is a property of
-/// this installation/device, not of any one profile, so it must survive
-/// profile switches and stay the same for every profile on this device
-/// (see docs/adr/0027-localization.md).
+/// Device-level app settings — UI language and theme mode. Deliberately
+/// separate from [ProfilesStore]: both are properties of this
+/// installation/device, not of any one profile, so they must survive
+/// profile switches and stay the same for every profile sharing this
+/// device (see docs/adr/0027-localization.md,
+/// docs/adr/0028-settings-screen-and-theming.md).
 class AppSettingsStore {
   AppSettingsStore(this.appSupportDir);
 
@@ -19,19 +20,36 @@ class AppSettingsStore {
   /// `null` means "never explicitly chosen" — the app falls back to
   /// following the system locale (Flutter's default behavior when
   /// `MaterialApp.locale` is left unset) until the user picks one, either
-  /// on the language-choice screen on a fresh install or later from the
-  /// "О приложении" screen.
+  /// on the language-choice screen on a fresh install or later from
+  /// Settings.
   Future<Locale?> languageLocale() async {
-    if (!await _file.exists()) return null;
-    final json = jsonDecode(await _file.readAsString()) as Map<String, Object?>;
-    final code = json['languageCode'] as String?;
+    final code = (await _read())['languageCode'] as String?;
     return code == null ? null : Locale(code);
   }
 
   /// [code] is a bare language code (e.g. `'ru'`, `'en'`) — pass `null` to
   /// clear the explicit choice and go back to following the system locale.
-  Future<void> setLanguageCode(String? code) async {
+  Future<void> setLanguageCode(String? code) => _write('languageCode', code);
+
+  /// Defaults to [ThemeMode.system] — same "don't force a choice nobody
+  /// made yet" reasoning as [languageLocale], except there's no dedicated
+  /// first-run screen for it: system-follow is already a fine default for
+  /// a fresh install, not just a placeholder waiting to be replaced.
+  Future<ThemeMode> themeMode() async {
+    final name = (await _read())['themeMode'] as String?;
+    return ThemeMode.values.firstWhere((m) => m.name == name, orElse: () => ThemeMode.system);
+  }
+
+  Future<void> setThemeMode(ThemeMode mode) => _write('themeMode', mode.name);
+
+  Future<Map<String, Object?>> _read() async {
+    if (!await _file.exists()) return const {};
+    return jsonDecode(await _file.readAsString()) as Map<String, Object?>;
+  }
+
+  Future<void> _write(String key, Object? value) async {
     if (!await appSupportDir.exists()) await appSupportDir.create(recursive: true);
-    await _file.writeAsString(jsonEncode({'languageCode': code}));
+    final current = await _read();
+    await _file.writeAsString(jsonEncode({...current, key: value}));
   }
 }

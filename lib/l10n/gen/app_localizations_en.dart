@@ -572,8 +572,64 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get aboutLanguage => 'Language';
+  String get aboutDescription =>
+      'AudiLoc — a P2P music player with automatic library sync over the local network, no cloud, no central server.';
 
   @override
-  String get aboutLanguageSystem => 'Follow system';
+  String get aboutGithubLink => 'Source code on GitHub';
+
+  @override
+  String get settingsTitle => 'Settings';
+
+  @override
+  String get settingsTheme => 'Theme';
+
+  @override
+  String get settingsThemeSystem => 'Follow system';
+
+  @override
+  String get settingsThemeLight => 'Light';
+
+  @override
+  String get settingsThemeDark => 'Dark';
+
+  @override
+  String get settingsLanguage => 'Language';
+
+  @override
+  String get settingsLanguageSystem => 'Follow system';
+
+  @override
+  String get settingsAbout => 'About';
+
+  @override
+  String get settingsEraseData => 'Erase all data';
+
+  @override
+  String get settingsEraseDataSubtitle =>
+      'Deletes every profile and setting — the app becomes like a fresh install';
+
+  @override
+  String get settingsEraseDataWarningTitle => 'Erase all data?';
+
+  @override
+  String get settingsEraseDataWarningBody =>
+      'Every profile on this device will be permanently deleted — its whole library, playlists, covers, list of paired devices — along with language/theme settings. This affects every profile, not just the current one. This cannot be undone.';
+
+  @override
+  String get settingsEraseDataWarningContinue => 'Continue';
+
+  @override
+  String get settingsEraseDataFinalTitle => 'Final confirmation';
+
+  @override
+  String settingsEraseDataFinalBody(String keyword) {
+    return 'To confirm, type “$keyword”:';
+  }
+
+  @override
+  String get settingsEraseDataFinalKeyword => 'DELETE';
+
+  @override
+  String get settingsEraseDataFinalButton => 'Erase everything permanently';
 }

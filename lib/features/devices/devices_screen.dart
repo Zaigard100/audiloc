@@ -2,12 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/providers.dart';
+import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../../data/models/track.dart';
 import '../../l10n/l10n.dart';
-import '../about/about_screen.dart';
 import '../library/providers/library_providers.dart';
 import '../profiles/profile_switcher_sheet.dart';
+import '../settings/settings_screen.dart';
 import 'providers/devices_providers.dart';
 import 'widgets/device_tile.dart';
 import 'widgets/sync_badge.dart';
@@ -17,8 +18,9 @@ import 'widgets/sync_badge.dart';
 /// confirm-on-both-sides (docs/adr/0011-mutual-pairing-confirmation.md),
 /// not a QR code — there's never been a scanner to read one with, only a
 /// display, so it added a screen without adding a way to actually pair.
-/// Also the entry point to [AboutScreen] — the app has no separate
-/// settings tab, and this is the closest thing to one.
+/// Also the entry point to [SettingsScreen] — the app has no separate
+/// settings tab, and this is the closest thing to one
+/// (docs/adr/0028-settings-screen-and-theming.md).
 class DevicesScreen extends ConsumerWidget {
   const DevicesScreen({super.key});
 
@@ -36,10 +38,10 @@ class DevicesScreen extends ConsumerWidget {
         actions: [
           const _RefreshDiscoveryButton(),
           IconButton(
-            icon: const Icon(Icons.info_outline),
-            tooltip: l10n.aboutTitle,
+            icon: const Icon(Icons.settings_outlined),
+            tooltip: l10n.settingsTitle,
             onPressed: () =>
-                Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AboutScreen())),
+                Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SettingsScreen())),
           ),
         ],
       ),
@@ -61,7 +63,7 @@ class DevicesScreen extends ConsumerWidget {
           const SyncBadge(),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-            child: Text(l10n.devicesKnownDevicesLabel, style: const TextStyle(color: AppTheme.onSurfaceMuted)),
+            child: Text(l10n.devicesKnownDevicesLabel, style: TextStyle(color: context.colors.onSurfaceMuted)),
           ),
           knownDevicesAsync.when(
             data: (devices) {
@@ -71,7 +73,7 @@ class DevicesScreen extends ConsumerWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
                   child: Text(
                     l10n.devicesNoneFound,
-                    style: const TextStyle(color: AppTheme.onSurfaceMuted),
+                    style: TextStyle(color: context.colors.onSurfaceMuted),
                   ),
                 );
               }
@@ -160,13 +162,13 @@ class _NearbyUnpairedPeers extends ConsumerWidget {
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-          child: Text(l10n.devicesNearbyLabel, style: const TextStyle(color: AppTheme.onSurfaceMuted)),
+          child: Text(l10n.devicesNearbyLabel, style: TextStyle(color: context.colors.onSurfaceMuted)),
         ),
         for (final peer in nearby)
           ListTile(
-            leading: const CircleAvatar(
-              backgroundColor: AppTheme.surfaceHigh,
-              child: Icon(Icons.wifi_tethering, color: AppTheme.onSurfaceMuted),
+            leading: CircleAvatar(
+              backgroundColor: context.colors.surfaceHigh,
+              child: Icon(Icons.wifi_tethering, color: context.colors.onSurfaceMuted),
             ),
             title: Text(peer.name),
             subtitle: Text(l10n.devicesUnpaired),
@@ -210,7 +212,7 @@ class _FileSyncStatus extends ConsumerWidget {
           if (missing.isEmpty)
             Text(
               l10n.devicesAllFilesPresent,
-              style: const TextStyle(color: AppTheme.onSurfaceMuted, fontSize: 12),
+              style: TextStyle(color: context.colors.onSurfaceMuted, fontSize: 12),
             )
           else ...[
             for (final entry in transfers.entries)
@@ -221,7 +223,7 @@ class _FileSyncStatus extends ConsumerWidget {
                 padding: const EdgeInsets.only(top: 4),
                 child: Text(
                   l10n.devicesQueuedCount(queuedCount),
-                  style: const TextStyle(color: AppTheme.onSurfaceMuted, fontSize: 12),
+                  style: TextStyle(color: context.colors.onSurfaceMuted, fontSize: 12),
                 ),
               ),
           ],
@@ -259,7 +261,7 @@ class _TransferProgressRow extends StatelessWidget {
               value: fraction,
               minHeight: 4,
               color: AppTheme.accent,
-              backgroundColor: AppTheme.surfaceHigh,
+              backgroundColor: context.colors.surfaceHigh,
             ),
           ),
         ],

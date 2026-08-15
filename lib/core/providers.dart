@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:flutter/widgets.dart' show Locale;
+import 'package:flutter/material.dart' show Locale, ThemeMode;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 import 'package:path/path.dart' as p;
@@ -132,6 +132,28 @@ final changeLanguageProvider = Provider<Future<void> Function(Locale?)>(
 /// "system happens to be Russian" from "Russian was explicitly chosen".
 final currentLocaleProvider = StateProvider<Locale?>(
   (ref) => throw UnimplementedError('currentLocaleProvider must be overridden by profile_session.dart'),
+);
+
+/// Same pattern as [changeLanguageProvider]/[currentLocaleProvider], for
+/// theme mode instead — see docs/adr/0028-settings-screen-and-theming.md.
+final changeThemeModeProvider = Provider<Future<void> Function(ThemeMode)>(
+  (ref) => throw UnimplementedError('changeThemeModeProvider must be overridden by AudilocApp'),
+);
+
+final currentThemeModeProvider = StateProvider<ThemeMode>(
+  (ref) => throw UnimplementedError('currentThemeModeProvider must be overridden by profile_session.dart'),
+);
+
+/// "Стереть все данные" in Settings — erases every profile and every
+/// device-level setting, then re-launches into the same first-run flow a
+/// genuinely fresh install sees. Only `AudilocApp` can actually do this:
+/// it owns the `ProfileSessionHandle`/`ProviderContainer` that has to be
+/// torn down *before* the directory underneath it is deleted, and the
+/// top-level `_needsLanguageChoice`/`_needsInitialProfileName` state that
+/// decides what's shown next. See
+/// docs/adr/0028-settings-screen-and-theming.md.
+final eraseAllDataProvider = Provider<Future<void> Function()>(
+  (ref) => throw UnimplementedError('eraseAllDataProvider must be overridden by AudilocApp'),
 );
 
 final tracksRepositoryProvider =

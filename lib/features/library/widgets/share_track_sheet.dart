@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/providers.dart';
-import '../../../core/theme/app_theme.dart';
+import '../../../core/theme/app_colors.dart';
 import '../../../data/models/track.dart';
 import '../../../l10n/l10n.dart';
 import '../../devices/providers/devices_providers.dart';
@@ -53,7 +53,7 @@ class _ShareTrackSheetState extends ConsumerState<_ShareTrackSheet> {
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
             child: Align(
               alignment: Alignment.centerLeft,
-              child: Text(l10n.nearbyDevicesLabel, style: const TextStyle(color: AppTheme.onSurfaceMuted)),
+              child: Text(l10n.nearbyDevicesLabel, style: TextStyle(color: context.colors.onSurfaceMuted)),
             ),
           ),
           if (nearby.isEmpty)

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/providers.dart';
+import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/models/device.dart';
 import '../../../l10n/l10n.dart';
@@ -18,10 +19,10 @@ class DeviceTile extends ConsumerWidget {
     final l10n = context.l10n;
     return ListTile(
       leading: CircleAvatar(
-        backgroundColor: AppTheme.surfaceHigh,
+        backgroundColor: context.colors.surfaceHigh,
         child: Icon(
           isOnline ? Icons.devices : Icons.devices_other,
-          color: isOnline ? AppTheme.accent : AppTheme.onSurfaceMuted,
+          color: isOnline ? AppTheme.accent : context.colors.onSurfaceMuted,
         ),
       ),
       title: Text(device.name),

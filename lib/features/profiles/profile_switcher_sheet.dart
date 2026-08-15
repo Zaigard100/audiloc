@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/profile_session.dart';
 import '../../core/providers.dart';
+import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../../data/profiles/profile.dart';
 import '../../l10n/l10n.dart';
@@ -52,7 +53,7 @@ class _ProfileSwitcherSheetState extends ConsumerState<_ProfileSwitcherSheet> {
             const SizedBox(height: 4),
             Text(
               l10n.profilesSubtitle,
-              style: const TextStyle(color: AppTheme.onSurfaceMuted, fontSize: 12),
+              style: TextStyle(color: context.colors.onSurfaceMuted, fontSize: 12),
             ),
             FutureBuilder<List<Profile>>(
               future: _profilesFuture,
@@ -70,10 +71,10 @@ class _ProfileSwitcherSheetState extends ConsumerState<_ProfileSwitcherSheet> {
                     for (final profile in profiles)
                       ListTile(
                         leading: CircleAvatar(
-                          backgroundColor: profile.id == current.id ? AppTheme.accent : AppTheme.surfaceHigh,
+                          backgroundColor: profile.id == current.id ? AppTheme.accent : context.colors.surfaceHigh,
                           child: Icon(
                             Icons.person,
-                            color: profile.id == current.id ? Colors.white : AppTheme.onSurfaceMuted,
+                            color: profile.id == current.id ? Colors.white : context.colors.onSurfaceMuted,
                           ),
                         ),
                         title: Text(profile.name),
@@ -84,7 +85,7 @@ class _ProfileSwitcherSheetState extends ConsumerState<_ProfileSwitcherSheet> {
                         trailing: profile.id == current.id
                             ? const Icon(Icons.check, color: AppTheme.accent)
                             : IconButton(
-                                icon: const Icon(Icons.delete_outline, color: AppTheme.onSurfaceMuted),
+                                icon: Icon(Icons.delete_outline, color: context.colors.onSurfaceMuted),
                                 tooltip: l10n.profileDeleteTooltip,
                                 onPressed: () => _deleteDialog(context, profile),
                               ),

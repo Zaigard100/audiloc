@@ -1,3 +1,4 @@
+import 'package:audiloc/core/theme/app_theme.dart';
 import 'package:audiloc/features/profiles/initial_profile_name_screen.dart';
 import 'package:audiloc/l10n/l10n.dart';
 import 'package:flutter/material.dart';
@@ -14,6 +15,7 @@ void main() {
     var waitedForPairing = false;
 
     await tester.pumpWidget(MaterialApp(
+      theme: AppTheme.dark(),
       locale: const Locale('ru'),
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
@@ -39,6 +41,7 @@ void main() {
     var submitted = '';
 
     await tester.pumpWidget(MaterialApp(
+      theme: AppTheme.dark(),
       locale: const Locale('ru'),
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,

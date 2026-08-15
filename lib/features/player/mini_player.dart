@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/providers.dart';
+import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../library/providers/library_providers.dart';
 import 'full_player_screen.dart';
@@ -33,9 +34,9 @@ class MiniPlayer extends ConsumerWidget {
         if ((details.primaryVelocity ?? 0) < -200) openFullPlayer();
       },
       child: Container(
-        decoration: const BoxDecoration(
-          color: AppTheme.surface,
-          border: Border(top: BorderSide(color: Colors.white12)),
+        decoration: BoxDecoration(
+          color: context.colors.surface,
+          border: Border(top: BorderSide(color: context.colors.divider)),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -45,7 +46,7 @@ class MiniPlayer extends ConsumerWidget {
                   ? 0
                   : position.fraction.clamp(0, 1),
               minHeight: 2,
-              backgroundColor: Colors.white12,
+              backgroundColor: context.colors.divider,
               valueColor: const AlwaysStoppedAnimation(AppTheme.accent),
             ),
             Padding(
@@ -69,20 +70,20 @@ class MiniPlayer extends ConsumerWidget {
                           track.displayArtist,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(color: AppTheme.onSurfaceMuted, fontSize: 12),
+                          style: TextStyle(color: context.colors.onSurfaceMuted, fontSize: 12),
                         ),
                       ],
                     ),
                   ),
                   IconButton(
                     icon: Icon(isFavorite ? Icons.favorite : Icons.favorite_border),
-                    color: isFavorite ? AppTheme.accent : AppTheme.onSurfaceMuted,
+                    color: isFavorite ? AppTheme.accent : context.colors.onSurfaceMuted,
                     onPressed: () => ref.read(favoritesRepositoryProvider).toggle(track.id),
                   ),
                   IconButton(
                     icon: Icon(isPlaying ? Icons.pause_circle_filled : Icons.play_circle_filled),
                     iconSize: 36,
-                    color: Colors.white,
+                    color: context.colors.onSurface,
                     onPressed: () => ref.read(playerServiceProvider).playOrPause(),
                   ),
                 ],
@@ -109,9 +110,9 @@ class _MiniCover extends StatelessWidget {
         height: 44,
         child: coverPath != null
             ? Image.file(File(coverPath!), fit: BoxFit.cover)
-            : const ColoredBox(
-                color: AppTheme.surfaceHigh,
-                child: Icon(Icons.music_note, color: AppTheme.onSurfaceMuted),
+            : ColoredBox(
+                color: context.colors.surfaceHigh,
+                child: Icon(Icons.music_note, color: context.colors.onSurfaceMuted),
               ),
       ),
     );
