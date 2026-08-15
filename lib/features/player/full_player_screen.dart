@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/providers.dart';
 import '../../core/theme/app_theme.dart';
+import '../../l10n/l10n.dart';
 import '../../services/playback/player_service.dart';
 import '../library/providers/library_providers.dart';
 import 'models/queue_source.dart';
@@ -24,6 +25,7 @@ class FullPlayerScreen extends ConsumerWidget {
         ? false
         : ref.watch(favoriteIdsProvider).value?.contains(track.id) ?? false;
     final queueSource = ref.watch(queueSourceProvider);
+    final l10n = context.l10n;
 
     return Scaffold(
       appBar: AppBar(
@@ -31,10 +33,10 @@ class FullPlayerScreen extends ConsumerWidget {
           icon: const Icon(Icons.keyboard_arrow_down),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: const Text('Сейчас играет'),
+        title: Text(l10n.playerNowPlayingTitle),
       ),
       body: track == null
-          ? const Center(child: Text('Ничего не воспроизводится'))
+          ? Center(child: Text(l10n.playerNothingPlaying))
           : SafeArea(
               child: LayoutBuilder(
                 builder: (context, constraints) {
@@ -77,7 +79,7 @@ class FullPlayerScreen extends ConsumerWidget {
                             textAlign: TextAlign.center,
                             style: const TextStyle(color: AppTheme.onSurfaceMuted, fontSize: 15),
                           ),
-                          if (_sourceLabel(queueSource) case final label?) ...[
+                          if (_sourceLabel(l10n, queueSource) case final label?) ...[
                             const SizedBox(height: 8),
                             Text(
                               label,
@@ -125,11 +127,11 @@ class FullPlayerScreen extends ConsumerWidget {
     );
   }
 
-  String? _sourceLabel(QueueSource? source) => switch (source) {
+  String? _sourceLabel(AppLocalizations l10n, QueueSource? source) => switch (source) {
         null => null,
-        LibraryQueueSource() => 'Играет: Библиотека',
-        FavoritesQueueSource() => 'Играет: Избранное',
-        PlaylistQueueSource(:final name) => 'Играет: Плейлист «$name»',
+        LibraryQueueSource() => l10n.playerSourceLibrary,
+        FavoritesQueueSource() => l10n.playerSourceFavorites,
+        PlaylistQueueSource(:final name) => l10n.playerSourcePlaylist(name),
       };
 }
 

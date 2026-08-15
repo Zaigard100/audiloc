@@ -3,6 +3,7 @@ import 'package:audiloc/data/db/audiloc_database.dart';
 import 'package:audiloc/data/models/device.dart';
 import 'package:audiloc/data/models/track.dart';
 import 'package:audiloc/features/player/mini_player.dart';
+import 'package:audiloc/l10n/l10n.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -30,6 +31,9 @@ void main() {
           playerServiceProvider.overrideWithValue(playerService),
         ],
         child: const MaterialApp(
+          locale: Locale('ru'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
           home: Scaffold(body: SizedBox.shrink(), bottomNavigationBar: MiniPlayer()),
         ),
       );

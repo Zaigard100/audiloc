@@ -5,6 +5,7 @@ import '../../core/providers.dart';
 import '../../core/theme/app_theme.dart';
 import '../../data/models/playlist.dart';
 import '../../data/models/playlist_track.dart';
+import '../../l10n/l10n.dart';
 import '../library/providers/library_providers.dart';
 import '../library/widgets/track_tile.dart';
 import '../player/models/queue_source.dart';
@@ -20,12 +21,13 @@ class PlaylistDetailScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final itemsAsync = ref.watch(playlistItemsProvider(playlistId));
+    final l10n = context.l10n;
     final name = playlist?.name ??
         (ref.watch(playlistsProvider).value ?? const [])
             .cast<Playlist?>()
             .firstWhere((p) => p?.id == playlistId, orElse: () => null)
             ?.name ??
-        'Плейлист';
+        l10n.playlistFallbackName;
 
     return Scaffold(
       appBar: AppBar(title: Text(name)),
@@ -35,8 +37,8 @@ class PlaylistDetailScreen extends ConsumerWidget {
       ),
       body: itemsAsync.when(
         data: (items) => items.isEmpty
-            ? const Center(
-                child: Text('В плейлисте пока нет треков', style: TextStyle(color: AppTheme.onSurfaceMuted)),
+            ? Center(
+                child: Text(l10n.playlistEmptyTracks, style: const TextStyle(color: AppTheme.onSurfaceMuted)),
               )
             : ReorderableListView.builder(
                 itemCount: items.length,
@@ -61,7 +63,7 @@ class PlaylistDetailScreen extends ConsumerWidget {
                 },
               ),
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, _) => Center(child: Text('Ошибка: $error')),
+        error: (error, _) => Center(child: Text(l10n.commonErrorPrefix(error))),
       ),
     );
   }
@@ -127,6 +129,7 @@ class _AddTracksSheetState extends ConsumerState<_AddTracksSheet> {
       if (query.isEmpty) return true;
       return t.displayTitle.toLowerCase().contains(query) || t.displayArtist.toLowerCase().contains(query);
     }).toList();
+    final l10n = context.l10n;
 
     return DraggableScrollableSheet(
       initialChildSize: 0.8,
@@ -138,9 +141,9 @@ class _AddTracksSheetState extends ConsumerState<_AddTracksSheet> {
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
               child: TextField(
                 controller: _searchController,
-                decoration: const InputDecoration(
-                  hintText: 'Поиск трека',
-                  prefixIcon: Icon(Icons.search),
+                decoration: InputDecoration(
+                  hintText: l10n.playlistSearchHint,
+                  prefixIcon: const Icon(Icons.search),
                   isDense: true,
                 ),
                 onChanged: (value) => setState(() => _query = value),
@@ -150,7 +153,7 @@ class _AddTracksSheetState extends ConsumerState<_AddTracksSheet> {
               child: available.isEmpty
                   ? Center(
                       child: Text(
-                        query.isEmpty ? 'Все треки уже в плейлисте' : 'Ничего не найдено',
+                        query.isEmpty ? l10n.playlistAllTracksAdded : l10n.playlistNothingFound,
                         style: const TextStyle(color: AppTheme.onSurfaceMuted),
                       ),
                     )
@@ -174,7 +177,9 @@ class _AddTracksSheetState extends ConsumerState<_AddTracksSheet> {
                 onPressed: _selectedIds.isEmpty || _adding ? null : _addSelected,
                 child: _adding
                     ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                    : Text(_selectedIds.isEmpty ? 'Добавить' : 'Добавить (${_selectedIds.length})'),
+                    : Text(_selectedIds.isEmpty
+                        ? l10n.playlistAddButton
+                        : l10n.playlistAddButtonWithCount(_selectedIds.length)),
               ),
             ),
           ],

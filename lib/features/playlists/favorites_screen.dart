@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/providers.dart';
 import '../../core/theme/app_theme.dart';
+import '../../l10n/l10n.dart';
 import '../library/providers/library_providers.dart';
 import '../library/widgets/track_tile.dart';
 import '../player/models/queue_source.dart';
@@ -21,27 +22,28 @@ class FavoritesScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final tracks = ref.watch(favoriteTracksProvider);
+    final l10n = context.l10n;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Избранное')),
+      appBar: AppBar(title: Text(l10n.favoritesTitle)),
       body: tracks.isEmpty
-          ? const Center(
+          ? Center(
               child: Padding(
-                padding: EdgeInsets.all(32),
+                padding: const EdgeInsets.all(32),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.favorite_border, size: 64, color: AppTheme.onSurfaceMuted),
-                    SizedBox(height: 16),
+                    const Icon(Icons.favorite_border, size: 64, color: AppTheme.onSurfaceMuted),
+                    const SizedBox(height: 16),
                     Text(
-                      'Пока нет избранных треков',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                      l10n.favoritesEmptyTitle,
+                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                     ),
-                    SizedBox(height: 8),
+                    const SizedBox(height: 8),
                     Text(
-                      'Нажмите на сердечко у трека — он появится здесь',
+                      l10n.favoritesEmptyBody,
                       textAlign: TextAlign.center,
-                      style: TextStyle(color: AppTheme.onSurfaceMuted),
+                      style: const TextStyle(color: AppTheme.onSurfaceMuted),
                     ),
                   ],
                 ),

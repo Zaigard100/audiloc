@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_theme.dart';
+import '../../l10n/l10n.dart';
 
 /// Shown once, only on a genuinely fresh install (see
 /// `ProfilesStore.needsInitialSetup`).
@@ -76,29 +77,29 @@ class _InitialProfileNameScreenState extends State<InitialProfileNameScreen> {
   }
 
   Widget _buildChoice() {
+    final l10n = context.l10n;
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         const Icon(Icons.devices_outlined, size: 48, color: AppTheme.accent),
         const SizedBox(height: 16),
-        const Text(
-          'Добро пожаловать в AudiLoc',
+        Text(
+          l10n.onboardingWelcomeTitle,
           textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
+          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 8),
-        const Text(
-          'Это устройство уже используете вы сами где-то ещё, или это '
-          'первый раз, когда вы открываете AudiLoc?',
+        Text(
+          l10n.onboardingWelcomeSubtitle,
           textAlign: TextAlign.center,
-          style: TextStyle(color: AppTheme.onSurfaceMuted, fontSize: 13),
+          style: const TextStyle(color: AppTheme.onSurfaceMuted, fontSize: 13),
         ),
         const SizedBox(height: 24),
         FilledButton.icon(
           onPressed: _submitting ? null : () => setState(() => _step = _Step.name),
           icon: const Icon(Icons.person_add_outlined),
-          label: const Text('Здесь я впервые — новый профиль'),
+          label: Text(l10n.onboardingNewProfileButton),
         ),
         const SizedBox(height: 12),
         OutlinedButton.icon(
@@ -106,31 +107,30 @@ class _InitialProfileNameScreenState extends State<InitialProfileNameScreen> {
           icon: _submitting
               ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
               : const Icon(Icons.sync_outlined),
-          label: const Text('Это моё второе устройство — сопрячь с первым'),
+          label: Text(l10n.onboardingSecondDeviceButton),
         ),
       ],
     );
   }
 
   Widget _buildNameEntry() {
+    final l10n = context.l10n;
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         const Icon(Icons.person_outline, size: 48, color: AppTheme.accent),
         const SizedBox(height: 16),
-        const Text(
-          'Как вас зовут?',
+        Text(
+          l10n.onboardingNameTitle,
           textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
+          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 8),
-        const Text(
-          'Это имя вашего профиля — у него будет своя библиотека и свой '
-          'список сопряжённых устройств. Позже на этом же устройстве можно '
-          'добавить другие профили для других людей.',
+        Text(
+          l10n.onboardingNameSubtitle,
           textAlign: TextAlign.center,
-          style: TextStyle(color: AppTheme.onSurfaceMuted, fontSize: 13),
+          style: const TextStyle(color: AppTheme.onSurfaceMuted, fontSize: 13),
         ),
         const SizedBox(height: 24),
         TextField(
@@ -138,7 +138,7 @@ class _InitialProfileNameScreenState extends State<InitialProfileNameScreen> {
           autofocus: true,
           textAlign: TextAlign.center,
           textInputAction: TextInputAction.done,
-          decoration: const InputDecoration(hintText: 'Имя профиля'),
+          decoration: InputDecoration(hintText: l10n.onboardingNameHint),
           onSubmitted: (_) => _submit(),
         ),
         const SizedBox(height: 24),
@@ -146,12 +146,12 @@ class _InitialProfileNameScreenState extends State<InitialProfileNameScreen> {
           onPressed: _submitting ? null : _submit,
           child: _submitting
               ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-              : const Text('Начать'),
+              : Text(l10n.onboardingStartButton),
         ),
         const SizedBox(height: 12),
         TextButton(
           onPressed: _submitting ? null : () => setState(() => _step = _Step.choose),
-          child: const Text('Назад'),
+          child: Text(l10n.commonBack),
         ),
       ],
     );

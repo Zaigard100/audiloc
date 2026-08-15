@@ -8,6 +8,7 @@ import 'package:path/path.dart' as p;
 import '../../../core/providers.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/models/track.dart';
+import '../../../l10n/l10n.dart';
 
 /// Edits a track's own metadata (title/artist/album/genre) and, on the
 /// user's own request, its cover art — by default a track already has a
@@ -17,6 +18,7 @@ import '../../../data/models/track.dart';
 /// path, and there's nothing else to edit metadata *for* until the file
 /// (or at least its tags) exist on this device.
 Future<void> showEditTrackDialog(BuildContext context, WidgetRef ref, Track track) async {
+  final l10n = context.l10n;
   final titleController = TextEditingController(text: track.title);
   final artistController = TextEditingController(text: track.artist);
   final albumController = TextEditingController(text: track.album);
@@ -27,7 +29,7 @@ Future<void> showEditTrackDialog(BuildContext context, WidgetRef ref, Track trac
     context: context,
     builder: (dialogContext) => StatefulBuilder(
       builder: (dialogContext, setState) => AlertDialog(
-        title: const Text('Редактировать трек'),
+        title: Text(l10n.trackEditTitle),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -37,7 +39,7 @@ Future<void> showEditTrackDialog(BuildContext context, WidgetRef ref, Track trac
                 child: GestureDetector(
                   onTap: () async {
                     final result = await FilePicker.pickFiles(
-                      dialogTitle: 'Выберите обложку',
+                      dialogTitle: l10n.trackEditPickCoverDialogTitle,
                       type: FileType.image,
                     );
                     final pickedPath = result?.files.single.path;
@@ -73,19 +75,19 @@ Future<void> showEditTrackDialog(BuildContext context, WidgetRef ref, Track trac
                 ),
               ),
               const SizedBox(height: 16),
-              TextField(controller: titleController, decoration: const InputDecoration(labelText: 'Название')),
+              TextField(controller: titleController, decoration: InputDecoration(labelText: l10n.fieldTitle)),
               const SizedBox(height: 8),
-              TextField(controller: artistController, decoration: const InputDecoration(labelText: 'Исполнитель')),
+              TextField(controller: artistController, decoration: InputDecoration(labelText: l10n.fieldArtist)),
               const SizedBox(height: 8),
-              TextField(controller: albumController, decoration: const InputDecoration(labelText: 'Альбом')),
+              TextField(controller: albumController, decoration: InputDecoration(labelText: l10n.fieldAlbum)),
               const SizedBox(height: 8),
-              TextField(controller: genreController, decoration: const InputDecoration(labelText: 'Жанр')),
+              TextField(controller: genreController, decoration: InputDecoration(labelText: l10n.fieldGenre)),
             ],
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: const Text('Отмена')),
-          FilledButton(onPressed: () => Navigator.of(dialogContext).pop(true), child: const Text('Сохранить')),
+          TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: Text(l10n.commonCancel)),
+          FilledButton(onPressed: () => Navigator.of(dialogContext).pop(true), child: Text(l10n.commonSave)),
         ],
       ),
     ),

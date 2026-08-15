@@ -7,6 +7,7 @@ import 'package:path/path.dart' as p;
 
 import '../../../core/providers.dart';
 import '../../../data/models/playlist.dart';
+import '../../../l10n/l10n.dart';
 
 /// Either one of the playlist's own tracks' cover art, or a picked image
 /// file — see docs/adr/0017-forbid-cross-profile-pairing-and-sharing.md
@@ -16,6 +17,7 @@ Future<void> showPlaylistCoverPicker(BuildContext context, WidgetRef ref, Playli
   final tracks = await ref.read(playlistsRepositoryProvider).watchTracks(playlist.id).first;
   final tracksWithCovers = tracks.where((t) => t.coverPath != null).toList();
   if (!context.mounted) return;
+  final l10n = context.l10n;
 
   await showModalBottomSheet<void>(
     context: context,
@@ -25,11 +27,11 @@ Future<void> showPlaylistCoverPicker(BuildContext context, WidgetRef ref, Playli
         children: [
           ListTile(
             leading: const Icon(Icons.image_outlined),
-            title: const Text('Картинка из файла'),
+            title: Text(l10n.playlistCoverFromFile),
             onTap: () async {
               Navigator.of(sheetContext).pop();
               final result = await FilePicker.pickFiles(
-                dialogTitle: 'Выберите обложку плейлиста',
+                dialogTitle: l10n.playlistCoverPickDialogTitle,
                 type: FileType.image,
               );
               final pickedPath = result?.files.single.path;

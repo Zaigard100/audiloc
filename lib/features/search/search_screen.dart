@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/providers.dart';
 import '../../core/theme/app_theme.dart';
+import '../../l10n/l10n.dart';
 import '../library/providers/library_providers.dart';
 import '../library/widgets/track_tile.dart';
 import '../player/models/queue_source.dart';
@@ -31,6 +32,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   Widget build(BuildContext context) {
     final results = ref.watch(filteredLibraryTracksProvider);
     final query = ref.watch(librarySearchQueryProvider);
+    final l10n = context.l10n;
 
     return Scaffold(
       appBar: AppBar(
@@ -38,20 +40,20 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           controller: _controller,
           autofocus: false,
           style: const TextStyle(color: Colors.white),
-          decoration: const InputDecoration(
-            hintText: 'Название, исполнитель, альбом…',
-            hintStyle: TextStyle(color: AppTheme.onSurfaceMuted),
+          decoration: InputDecoration(
+            hintText: l10n.searchHint,
+            hintStyle: const TextStyle(color: AppTheme.onSurfaceMuted),
             border: InputBorder.none,
           ),
           onChanged: (value) => ref.read(librarySearchQueryProvider.notifier).state = value,
         ),
       ),
       body: query.isEmpty
-          ? const Center(
-              child: Text('Начните вводить запрос', style: TextStyle(color: AppTheme.onSurfaceMuted)),
+          ? Center(
+              child: Text(l10n.searchStartTyping, style: const TextStyle(color: AppTheme.onSurfaceMuted)),
             )
           : results.isEmpty
-              ? const Center(child: Text('Ничего не найдено', style: TextStyle(color: AppTheme.onSurfaceMuted)))
+              ? Center(child: Text(l10n.searchNothingFound, style: const TextStyle(color: AppTheme.onSurfaceMuted)))
               : ListView.builder(
                   itemCount: results.length,
                   itemBuilder: (context, index) {

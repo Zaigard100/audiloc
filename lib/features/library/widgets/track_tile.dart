@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/providers.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/models/track.dart';
+import '../../../l10n/l10n.dart';
 import '../providers/library_providers.dart';
 
 class TrackTile extends ConsumerWidget {
@@ -28,6 +29,7 @@ class TrackTile extends ConsumerWidget {
     final transfers = ref.watch(activeTransfersProvider).value ?? const {};
     final isTransferring = transfers.containsKey(track.id);
     final fraction = transfers[track.id];
+    final l10n = context.l10n;
 
     final tile = ListTile(
       onTap: onTap,
@@ -66,7 +68,7 @@ class TrackTile extends ConsumerWidget {
         track.isAvailableLocally
             ? '${track.displayArtist} · ${track.displayAlbum}'
             : '${track.displayArtist} · ${track.displayAlbum} · '
-                '${isTransferring ? 'загрузка${fraction == null ? '…' : ' ${(fraction * 100).round()}%'}' : 'ждёт передачи с другого устройства'}',
+                '${isTransferring ? (fraction == null ? l10n.trackDownloadingIndeterminate : l10n.trackDownloadingPercent((fraction * 100).round())) : l10n.trackWaitingForTransfer}',
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),

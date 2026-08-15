@@ -3,6 +3,7 @@ import 'package:audiloc/data/db/audiloc_database.dart';
 import 'package:audiloc/data/models/track.dart';
 import 'package:audiloc/data/repositories/tracks_repository.dart';
 import 'package:audiloc/features/library/library_screen.dart';
+import 'package:audiloc/l10n/l10n.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -16,7 +17,12 @@ void main() {
 
     await tester.pumpWidget(UncontrolledProviderScope(
       container: container,
-      child: const MaterialApp(home: LibraryScreen()),
+      child: const MaterialApp(
+        locale: Locale('ru'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: LibraryScreen(),
+      ),
     ));
     // Plain pump() drains the event loop each call, letting the
     // sqflite_common_ffi isolate's initial (empty) query response land.

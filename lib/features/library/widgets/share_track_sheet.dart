@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/providers.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/models/track.dart';
+import '../../../l10n/l10n.dart';
 import '../../devices/providers/devices_providers.dart';
 
 /// Sends [track] (or, if the user opts in, every track sharing its
@@ -35,6 +36,7 @@ class _ShareTrackSheetState extends ConsumerState<_ShareTrackSheet> {
     final track = widget.track;
     final hasAlbum = track.album != null && track.album!.trim().isNotEmpty;
     final nearby = (ref.watch(nearbyPeersProvider).value ?? const {}).values.toList();
+    final l10n = context.l10n;
 
     return SafeArea(
       child: Column(
@@ -42,22 +44,22 @@ class _ShareTrackSheetState extends ConsumerState<_ShareTrackSheet> {
         children: [
           if (hasAlbum)
             SwitchListTile(
-              title: const Text('Поделиться всем альбомом'),
+              title: Text(l10n.shareWholeAlbum),
               subtitle: Text(track.displayAlbum),
               value: _shareWholeAlbum,
               onChanged: (value) => setState(() => _shareWholeAlbum = value),
             ),
-          const Padding(
-            padding: EdgeInsets.fromLTRB(16, 12, 16, 8),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
             child: Align(
               alignment: Alignment.centerLeft,
-              child: Text('Устройства поблизости', style: TextStyle(color: AppTheme.onSurfaceMuted)),
+              child: Text(l10n.nearbyDevicesLabel, style: const TextStyle(color: AppTheme.onSurfaceMuted)),
             ),
           ),
           if (nearby.isEmpty)
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-              child: Text('Поблизости не найдено ни одного устройства'),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+              child: Text(l10n.noNearbyDevices),
             )
           else
             for (final peer in nearby)
@@ -76,7 +78,7 @@ class _ShareTrackSheetState extends ConsumerState<_ShareTrackSheet> {
                     await shareService.shareTrack(host: peer.host, port: sharePort, track: track);
                   }
                   if (context.mounted) Navigator.of(context).pop();
-                  messenger.showSnackBar(SnackBar(content: Text('Отправлено «${peer.name}»')));
+                  messenger.showSnackBar(SnackBar(content: Text(l10n.shareSentSnackbar(peer.name))));
                 },
               ),
         ],

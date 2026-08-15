@@ -11,7 +11,10 @@ import 'core/providers.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
 import 'data/profiles/profiles_store.dart';
+import 'data/settings/app_settings_store.dart';
 import 'features/profiles/initial_profile_name_screen.dart';
+import 'features/profiles/language_choice_screen.dart';
+import 'l10n/l10n.dart';
 import 'services/playback/audiloc_audio_handler.dart';
 import 'services/playback/media_kit_player_service.dart';
 import 'services/sync/pairing/pairing_models.dart';
@@ -35,8 +38,24 @@ class AudilocApp extends StatefulWidget {
 class _AudilocAppState extends State<AudilocApp> {
   late final MediaKitPlayerService _playerService;
   ProfilesStore? _profilesStore;
+  AppSettingsStore? _settingsStore;
   ProfileSessionHandle? _session;
   bool _needsInitialProfileName = false;
+
+  /// True only before the very first choice has ever been made on this
+  /// device (docs/adr/0027-localization.md) — shown even before
+  /// [InitialProfileNameScreen], since that screen's own text needs a
+  /// language to be in already. Existing installs upgrading into this
+  /// version never see it: [_locale] just stays `null` (follow system)
+  /// until the user picks one from "О приложении".
+  bool _needsLanguageChoice = false;
+
+  /// `null` means "follow the system locale" — [MaterialApp.locale] left
+  /// unset does exactly that automatically. Only set once the user makes
+  /// an explicit choice (the first-run [LanguageChoiceScreen], or later
+  /// from "О приложении"), and persisted via [_settingsStore] so it
+  /// survives restarts.
+  Locale? _locale;
 
   /// Set when [_bootstrap] or [_openProfile] throws — without this, an
   /// exception anywhere in that startup chain (a port still held by a
@@ -93,14 +112,29 @@ class _AudilocAppState extends State<AudilocApp> {
 
       final appSupportDir = await getApplicationSupportDirectory();
       final store = ProfilesStore(appSupportDir);
+      final settingsStore = AppSettingsStore(appSupportDir);
+      final savedLocale = await settingsStore.languageLocale();
       if (!mounted) return;
-      setState(() => _profilesStore = store);
+      setState(() {
+        _profilesStore = store;
+        _settingsStore = settingsStore;
+        _locale = savedLocale;
+      });
 
       // A genuinely fresh install (nothing to migrate either) — ask for a
       // name instead of silently calling it "Профиль 1". Anyone upgrading
       // from before profiles existed skips this entirely: their library
       // gets migrated and reopened with zero prompts, same as always.
-      if (await store.needsInitialSetup()) {
+      final needsProfile = await store.needsInitialSetup();
+      if (needsProfile && savedLocale == null) {
+        // Nothing chosen yet on this device at all — ask which language
+        // before anything else, including InitialProfileNameScreen's own
+        // text (docs/adr/0027-localization.md).
+        if (!mounted) return;
+        setState(() => _needsLanguageChoice = true);
+        return;
+      }
+      if (needsProfile) {
         if (!mounted) return;
         setState(() => _needsInitialProfileName = true);
         return;
@@ -124,6 +158,33 @@ class _AudilocAppState extends State<AudilocApp> {
     } else {
       await _bootstrap();
     }
+  }
+
+  /// Bound to [LanguageChoiceScreen] — persists the choice and moves on to
+  /// the profile-name step, same as the rest of the first-run flow.
+  Future<void> _chooseLanguage(Locale locale) async {
+    await _settingsStore!.setLanguageCode(locale.languageCode);
+    if (!mounted) return;
+    setState(() {
+      _locale = locale;
+      _needsLanguageChoice = false;
+      _needsInitialProfileName = true;
+    });
+  }
+
+  /// Bound to the language picker on "О приложении" — the only way to
+  /// change language after the first run. `null` clears the explicit
+  /// choice and goes back to following the system locale.
+  Future<void> _changeLanguage(Locale? locale) async {
+    await _settingsStore!.setLanguageCode(locale?.languageCode);
+    // Keeps `currentLocaleProvider` in the (unchanged) session container in
+    // sync too — that's what the "О приложении" picker itself reads to
+    // show which option is selected, and it doesn't get a fresh value for
+    // free just from AudilocApp's own setState below (see
+    // currentLocaleProvider's doc).
+    _session?.container.read(currentLocaleProvider.notifier).state = locale;
+    if (!mounted) return;
+    setState(() => _locale = locale);
   }
 
   Future<void> _createInitialProfile(String name) async {
@@ -216,6 +277,8 @@ class _AudilocAppState extends State<AudilocApp> {
         joinProfileForPairing: _joinProfileForPairing,
         canJoinDifferentProfile: () async => _awaitingProfileAdoption,
         waitForPairing: _waitForPairing,
+        changeLanguage: _changeLanguage,
+        initialLocale: _locale,
       );
       if (!mounted) {
         await session.close();
@@ -253,6 +316,20 @@ class _AudilocAppState extends State<AudilocApp> {
 
   @override
   Widget build(BuildContext context) {
+    if (_needsLanguageChoice) {
+      return MaterialApp(
+        title: 'AudiLoc',
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.dark(),
+        darkTheme: AppTheme.dark(),
+        themeMode: ThemeMode.dark,
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        locale: _locale,
+        home: LanguageChoiceScreen(onChosen: _chooseLanguage),
+      );
+    }
+
     if (_needsInitialProfileName) {
       return MaterialApp(
         title: 'AudiLoc',
@@ -260,6 +337,9 @@ class _AudilocAppState extends State<AudilocApp> {
         theme: AppTheme.dark(),
         darkTheme: AppTheme.dark(),
         themeMode: ThemeMode.dark,
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        locale: _locale,
         home: InitialProfileNameScreen(onSubmit: _createInitialProfile, onWaitForPairing: _waitForPairing),
       );
     }
@@ -273,38 +353,12 @@ class _AudilocAppState extends State<AudilocApp> {
         theme: AppTheme.dark(),
         darkTheme: AppTheme.dark(),
         themeMode: ThemeMode.dark,
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        locale: _locale,
         home: error == null
             ? const Scaffold(body: Center(child: CircularProgressIndicator()))
-            : Scaffold(
-                body: SafeArea(
-                  child: Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(24),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          const Icon(Icons.error_outline, size: 48, color: AppTheme.accent),
-                          const SizedBox(height: 16),
-                          const Text(
-                            'Не удалось запустить AudiLoc',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            '$error',
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(color: AppTheme.onSurfaceMuted, fontSize: 13),
-                          ),
-                          const SizedBox(height: 24),
-                          FilledButton(onPressed: _retryStartup, child: const Text('Повторить')),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
+            : _StartupErrorScreen(error: error, onRetry: _retryStartup),
       );
     }
 
@@ -316,6 +370,9 @@ class _AudilocAppState extends State<AudilocApp> {
         theme: AppTheme.dark(),
         darkTheme: AppTheme.dark(),
         themeMode: ThemeMode.dark,
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        locale: _locale,
         routerConfig: appRouter,
         builder: (context, child) {
           if (!_awaitingProfileAdoption || child == null) return child ?? const SizedBox.shrink();
@@ -331,16 +388,16 @@ class _AudilocAppState extends State<AudilocApp> {
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     child: Row(
                       children: [
-                        const Expanded(
+                        Expanded(
                           child: Text(
-                            'Ждём сопряжения со вторым устройством — подтвердите на вкладке «Устройства»',
-                            style: TextStyle(color: Colors.white, fontSize: 12),
+                            context.l10n.pairingBannerText,
+                            style: const TextStyle(color: Colors.white, fontSize: 12),
                           ),
                         ),
                         TextButton(
                           onPressed: () => appRouter.go('/devices'),
                           style: TextButton.styleFrom(foregroundColor: Colors.white),
-                          child: const Text('Устройства'),
+                          child: Text(context.l10n.navDevices),
                         ),
                       ],
                     ),
@@ -351,6 +408,53 @@ class _AudilocAppState extends State<AudilocApp> {
             ],
           );
         },
+      ),
+    );
+  }
+}
+
+/// Shown when [_AudilocAppState._bootstrap]/`_openProfile` fails — a
+/// separate widget (rather than inlined in `build()`) purely so it gets
+/// its own `BuildContext`, one that's actually a descendant of the
+/// `MaterialApp` that provides `AppLocalizations` (`context.l10n` used
+/// directly inside `_AudilocAppState.build()` would reach for
+/// `Localizations` above where `MaterialApp` installs it, and throw).
+class _StartupErrorScreen extends StatelessWidget {
+  const _StartupErrorScreen({required this.error, required this.onRetry});
+
+  final Object error;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: SafeArea(
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Icon(Icons.error_outline, size: 48, color: AppTheme.accent),
+                const SizedBox(height: 16),
+                Text(
+                  context.l10n.startupErrorTitle,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '$error',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: AppTheme.onSurfaceMuted, fontSize: 13),
+                ),
+                const SizedBox(height: 24),
+                FilledButton(onPressed: onRetry, child: Text(context.l10n.commonRetry)),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

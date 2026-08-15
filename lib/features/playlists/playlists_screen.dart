@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/providers.dart';
 import '../../core/theme/app_theme.dart';
+import '../../l10n/l10n.dart';
 import 'favorites_screen.dart';
 import 'providers/playlists_providers.dart';
 import 'trash_screen.dart';
@@ -20,9 +21,10 @@ class PlaylistsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final playlistsAsync = ref.watch(playlistsProvider);
+    final l10n = context.l10n;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Плейлисты')),
+      appBar: AppBar(title: Text(l10n.navPlaylists)),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _createPlaylist(context, ref),
         child: const Icon(Icons.add),
@@ -41,14 +43,14 @@ class PlaylistsScreen extends ConsumerWidget {
           ),
           children: [
             _PlaylistTile(
-              label: 'Избранное',
+              label: l10n.favoritesTitle,
               icon: Icons.favorite,
               color: AppTheme.accent,
               onTap: () => Navigator.of(context)
                   .push(MaterialPageRoute(builder: (_) => const FavoritesScreen())),
             ),
             _PlaylistTile(
-              label: 'Удалённые',
+              label: l10n.trashTitle,
               icon: Icons.delete_outline,
               color: AppTheme.surfaceHigh,
               onTap: () =>
@@ -70,27 +72,28 @@ class PlaylistsScreen extends ConsumerWidget {
           ],
         ),
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, _) => Center(child: Text('Ошибка: $error')),
+        error: (error, _) => Center(child: Text(l10n.commonErrorPrefix(error))),
       ),
     );
   }
 
   Future<void> _createPlaylist(BuildContext context, WidgetRef ref) async {
+    final l10n = context.l10n;
     final controller = TextEditingController();
     final name = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Новый плейлист'),
+        title: Text(l10n.playlistCreateTitle),
         content: TextField(
           controller: controller,
           autofocus: true,
-          decoration: const InputDecoration(hintText: 'Название'),
+          decoration: InputDecoration(hintText: l10n.fieldName),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Отмена')),
+          TextButton(onPressed: () => Navigator.of(context).pop(), child: Text(l10n.commonCancel)),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(controller.text.trim()),
-            child: const Text('Создать'),
+            child: Text(l10n.commonCreate),
           ),
         ],
       ),

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/providers.dart';
 import '../../core/theme/app_theme.dart';
 import '../../data/models/track.dart';
+import '../../l10n/l10n.dart';
 import '../about/about_screen.dart';
 import '../library/providers/library_providers.dart';
 import '../profiles/profile_switcher_sheet.dart';
@@ -27,15 +28,16 @@ class DevicesScreen extends ConsumerWidget {
     final currentProfile = ref.watch(currentProfileProvider);
     final knownDevicesAsync = ref.watch(knownDevicesProvider);
     final onlineIds = ref.watch(onlineDeviceIdsProvider).value ?? const {};
+    final l10n = context.l10n;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Устройства'),
+        title: Text(l10n.navDevices),
         actions: [
           const _RefreshDiscoveryButton(),
           IconButton(
             icon: const Icon(Icons.info_outline),
-            tooltip: 'О приложении',
+            tooltip: l10n.aboutTitle,
             onPressed: () =>
                 Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AboutScreen())),
           ),
@@ -48,28 +50,28 @@ class DevicesScreen extends ConsumerWidget {
               backgroundColor: AppTheme.accent,
               child: Icon(Icons.person, color: Colors.white),
             ),
-            title: Text('Профиль: ${currentProfile.name}'),
-            subtitle: const Text('У каждого профиля своя библиотека и свои устройства'),
+            title: Text(l10n.devicesProfileLabel(currentProfile.name)),
+            subtitle: Text(l10n.devicesProfileSubtitle),
             trailing: TextButton(
               onPressed: () => showProfileSwitcherSheet(context),
-              child: const Text('Сменить'),
+              child: Text(l10n.devicesChangeProfile),
             ),
           ),
           const Divider(height: 1),
           const SyncBadge(),
-          const Padding(
-            padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
-            child: Text('Известные устройства', style: TextStyle(color: AppTheme.onSurfaceMuted)),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+            child: Text(l10n.devicesKnownDevicesLabel, style: const TextStyle(color: AppTheme.onSurfaceMuted)),
           ),
           knownDevicesAsync.when(
             data: (devices) {
               final others = devices.where((d) => d.id != self.id).toList();
               if (others.isEmpty) {
-                return const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
                   child: Text(
-                    'Пока не найдено ни одного устройства в локальной сети',
-                    style: TextStyle(color: AppTheme.onSurfaceMuted),
+                    l10n.devicesNoneFound,
+                    style: const TextStyle(color: AppTheme.onSurfaceMuted),
                   ),
                 );
               }
@@ -86,7 +88,7 @@ class DevicesScreen extends ConsumerWidget {
             ),
             error: (error, _) => Padding(
               padding: const EdgeInsets.all(16),
-              child: Text('Ошибка: $error'),
+              child: Text(l10n.devicesErrorPrefix(error)),
             ),
           ),
           const _NearbyUnpairedPeers(),
@@ -135,7 +137,7 @@ class _RefreshDiscoveryButtonState extends ConsumerState<_RefreshDiscoveryButton
               child: CircularProgressIndicator(strokeWidth: 2),
             )
           : const Icon(Icons.refresh),
-      tooltip: 'Обновить список устройств',
+      tooltip: context.l10n.devicesRefreshTooltip,
       onPressed: _restarting ? null : _restart,
     );
   }
@@ -151,13 +153,14 @@ class _NearbyUnpairedPeers extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final nearby = ref.watch(unpairedNearbyPeersProvider);
     if (nearby.isEmpty) return const SizedBox.shrink();
+    final l10n = context.l10n;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Padding(
-          padding: EdgeInsets.fromLTRB(16, 8, 16, 8),
-          child: Text('Найдено рядом', style: TextStyle(color: AppTheme.onSurfaceMuted)),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+          child: Text(l10n.devicesNearbyLabel, style: const TextStyle(color: AppTheme.onSurfaceMuted)),
         ),
         for (final peer in nearby)
           ListTile(
@@ -166,15 +169,15 @@ class _NearbyUnpairedPeers extends ConsumerWidget {
               child: Icon(Icons.wifi_tethering, color: AppTheme.onSurfaceMuted),
             ),
             title: Text(peer.name),
-            subtitle: const Text('Не сопряжено'),
+            subtitle: Text(l10n.devicesUnpaired),
             trailing: TextButton(
               onPressed: () {
                 ref.read(pairingServiceProvider).requestPairing(peer);
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Запрос на сопряжение отправлен «${peer.name}»')),
+                  SnackBar(content: Text(l10n.devicesPairingRequestSent(peer.name))),
                 );
               },
-              child: const Text('Добавить'),
+              child: Text(l10n.devicesAddPeer),
             ),
           ),
       ],
@@ -195,18 +198,19 @@ class _FileSyncStatus extends ConsumerWidget {
     final transfers = ref.watch(activeTransfersProvider).value ?? const {};
     final byId = {for (final track in missing) track.id: track};
     final queuedCount = missing.length - transfers.length;
+    final l10n = context.l10n;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Передача файлов', style: TextStyle(fontWeight: FontWeight.w600)),
+          Text(l10n.devicesFileTransferTitle, style: const TextStyle(fontWeight: FontWeight.w600)),
           const SizedBox(height: 4),
           if (missing.isEmpty)
-            const Text(
-              'Все известные треки уже есть на этом устройстве',
-              style: TextStyle(color: AppTheme.onSurfaceMuted, fontSize: 12),
+            Text(
+              l10n.devicesAllFilesPresent,
+              style: const TextStyle(color: AppTheme.onSurfaceMuted, fontSize: 12),
             )
           else ...[
             for (final entry in transfers.entries)
@@ -216,8 +220,7 @@ class _FileSyncStatus extends ConsumerWidget {
               Padding(
                 padding: const EdgeInsets.only(top: 4),
                 child: Text(
-                  'В очереди: $queuedCount — появятся сами, как только в сети '
-                  'найдётся устройство с этими файлами',
+                  l10n.devicesQueuedCount(queuedCount),
                   style: const TextStyle(color: AppTheme.onSurfaceMuted, fontSize: 12),
                 ),
               ),

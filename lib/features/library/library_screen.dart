@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/providers.dart';
 import '../../core/theme/app_theme.dart';
+import '../../l10n/l10n.dart';
 import '../../services/library_import/library_import_service.dart';
 import '../player/models/queue_source.dart';
 import '../player/providers/player_providers.dart';
@@ -28,20 +29,21 @@ class LibraryScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final tracksAsync = ref.watch(libraryTracksProvider);
+    final l10n = context.l10n;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Библиотека'),
+        title: Text(l10n.navLibrary),
         actions: [
           _SortMenuButton(),
           IconButton(
             icon: const Icon(Icons.add),
-            tooltip: 'Добавить трек',
+            tooltip: l10n.libraryAddTrackTooltip,
             onPressed: () => _importFiles(context, ref),
           ),
           IconButton(
             icon: const Icon(Icons.create_new_folder_outlined),
-            tooltip: 'Добавить папку',
+            tooltip: l10n.libraryAddFolderTooltip,
             onPressed: () => _importFolder(context, ref),
           ),
         ],
@@ -51,33 +53,33 @@ class LibraryScreen extends ConsumerWidget {
             ? _EmptyLibrary(onImport: () => _importFolder(context, ref))
             : const _SortedTrackList(),
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, _) => Center(child: Text('Ошибка загрузки библиотеки: $error')),
+        error: (error, _) => Center(child: Text(l10n.libraryLoadError(error))),
       ),
     );
   }
 
   static Future<void> _importFolder(BuildContext context, WidgetRef ref) async {
+    final l10n = context.l10n;
     final path = await FilePicker.getDirectoryPath(
-      dialogTitle: 'Выберите папку с музыкой',
+      dialogTitle: l10n.libraryPickFolderDialogTitle,
     );
     if (path == null || !context.mounted) return;
 
     final messenger = ScaffoldMessenger.of(context);
-    messenger.showSnackBar(const SnackBar(content: Text('Импорт запущен…')));
+    messenger.showSnackBar(SnackBar(content: Text(l10n.libraryImportStarted)));
 
     final importService = await ref.read(libraryImportServiceProvider.future);
     final result = await importService.importDirectory(Directory(path));
 
     messenger.showSnackBar(SnackBar(
-      content: Text(
-        'Добавлено: ${result.imported}, пропущено дублей: ${result.skippedDuplicates}, ошибок: ${result.failed}',
-      ),
+      content: Text(l10n.libraryImportResult(result.imported, result.skippedDuplicates, result.failed)),
     ));
   }
 
   static Future<void> _importFiles(BuildContext context, WidgetRef ref) async {
+    final l10n = context.l10n;
     final result = await FilePicker.pickFiles(
-      dialogTitle: 'Выберите треки',
+      dialogTitle: l10n.libraryPickFilesDialogTitle,
       allowMultiple: true,
       type: FileType.custom,
       allowedExtensions: [
@@ -87,16 +89,14 @@ class LibraryScreen extends ConsumerWidget {
     if (result == null || result.files.isEmpty || !context.mounted) return;
 
     final messenger = ScaffoldMessenger.of(context);
-    messenger.showSnackBar(const SnackBar(content: Text('Импорт запущен…')));
+    messenger.showSnackBar(SnackBar(content: Text(l10n.libraryImportStarted)));
 
     final importService = await ref.read(libraryImportServiceProvider.future);
     final files = [for (final f in result.files) if (f.path != null) File(f.path!)];
     final imported = await importService.importFiles(files);
 
     messenger.showSnackBar(SnackBar(
-      content: Text(
-        'Добавлено: ${imported.imported}, пропущено дублей: ${imported.skippedDuplicates}, ошибок: ${imported.failed}',
-      ),
+      content: Text(l10n.libraryImportResult(imported.imported, imported.skippedDuplicates, imported.failed)),
     ));
   }
 }
@@ -104,18 +104,18 @@ class LibraryScreen extends ConsumerWidget {
 class _SortMenuButton extends ConsumerWidget {
   const _SortMenuButton();
 
-  static const _labels = {
-    LibrarySortField.title: 'Название',
-    LibrarySortField.artist: 'Исполнитель',
-    LibrarySortField.addedAt: 'Дата добавления',
-  };
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final sort = ref.watch(librarySortProvider);
+    final l10n = context.l10n;
+    final labels = {
+      LibrarySortField.title: l10n.librarySortTitle,
+      LibrarySortField.artist: l10n.librarySortArtist,
+      LibrarySortField.addedAt: l10n.librarySortAddedAt,
+    };
     return PopupMenuButton<LibrarySortField>(
       icon: const Icon(Icons.sort),
-      tooltip: 'Сортировка',
+      tooltip: l10n.librarySortTooltip,
       onSelected: (field) {
         ref.read(librarySortProvider.notifier).state = LibrarySortState(
           field: field,
@@ -123,7 +123,7 @@ class _SortMenuButton extends ConsumerWidget {
         );
       },
       itemBuilder: (context) => [
-        for (final entry in _labels.entries)
+        for (final entry in labels.entries)
           PopupMenuItem(
             value: entry.key,
             child: Row(
@@ -179,18 +179,18 @@ class _EmptyLibrary extends StatelessWidget {
           children: [
             const Icon(Icons.library_music_outlined, size: 64, color: AppTheme.onSurfaceMuted),
             const SizedBox(height: 16),
-            const Text('Библиотека пуста', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+            Text(context.l10n.libraryEmptyTitle, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
             const SizedBox(height: 8),
-            const Text(
-              'Импортируйте папку с музыкой — теги и обложки подтянутся автоматически',
+            Text(
+              context.l10n.libraryEmptyBody,
               textAlign: TextAlign.center,
-              style: TextStyle(color: AppTheme.onSurfaceMuted),
+              style: const TextStyle(color: AppTheme.onSurfaceMuted),
             ),
             const SizedBox(height: 20),
             FilledButton.icon(
               onPressed: onImport,
               icon: const Icon(Icons.create_new_folder_outlined),
-              label: const Text('Выбрать папку'),
+              label: Text(context.l10n.libraryPickFolderButton),
             ),
           ],
         ),

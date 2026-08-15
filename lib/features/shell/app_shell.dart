@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/providers.dart';
+import '../../l10n/l10n.dart';
 import '../../services/sync/pairing/pairing_models.dart';
 import '../devices/devices_screen.dart';
 import '../devices/providers/devices_providers.dart';
@@ -80,6 +81,7 @@ class _AppShellState extends ConsumerState<AppShell> {
       final offer = next.value;
       if (offer != null) showShareOfferDialog(context, ref, offer);
     });
+    final l10n = context.l10n;
 
     return Scaffold(
       body: PageView(
@@ -99,11 +101,23 @@ class _AppShellState extends ConsumerState<AppShell> {
           NavigationBar(
             selectedIndex: _index,
             onDestinationSelected: (i) => context.go('/${_tabs[i]}'),
-            destinations: const [
-              NavigationDestination(icon: Icon(Icons.library_music_outlined), selectedIcon: Icon(Icons.library_music), label: 'Библиотека'),
-              NavigationDestination(icon: Icon(Icons.queue_music_outlined), selectedIcon: Icon(Icons.queue_music), label: 'Плейлисты'),
-              NavigationDestination(icon: Icon(Icons.search), label: 'Поиск'),
-              NavigationDestination(icon: Icon(Icons.devices_outlined), selectedIcon: Icon(Icons.devices), label: 'Устройства'),
+            destinations: [
+              NavigationDestination(
+                icon: const Icon(Icons.library_music_outlined),
+                selectedIcon: const Icon(Icons.library_music),
+                label: l10n.navLibrary,
+              ),
+              NavigationDestination(
+                icon: const Icon(Icons.queue_music_outlined),
+                selectedIcon: const Icon(Icons.queue_music),
+                label: l10n.navPlaylists,
+              ),
+              NavigationDestination(icon: const Icon(Icons.search), label: l10n.navSearch),
+              NavigationDestination(
+                icon: const Icon(Icons.devices_outlined),
+                selectedIcon: const Icon(Icons.devices),
+                label: l10n.navDevices,
+              ),
             ],
           ),
         ],
@@ -121,17 +135,15 @@ class _AppShellState extends ConsumerState<AppShell> {
     // approving switches this device onto the requester's profile; say
     // so plainly.
     final sameProfile = ref.read(currentProfileProvider).profileHash == request.profileHash;
+    final l10n = context.l10n;
     showDialog<void>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Запрос на сопряжение'),
+        title: Text(l10n.pairingRequestTitle),
         content: Text(
           sameProfile
-              ? '«${request.fromName}» хочет синхронизироваться с этим устройством.'
-              : '«${request.fromName}» хочет добавить это устройство в свой профиль. '
-                  'Если вы согласитесь, это устройство переключится на профиль '
-                  '«${request.fromName}» и загрузит его библиотеку — ваш текущий профиль '
-                  'никуда не денется, вернуться к нему можно через переключатель профилей.',
+              ? l10n.pairingRequestSameProfile(request.fromName)
+              : l10n.pairingRequestDifferentProfile(request.fromName),
         ),
         actions: [
           TextButton(
@@ -139,14 +151,14 @@ class _AppShellState extends ConsumerState<AppShell> {
               ref.read(pairingServiceProvider).reject(request);
               Navigator.of(context).pop();
             },
-            child: const Text('Отклонить'),
+            child: Text(l10n.commonDecline),
           ),
           TextButton(
             onPressed: () {
               ref.read(pairingServiceProvider).approve(request);
               Navigator.of(context).pop();
             },
-            child: const Text('Разрешить'),
+            child: Text(l10n.commonAllow),
           ),
         ],
       ),

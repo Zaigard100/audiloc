@@ -8,6 +8,7 @@ import 'package:audiloc/data/profiles/profile.dart';
 import 'package:audiloc/data/profiles/profiles_store.dart';
 import 'package:audiloc/services/playback/player_service.dart';
 import 'package:audiloc/services/sync/pairing/pairing_models.dart';
+import 'package:flutter/widgets.dart' show Locale;
 import 'package:flutter_test/flutter_test.dart';
 
 /// `openProfileSession` doesn't touch playback beyond clearing the queue
@@ -49,6 +50,7 @@ Future<void> _noopJoin(IncomingPairingRequest request) async {}
 Future<String> _testPlatformLabel() async => 'TestOS';
 Future<bool> _noopCanJoin() async => false;
 Future<void> _noopWaitForPairing() async {}
+Future<void> _noopChangeLanguage(Locale? locale) async {}
 
 void main() {
   test(
@@ -74,6 +76,8 @@ void main() {
       joinProfileForPairing: _noopJoin,
       canJoinDifferentProfile: _noopCanJoin,
       waitForPairing: _noopWaitForPairing,
+      changeLanguage: _noopChangeLanguage,
+      initialLocale: null,
       platformLabel: _testPlatformLabel,
     );
     await first.close();
@@ -89,6 +93,8 @@ void main() {
       joinProfileForPairing: _noopJoin,
       canJoinDifferentProfile: _noopCanJoin,
       waitForPairing: _noopWaitForPairing,
+      changeLanguage: _noopChangeLanguage,
+      initialLocale: null,
       platformLabel: _testPlatformLabel,
     );
     await second.close();
@@ -113,6 +119,8 @@ void main() {
       joinProfileForPairing: _noopJoin,
       canJoinDifferentProfile: _noopCanJoin,
       waitForPairing: _noopWaitForPairing,
+      changeLanguage: _noopChangeLanguage,
+      initialLocale: null,
       platformLabel: _testPlatformLabel,
     );
     addTearDown(session.close);
@@ -137,6 +145,8 @@ void main() {
       joinProfileForPairing: _noopJoin,
       canJoinDifferentProfile: _noopCanJoin,
       waitForPairing: _noopWaitForPairing,
+      changeLanguage: _noopChangeLanguage,
+      initialLocale: null,
       platformLabel: _testPlatformLabel,
     );
     await first.close();
@@ -151,6 +161,8 @@ void main() {
       joinProfileForPairing: _noopJoin,
       canJoinDifferentProfile: _noopCanJoin,
       waitForPairing: _noopWaitForPairing,
+      changeLanguage: _noopChangeLanguage,
+      initialLocale: null,
       platformLabel: _testPlatformLabel,
     );
     addTearDown(second.close);
@@ -175,6 +187,8 @@ void main() {
       joinProfileForPairing: _noopJoin,
       canJoinDifferentProfile: _noopCanJoin,
       waitForPairing: _noopWaitForPairing,
+      changeLanguage: _noopChangeLanguage,
+      initialLocale: null,
       platformLabel: _testPlatformLabel,
     );
     addTearDown(session.close);

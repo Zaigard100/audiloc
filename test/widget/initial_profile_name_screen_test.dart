@@ -1,4 +1,5 @@
 import 'package:audiloc/features/profiles/initial_profile_name_screen.dart';
+import 'package:audiloc/l10n/l10n.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -13,6 +14,9 @@ void main() {
     var waitedForPairing = false;
 
     await tester.pumpWidget(MaterialApp(
+      locale: const Locale('ru'),
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
       home: InitialProfileNameScreen(
         onSubmit: (name) => submitted = name,
         onWaitForPairing: () => waitedForPairing = true,
@@ -35,6 +39,9 @@ void main() {
     var submitted = '';
 
     await tester.pumpWidget(MaterialApp(
+      locale: const Locale('ru'),
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
       home: InitialProfileNameScreen(
         onSubmit: (name) => submitted = name,
         onWaitForPairing: () {},

@@ -1,104 +1,125 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
+import '../../core/providers.dart';
 import '../../core/theme/app_theme.dart';
+import '../../l10n/l10n.dart';
 
-/// "О приложении" — author credit, license, and a short in-app usage
-/// guide, reachable from the Устройства tab. Nothing here reads from
-/// providers/repositories — it's static reference content, not app state.
-class AboutScreen extends StatelessWidget {
+/// "О приложении" — author credit, license, language picker, and a short
+/// in-app usage guide, reachable from the Устройства tab.
+class AboutScreen extends ConsumerWidget {
   const AboutScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = context.l10n;
     return Scaffold(
-      appBar: AppBar(title: const Text('О приложении')),
+      appBar: AppBar(title: Text(l10n.aboutTitle)),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 24, 16, 24),
         children: [
-          const Center(
+          Center(
             child: Column(
               children: [
-                Icon(Icons.graphic_eq, size: 56, color: AppTheme.accent),
-                SizedBox(height: 8),
-                Text('audiloc', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700)),
-                SizedBox(height: 4),
-                _VersionLabel(),
-                SizedBox(height: 8),
-                Text('Автор: zaigard', style: TextStyle(color: AppTheme.onSurfaceMuted)),
-                SizedBox(height: 8),
+                const Icon(Icons.graphic_eq, size: 56, color: AppTheme.accent),
+                const SizedBox(height: 8),
+                const Text('audiloc', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700)),
+                const SizedBox(height: 4),
+                const _VersionLabel(),
+                const SizedBox(height: 8),
+                Text(l10n.aboutAuthor, style: const TextStyle(color: AppTheme.onSurfaceMuted)),
+                const SizedBox(height: 8),
                 Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 24),
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
                   child: Text(
-                    'Лицензия: PolyForm Noncommercial 1.0.0 — свободно для любых '
-                    'некоммерческих целей; коммерческое использование — по '
-                    'отдельному разрешению автора.',
+                    l10n.aboutLicense,
                     textAlign: TextAlign.center,
-                    style: TextStyle(color: AppTheme.onSurfaceMuted, fontSize: 12),
+                    style: const TextStyle(color: AppTheme.onSurfaceMuted, fontSize: 12),
                   ),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 32),
+          const SizedBox(height: 24),
           const Divider(),
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 12),
-            child: Text('Как пользоваться', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+          const _LanguagePicker(),
+          const Divider(),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: Text(l10n.aboutHowToUse, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
           ),
-          const _GuideSection(
-            title: 'Библиотека',
-            body: 'Импортируйте папку или отдельные файлы — теги и обложки '
-                'подтянутся автоматически, повторный импорт того же файла не '
-                'создаёт дубль. Долгий тап по треку (на десктопе — правый клик) '
-                'открывает меню: редактировать (название/исполнитель/альбом/'
-                'жанр/обложку), добавить в плейлист, поделиться, удалить. '
-                'Удаление — не безвозвратное: трек попадает в «Удалённые» '
-                '(вкладка «Плейлисты»), откуда его можно вернуть или стереть '
-                'по-настоящему.',
-          ),
-          const _GuideSection(
-            title: 'Плейлисты',
-            body: 'Кнопка «+» создаёт новый плейлист. Внутри плейлиста кнопка '
-                'добавления треков открывает поиск с множественным выбором — '
-                'можно отметить сразу несколько и добавить их одной кнопкой. '
-                'Долгий тап (правый клик) по плейлисту в сетке — переименовать, '
-                'удалить или выбрать обложку (одну из обложек его же треков или '
-                'картинку из файла). «Избранное» и «Удалённые» — отдельные '
-                'встроенные карточки в той же сетке.',
-          ),
-          const _GuideSection(
-            title: 'Устройства и сопряжение',
-            body: 'Устройства поблизости в локальной сети видны сами, без '
-                'настройки — на вкладке «Устройства» под заголовком «Найдено '
-                'рядом». «Добавить» отправляет запрос на сопряжение; на другом '
-                'устройстве нужно подтвердить его («Разрешить»). Сопряжение '
-                'работает только внутри одного и того же профиля — если нужно '
-                'передать что-то в другой профиль (в том числе чужой), '
-                'используйте «Поделиться» вместо сопряжения.',
-          ),
-          const _GuideSection(
-            title: '«Поделиться»',
-            body: 'В меню трека пункт «Поделиться» отправляет этот трек (или, по '
-                'желанию, весь его альбом) любому видимому поблизости устройству '
-                '— даже не сопряжённому и с другим профилем. Принимающая сторона '
-                'видит название и обложку и сама решает, принять ли — просто '
-                'скачивается и добавляется в библиотеку, без слияния профилей.',
-          ),
-          const _GuideSection(
-            title: 'Профили',
-            body: 'Несколько человек могут делить одно устройство — у каждого '
-                'своя библиотека и свой список сопряжённых устройств; '
-                'переключение — карточка профиля на вкладке «Устройства» → '
-                '«Сменить». Если это, наоборот, второе устройство одного и того '
-                'же человека — кнопка «Ждать сопряжения» (при создании профиля '
-                'или из переключателя) делает его копией уже существующего. '
-                'Удаление профиля необратимо и требует ввода его имени для '
-                'подтверждения; удалить можно только неактивный профиль.',
+          _GuideSection(title: l10n.aboutGuideLibraryTitle, body: l10n.aboutGuideLibraryBody),
+          _GuideSection(title: l10n.aboutGuidePlaylistsTitle, body: l10n.aboutGuidePlaylistsBody),
+          _GuideSection(title: l10n.aboutGuideDevicesTitle, body: l10n.aboutGuideDevicesBody),
+          _GuideSection(title: l10n.aboutGuideShareTitle, body: l10n.aboutGuideShareBody),
+          _GuideSection(title: l10n.aboutGuideProfilesTitle, body: l10n.aboutGuideProfilesBody),
+        ],
+      ),
+    );
+  }
+}
+
+/// Shows the currently-selected language and opens a picker — the only
+/// way to change it after the first-run [LanguageChoiceScreen]. See
+/// docs/adr/0027-localization.md.
+class _LanguagePicker extends ConsumerWidget {
+  const _LanguagePicker();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = context.l10n;
+    final current = ref.watch(currentLocaleProvider);
+    return ListTile(
+      leading: const Icon(Icons.language),
+      title: Text(l10n.aboutLanguage),
+      subtitle: Text(current == null ? l10n.aboutLanguageSystem : _nativeName(current)),
+      onTap: () => _pickLanguage(context, ref, current),
+    );
+  }
+
+  String _nativeName(Locale locale) => switch (locale.languageCode) {
+        'ru' => 'Русский',
+        'en' => 'English',
+        _ => locale.languageCode,
+      };
+
+  Future<void> _pickLanguage(BuildContext context, WidgetRef ref, Locale? current) async {
+    final l10n = context.l10n;
+    // Plain SimpleDialogOption rows with a checkmark rather than
+    // RadioListTile: Radio's groupValue/onChanged API is deprecated as of
+    // this Flutter version in favor of an ancestor RadioGroup, which would
+    // be more machinery than this one-off, two-or-three-option picker
+    // needs.
+    final chosen = await showDialog<Object>(
+      context: context,
+      builder: (dialogContext) => SimpleDialog(
+        title: Text(l10n.aboutLanguage),
+        children: [
+          for (final option in AppLocalizations.supportedLocales)
+            SimpleDialogOption(
+              onPressed: () => Navigator.of(dialogContext).pop(option),
+              child: Row(
+                children: [
+                  Expanded(child: Text(_nativeName(option))),
+                  if (current == option) const Icon(Icons.check, color: AppTheme.accent),
+                ],
+              ),
+            ),
+          SimpleDialogOption(
+            onPressed: () => Navigator.of(dialogContext).pop('system'),
+            child: Row(
+              children: [
+                Expanded(child: Text(l10n.aboutLanguageSystem)),
+                if (current == null) const Icon(Icons.check, color: AppTheme.accent),
+              ],
+            ),
           ),
         ],
       ),
     );
+    if (chosen == null) return;
+    await ref.read(changeLanguageProvider)(chosen is Locale ? chosen : null);
   }
 }
 
@@ -112,7 +133,7 @@ class _VersionLabel extends StatelessWidget {
       builder: (context, snapshot) {
         final info = snapshot.data;
         return Text(
-          info == null ? ' ' : 'Версия ${info.version}',
+          info == null ? ' ' : context.l10n.aboutVersion(info.version),
           style: const TextStyle(color: AppTheme.onSurfaceMuted),
         );
       },

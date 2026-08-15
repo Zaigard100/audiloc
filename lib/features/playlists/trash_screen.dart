@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/providers.dart';
 import '../../core/theme/app_theme.dart';
 import '../../data/models/track.dart';
+import '../../l10n/l10n.dart';
 import '../library/providers/library_providers.dart';
 import '../library/widgets/track_tile.dart';
 
@@ -21,14 +22,15 @@ class TrashScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final tracksAsync = ref.watch(deletedTracksProvider);
+    final l10n = context.l10n;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Удалённые')),
+      appBar: AppBar(title: Text(l10n.trashTitle)),
       body: tracksAsync.when(
         data: (tracks) {
           if (tracks.isEmpty) {
-            return const Center(
-              child: Text('Удалённых треков нет', style: TextStyle(color: AppTheme.onSurfaceMuted)),
+            return Center(
+              child: Text(l10n.trashEmpty, style: const TextStyle(color: AppTheme.onSurfaceMuted)),
             );
           }
           return ListView.builder(
@@ -43,13 +45,13 @@ class TrashScreen extends ConsumerWidget {
                   children: [
                     IconButton(
                       icon: const Icon(Icons.restore),
-                      tooltip: 'Вернуть в библиотеку',
+                      tooltip: l10n.trashRestoreTooltip,
                       color: AppTheme.accent,
                       onPressed: () => ref.read(tracksRepositoryProvider).restore(track.id),
                     ),
                     IconButton(
                       icon: const Icon(Icons.delete_forever_outlined),
-                      tooltip: 'Стереть навсегда',
+                      tooltip: l10n.trashEraseForeverTooltip,
                       color: AppTheme.onSurfaceMuted,
                       onPressed: () => _confirmErase(context, ref, track),
                     ),
@@ -60,23 +62,21 @@ class TrashScreen extends ConsumerWidget {
           );
         },
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, _) => Center(child: Text('Ошибка: $error')),
+        error: (error, _) => Center(child: Text(l10n.commonErrorPrefix(error))),
       ),
     );
   }
 
   Future<void> _confirmErase(BuildContext context, WidgetRef ref, Track track) async {
+    final l10n = context.l10n;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Стереть навсегда?'),
-        content: Text(
-          '«${track.displayTitle}» будет удалён с диска на этом устройстве и исчезнет '
-          'из «Удалённых». Импортировать его снова можно будет только заново, вручную.',
-        ),
+        title: Text(l10n.trashEraseConfirmTitle),
+        content: Text(l10n.trashEraseConfirmBody(track.displayTitle)),
         actions: [
-          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Отмена')),
-          FilledButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Стереть')),
+          TextButton(onPressed: () => Navigator.of(context).pop(false), child: Text(l10n.commonCancel)),
+          FilledButton(onPressed: () => Navigator.of(context).pop(true), child: Text(l10n.trashEraseConfirmButton)),
         ],
       ),
     );
@@ -85,7 +85,7 @@ class TrashScreen extends ConsumerWidget {
     await ref.read(tracksRepositoryProvider).eraseFileFromDisk(track.id);
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('«${track.displayTitle}» стёрт с этого устройства')),
+        SnackBar(content: Text(l10n.trashErasedSnackbar(track.displayTitle))),
       );
     }
   }

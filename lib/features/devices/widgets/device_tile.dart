@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/providers.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/models/device.dart';
+import '../../../l10n/l10n.dart';
 import '../../../services/sync/discovery/discovered_peer.dart';
 
 class DeviceTile extends ConsumerWidget {
@@ -14,6 +15,7 @@ class DeviceTile extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = context.l10n;
     return ListTile(
       leading: CircleAvatar(
         backgroundColor: AppTheme.surfaceHigh,
@@ -23,19 +25,19 @@ class DeviceTile extends ConsumerWidget {
         ),
       ),
       title: Text(device.name),
-      subtitle: Text(isOnline ? 'В сети' : _lastSeenLabel(device)),
+      subtitle: Text(isOnline ? l10n.deviceOnline : _lastSeenLabel(l10n, device)),
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           if (isOnline)
             IconButton(
               icon: const Icon(Icons.sync),
-              tooltip: 'Синхронизировать сейчас',
+              tooltip: l10n.deviceSyncNowTooltip,
               onPressed: () => _syncNow(ref),
             ),
           IconButton(
             icon: const Icon(Icons.link_off),
-            tooltip: 'Отвязать устройство',
+            tooltip: l10n.deviceUnpairTooltip,
             onPressed: () => _confirmUnpair(context, ref),
           ),
         ],
@@ -44,17 +46,15 @@ class DeviceTile extends ConsumerWidget {
   }
 
   Future<void> _confirmUnpair(BuildContext context, WidgetRef ref) async {
+    final l10n = context.l10n;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Отвязать устройство?'),
-        content: Text(
-          '«${device.name}» перестанет синхронизироваться с этим устройством. '
-          'Чтобы связать их снова, потребуется новое подтверждение с обеих сторон.',
-        ),
+        title: Text(l10n.deviceUnpairTitle),
+        content: Text(l10n.deviceUnpairBody(device.name)),
         actions: [
-          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Отмена')),
-          TextButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Отвязать')),
+          TextButton(onPressed: () => Navigator.of(context).pop(false), child: Text(l10n.commonCancel)),
+          TextButton(onPressed: () => Navigator.of(context).pop(true), child: Text(l10n.deviceUnpairConfirm)),
         ],
       ),
     );
@@ -64,18 +64,18 @@ class DeviceTile extends ConsumerWidget {
     await ref.read(devicesRepositoryProvider).delete(device.id);
   }
 
-  String _lastSeenLabel(Device device) {
+  String _lastSeenLabel(AppLocalizations l10n, Device device) {
     final lastOnline = device.lastOnlineAtDate;
-    if (lastOnline == null) return 'Не в сети';
-    return 'Не в сети · был(а) в сети ${_formatRelative(lastOnline)}';
+    if (lastOnline == null) return l10n.deviceOffline;
+    return l10n.deviceLastSeen(_formatRelative(l10n, lastOnline));
   }
 
-  String _formatRelative(DateTime dateTime) {
+  String _formatRelative(AppLocalizations l10n, DateTime dateTime) {
     final diff = DateTime.now().difference(dateTime);
-    if (diff.inMinutes < 1) return 'только что';
-    if (diff.inMinutes < 60) return '${diff.inMinutes} мин назад';
-    if (diff.inHours < 24) return '${diff.inHours} ч назад';
-    return '${diff.inDays} дн назад';
+    if (diff.inMinutes < 1) return l10n.deviceLastSeenJustNow;
+    if (diff.inMinutes < 60) return l10n.deviceLastSeenMinutes(diff.inMinutes);
+    if (diff.inHours < 24) return l10n.deviceLastSeenHours(diff.inHours);
+    return l10n.deviceLastSeenDays(diff.inDays);
   }
 
   void _syncNow(WidgetRef ref) {

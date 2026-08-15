@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/providers.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../l10n/l10n.dart';
 import '../../../services/sync/share/share_models.dart';
 
 /// Shown for an incoming "Поделиться" offer. The user needs to actually
@@ -66,17 +67,19 @@ class _ShareOfferDialogState extends ConsumerState<_ShareOfferDialog> {
     final offer = widget.offer;
     final items = offer.items;
     final first = items.first;
+    final l10n = context.l10n;
     final String description;
     if (items.length == 1) {
-      description = '«${offer.fromName}» хочет поделиться этим треком.';
+      description = l10n.shareOfferSingleTrack(offer.fromName);
     } else {
       final album = first.album;
-      description = '«${offer.fromName}» хочет поделиться '
-          '${album != null ? 'альбомом «$album»' : 'треками'} (${items.length} шт.).';
+      description = album != null
+          ? l10n.shareOfferAlbum(offer.fromName, album, items.length)
+          : l10n.shareOfferTracks(offer.fromName, items.length);
     }
 
     return AlertDialog(
-      title: const Text('Поделились треком'),
+      title: Text(l10n.shareOfferTitle),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -116,14 +119,14 @@ class _ShareOfferDialogState extends ConsumerState<_ShareOfferDialog> {
             ref.read(shareServiceProvider).rejectOffer(offer);
             Navigator.of(context).pop();
           },
-          child: const Text('Отклонить'),
+          child: Text(l10n.commonDecline),
         ),
         TextButton(
           onPressed: () {
             ref.read(shareServiceProvider).acceptOffer(offer);
             Navigator.of(context).pop();
           },
-          child: const Text('Принять'),
+          child: Text(l10n.shareOfferAccept),
         ),
       ],
     );

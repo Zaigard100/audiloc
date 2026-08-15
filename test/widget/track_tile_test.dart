@@ -2,6 +2,7 @@ import 'package:audiloc/core/providers.dart';
 import 'package:audiloc/data/db/audiloc_database.dart';
 import 'package:audiloc/data/models/track.dart';
 import 'package:audiloc/features/library/widgets/track_tile.dart';
+import 'package:audiloc/l10n/l10n.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -19,6 +20,9 @@ void main() {
     await tester.pumpWidget(UncontrolledProviderScope(
       container: container,
       child: MaterialApp(
+        locale: const Locale('ru'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
         home: Scaffold(body: TrackTile(track: track, onTap: () => tapped = true)),
       ),
     ));

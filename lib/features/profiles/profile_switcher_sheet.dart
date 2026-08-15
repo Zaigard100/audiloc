@@ -5,6 +5,7 @@ import '../../core/profile_session.dart';
 import '../../core/providers.dart';
 import '../../core/theme/app_theme.dart';
 import '../../data/profiles/profile.dart';
+import '../../l10n/l10n.dart';
 
 /// "Кто использует AudiLoc?" — list known profiles, switch to one, create
 /// a new one, or rename an existing one. See
@@ -38,6 +39,7 @@ class _ProfileSwitcherSheetState extends ConsumerState<_ProfileSwitcherSheet> {
   @override
   Widget build(BuildContext context) {
     final current = ref.watch(currentProfileProvider);
+    final l10n = context.l10n;
 
     return SafeArea(
       child: Padding(
@@ -46,12 +48,11 @@ class _ProfileSwitcherSheetState extends ConsumerState<_ProfileSwitcherSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Профили', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+            Text(l10n.profilesTitle, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
             const SizedBox(height: 4),
-            const Text(
-              'У каждого профиля своя библиотека и свой список сопряжённых устройств. '
-              'Долгий тап — переименовать, значок корзины — удалить безвозвратно.',
-              style: TextStyle(color: AppTheme.onSurfaceMuted, fontSize: 12),
+            Text(
+              l10n.profilesSubtitle,
+              style: const TextStyle(color: AppTheme.onSurfaceMuted, fontSize: 12),
             ),
             FutureBuilder<List<Profile>>(
               future: _profilesFuture,
@@ -84,7 +85,7 @@ class _ProfileSwitcherSheetState extends ConsumerState<_ProfileSwitcherSheet> {
                             ? const Icon(Icons.check, color: AppTheme.accent)
                             : IconButton(
                                 icon: const Icon(Icons.delete_outline, color: AppTheme.onSurfaceMuted),
-                                tooltip: 'Удалить профиль',
+                                tooltip: l10n.profileDeleteTooltip,
                                 onPressed: () => _deleteDialog(context, profile),
                               ),
                         onTap: profile.id == current.id ? null : () => _switchTo(context, profile.id),
@@ -97,16 +98,15 @@ class _ProfileSwitcherSheetState extends ConsumerState<_ProfileSwitcherSheet> {
             const Divider(),
             ListTile(
               leading: const Icon(Icons.add),
-              title: const Text('Новый профиль'),
+              title: Text(l10n.profilesNewProfile),
               onTap: () => _createDialog(context),
             ),
             ListTile(
               leading: const Icon(Icons.wifi_tethering),
-              title: const Text('Это моё второе устройство — ждать сопряжения'),
-              subtitle: const Text(
-                'Вместо пустого профиля — дождаться сопряжения с другим вашим '
-                'устройством и стать его копией',
-                style: TextStyle(fontSize: 12),
+              title: Text(l10n.profilesWaitForPairingTitle),
+              subtitle: Text(
+                l10n.profilesWaitForPairingSubtitle,
+                style: const TextStyle(fontSize: 12),
               ),
               onTap: () => _waitForPairing(context),
             ),
@@ -133,21 +133,22 @@ class _ProfileSwitcherSheetState extends ConsumerState<_ProfileSwitcherSheet> {
   }
 
   Future<void> _createDialog(BuildContext context) async {
+    final l10n = context.l10n;
     final controller = TextEditingController();
     final name = await showDialog<String>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Новый профиль'),
+        title: Text(l10n.profilesNewProfile),
         content: TextField(
           controller: controller,
           autofocus: true,
-          decoration: const InputDecoration(hintText: 'Имя'),
+          decoration: InputDecoration(hintText: l10n.profileCreateNameHint),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.of(dialogContext).pop(), child: const Text('Отмена')),
+          TextButton(onPressed: () => Navigator.of(dialogContext).pop(), child: Text(l10n.commonCancel)),
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(controller.text.trim()),
-            child: const Text('Создать'),
+            child: Text(l10n.commonCreate),
           ),
         ],
       ),
@@ -161,17 +162,18 @@ class _ProfileSwitcherSheetState extends ConsumerState<_ProfileSwitcherSheet> {
   }
 
   Future<void> _renameDialog(BuildContext context, Profile profile) async {
+    final l10n = context.l10n;
     final controller = TextEditingController(text: profile.name);
     final name = await showDialog<String>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Переименовать профиль'),
+        title: Text(l10n.profileRenameTitle),
         content: TextField(controller: controller, autofocus: true),
         actions: [
-          TextButton(onPressed: () => Navigator.of(dialogContext).pop(), child: const Text('Отмена')),
+          TextButton(onPressed: () => Navigator.of(dialogContext).pop(), child: Text(l10n.commonCancel)),
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(controller.text.trim()),
-            child: const Text('Сохранить'),
+            child: Text(l10n.commonSave),
           ),
         ],
       ),
@@ -203,6 +205,7 @@ class _ProfileSwitcherSheetState extends ConsumerState<_ProfileSwitcherSheet> {
   /// buttons, before the destructive action becomes available at all —
   /// see docs/adr/0018-delete-profile.md.
   Future<void> _deleteDialog(BuildContext context, Profile profile) async {
+    final l10n = context.l10n;
     final controller = TextEditingController();
     final confirmed = await showDialog<bool>(
       context: context,
@@ -210,27 +213,27 @@ class _ProfileSwitcherSheetState extends ConsumerState<_ProfileSwitcherSheet> {
         builder: (dialogContext, setState) {
           final matches = controller.text.trim() == profile.name;
           return AlertDialog(
-            title: const Text('Удалить профиль?'),
+            title: Text(l10n.profileDeleteTitle),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  '«${profile.name}» и вся его библиотека — треки, плейлисты, обложки, '
-                  'список сопряжённых устройств — будут удалены безвозвратно. Отменить это будет нельзя.',
-                ),
+                Text(l10n.profileDeleteBody(profile.name)),
                 const SizedBox(height: 16),
-                Text('Чтобы подтвердить, введите «${profile.name}»:'),
+                Text(l10n.profileDeleteConfirmPrompt(profile.name)),
                 const SizedBox(height: 4),
                 TextField(controller: controller, autofocus: true, onChanged: (_) => setState(() {})),
               ],
             ),
             actions: [
-              TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: const Text('Отмена')),
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(false),
+                child: Text(l10n.commonCancel),
+              ),
               FilledButton(
                 style: FilledButton.styleFrom(backgroundColor: Theme.of(dialogContext).colorScheme.error),
                 onPressed: matches ? () => Navigator.of(dialogContext).pop(true) : null,
-                child: const Text('Удалить безвозвратно'),
+                child: Text(l10n.profileDeleteConfirmButton),
               ),
             ],
           );
@@ -254,7 +257,7 @@ class _ProfileSwitcherSheetState extends ConsumerState<_ProfileSwitcherSheet> {
     } catch (error) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Профиль удалён из списка, но часть файлов стереть не удалось: $error')),
+          SnackBar(content: Text(l10n.profileDeletePartialError(error))),
         );
       }
     } finally {

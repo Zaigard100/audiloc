@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/widgets.dart' show Locale;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 import 'package:path/path.dart' as p;
@@ -110,6 +111,27 @@ final joinProfileForPairingProvider = Provider<Future<void> Function(IncomingPai
 /// reaches the UI — see docs/adr/0017-forbid-cross-profile-pairing-and-sharing.md.
 final canJoinDifferentProfileProvider = Provider<Future<bool> Function()>(
   (ref) => throw UnimplementedError('canJoinDifferentProfileProvider must be overridden by AudilocApp'),
+);
+
+/// Changes the app's UI language (docs/adr/0027-localization.md) — `null`
+/// clears the explicit choice and goes back to following the system
+/// locale. `AudilocApp` owns the actual `MaterialApp.locale` value, same
+/// pattern as [switchProfileProvider]; bound to the language picker on
+/// "О приложении".
+final changeLanguageProvider = Provider<Future<void> Function(Locale?)>(
+  (ref) => throw UnimplementedError('changeLanguageProvider must be overridden by AudilocApp'),
+);
+
+/// Mirrors `AudilocApp`'s own `_locale` field — `null` means "following
+/// the system locale", otherwise an explicit choice. A `StateProvider` (not
+/// `overrideWithValue`) because [changeLanguageProvider] needs to update it
+/// live when the user picks a different language, without reopening the
+/// whole profile session (see docs/adr/0027-localization.md). Purely for
+/// the "О приложении" language picker to show which option is currently
+/// selected — `Localizations.localeOf(context)` alone can't distinguish
+/// "system happens to be Russian" from "Russian was explicitly chosen".
+final currentLocaleProvider = StateProvider<Locale?>(
+  (ref) => throw UnimplementedError('currentLocaleProvider must be overridden by profile_session.dart'),
 );
 
 final tracksRepositoryProvider =
