@@ -79,4 +79,53 @@ void main() {
     await tester.tap(find.text('Song'));
     expect(tapped, isTrue);
   });
+
+  testWidgets('tapping the already-current track toggles play/pause instead of restarting it',
+      (tester) async {
+    final player = FakePlayerService();
+    final container = ProviderContainer(overrides: [
+      databaseProvider.overrideWithValue(db),
+      playerServiceProvider.overrideWithValue(player),
+    ]);
+    addTearDown(container.dispose);
+
+    const track = Track(id: 't1', path: '/a.mp3', title: 'Song', artist: 'Artist', album: 'Album');
+    var tapped = false;
+
+    await tester.pumpWidget(UncontrolledProviderScope(
+      container: container,
+      child: MaterialApp(
+        theme: AppTheme.dark(),
+        locale: const Locale('ru'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Scaffold(body: TrackTile(track: track, onTap: () => tapped = true)),
+      ),
+    ));
+    await tester.pump();
+
+    // Not current yet — tapping still just fires the caller's onTap
+    // (opens/starts the queue at this row), same as any other tile.
+    await tester.tap(find.text('Song'));
+    expect(tapped, isTrue);
+    expect(player.isPlaying, isFalse);
+
+    tapped = false;
+    player.emitTrack(track);
+    player.emitPlaying(true);
+    await tester.pump();
+
+    // Now current and playing — tapping the same row pauses it instead
+    // of restarting it from 0, and does *not* call the caller's onTap.
+    await tester.tap(find.text('Song'));
+    await tester.pump();
+    expect(tapped, isFalse);
+    expect(player.isPlaying, isFalse);
+
+    // Tapping again while current and paused resumes it.
+    await tester.tap(find.text('Song'));
+    await tester.pump();
+    expect(tapped, isFalse);
+    expect(player.isPlaying, isTrue);
+  });
 }

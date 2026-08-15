@@ -40,7 +40,13 @@ class TrackTile extends ConsumerWidget {
     final isPlaying = isCurrent && (ref.watch(isPlayingProvider).value ?? false);
 
     final tile = ListTile(
-      onTap: onTap,
+      // Tapping the tile that's already loaded re-runs the caller's
+      // `onTap` (`setQueue(...)`) by default, which reopens the file and
+      // restarts it from 0 even if it's simply paused — surprising when
+      // this is visibly the "now playing" row. Toggle play/pause instead
+      // for that one case; tapping any other row still starts it fresh,
+      // same as before.
+      onTap: isCurrent ? () => ref.read(playerServiceProvider).playOrPause() : onTap,
       onLongPress: onLongPress,
       tileColor: isCurrent ? AppTheme.accent.withValues(alpha: 0.08) : null,
       leading: Stack(
