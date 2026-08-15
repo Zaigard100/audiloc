@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:ui' show AppExitResponse;
 
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
@@ -15,6 +16,7 @@ import 'data/directory_erase.dart';
 import 'data/profiles/profiles_store.dart';
 import 'data/settings/app_settings_store.dart';
 import 'features/player/models/playback_shortcuts_settings.dart';
+import 'features/player/providers/player_providers.dart';
 import 'features/player/widgets/playback_shortcuts.dart';
 import 'features/profiles/initial_profile_name_screen.dart';
 import 'features/profiles/language_choice_screen.dart';
@@ -39,8 +41,15 @@ class AudilocApp extends StatefulWidget {
   State<AudilocApp> createState() => _AudilocAppState();
 }
 
-class _AudilocAppState extends State<AudilocApp> {
+class _AudilocAppState extends State<AudilocApp> with WidgetsBindingObserver {
   late final MediaKitPlayerService _playerService;
+
+  /// Registered so a window-manager close (X button, Alt+F4/Cmd+Q) on
+  /// desktop can be awaited on before the process actually exits — see
+  /// [_handleExitRequested]. Where the platform doesn't send an exit
+  /// request at all (some Linux window managers), [didChangeAppLifecycleState]
+  /// below is the fallback.
+  late final AppLifecycleListener _lifecycleListener;
 
   /// See [_bootstrap]'s doc — `AudioService.init` may only ever run once
   /// per process, but [_bootstrap] itself can now run more than once
@@ -106,7 +115,62 @@ class _AudilocAppState extends State<AudilocApp> {
   void initState() {
     super.initState();
     _playerService = MediaKitPlayerService();
+    WidgetsBinding.instance.addObserver(this);
+    _lifecycleListener = AppLifecycleListener(onExitRequested: _handleExitRequested);
     unawaited(_bootstrap());
+  }
+
+  /// The closest any platform gets to "the app is closing, not just
+  /// momentarily unfocused" without an explicit exit-request channel (see
+  /// [_lifecycleListener]/[_handleExitRequested] for that stronger
+  /// signal, desktop-only): `paused`/`detached` on Android/iOS fire
+  /// reliably when the user leaves (swipe away, task switcher, home
+  /// button) — before the OS is free to actually kill the process.
+  /// `hidden` is the closest desktop equivalent where `onExitRequested`
+  /// isn't supported. A real SIGKILL/force-quit/task-killed-from-outside
+  /// can't be intercepted by anything running in-process on any
+  /// platform — this only covers the ordinary "user closed/left the app"
+  /// path, which is what was actually asked for.
+  ///
+  /// Fire-and-forget, not awaited: this callback has no way to delay
+  /// whatever the OS does next, so there's nothing to await it *for*.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached ||
+        state == AppLifecycleState.hidden) {
+      unawaited(_savePlaybackStateBestEffort());
+    }
+  }
+
+  /// Desktop-only in practice (mobile already exits via a plain `return`
+  /// from the callback below with nothing to await): a window-manager
+  /// close request is the one signal where the platform actually waits
+  /// for this `Future` before letting the process die, so this is the
+  /// only trigger that can *guarantee* the write (and, best-effort, some
+  /// time for the outgoing sync push) lands before exit rather than
+  /// racing it.
+  Future<AppExitResponse> _handleExitRequested() async {
+    await _savePlaybackStateBestEffort();
+    return AppExitResponse.exit;
+  }
+
+  /// Shared by both lifecycle hooks above. Errors are swallowed
+  /// deliberately — a failed bookmark write must never be the reason the
+  /// app fails to close.
+  Future<void> _savePlaybackStateBestEffort() async {
+    final container = _session?.container;
+    if (container == null) return;
+    try {
+      await container.read(playbackStateWriterProvider).saveCurrentState();
+      // Best-effort head start for the outgoing CRDT sync push to a
+      // connected peer, which happens on its own via the existing
+      // sync machinery once the row is written — there's no hook to
+      // await "delivered", only "written locally".
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+    } catch (_) {
+      // Deliberately ignored — see doc above.
+    }
   }
 
   Future<void> _bootstrap() async {
@@ -399,6 +463,8 @@ class _AudilocAppState extends State<AudilocApp> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _lifecycleListener.dispose();
     unawaited(_session?.close());
     unawaited(_playerService.dispose());
     super.dispose();

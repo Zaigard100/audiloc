@@ -47,11 +47,43 @@
 `'current'` одна на весь профиль, и выигрывает всегда тот, кто написал
 её позже по HLC.
 
-**Только по паузе**: `PlaybackStateWriter`
-(`lib/services/playback/playback_state_writer.dart`) подписывается на
-`playerService.playingStream` и реагирует только на переход `true →
-false` (не на `positionStream` вообще) — тот же урок про "не писать на
-каждый тик", что уже применялся к `devices.last_online_at` в ADR 0025.
+**Только по паузе — для обычного, продолжающегося использования**:
+`PlaybackStateWriter` (`lib/services/playback/playback_state_writer.dart`)
+подписывается на `playerService.playingStream` и реагирует только на
+переход `true → false` (не на `positionStream` вообще) — тот же урок
+про "не писать на каждый тик", что уже применялся к
+`devices.last_online_at` в ADR 0025.
+
+**Плюс отдельно — при закрытии приложения**: паузы недостаточно, если
+пользователь просто закрывает приложение во время воспроизведения, не
+поставив на паузу — это отдельный, явный запрос. `PlaybackStateWriter.saveCurrentState()`
+— тот же самый мерж-запрос, но вызываемый напрямую, независимо от
+play/pause, а не только по переходу состояния. `AudilocApp`
+(`lib/app.dart`) вызывает его в двух местах:
+
+- `WidgetsBindingObserver.didChangeAppLifecycleState` — `paused`/`detached`
+  (Android/iOS, надёжно срабатывает при уходе из приложения) и `hidden`
+  (десктопный аналог там, где нет более сильного сигнала ниже).
+  Fire-and-forget: у колбэка всё равно нет способа задержать то, что ОС
+  сделает дальше.
+- `AppLifecycleListener.onExitRequested` — десктопное закрытие окна
+  (крестик, Alt+F4/Cmd+Q). Это единственный сигнал, который платформа
+  реально готова подождать: колбэк можно `await`-нуть, и только после
+  этого приложению разрешается закрыться — то есть именно здесь можно
+  дать гарантию, что запись в локальную базу успеет случиться до выхода
+  из процесса (плюс небольшая best-effort пауза, чтобы у исходящей
+  синхронизации был шанс уйти на пару устройств — подтверждения
+  доставки на этом уровне не существует, синк уже сам подхватывает
+  изменённую строку через тот же механизм, что и остальные таблицы).
+
+Честная граница: настоящий SIGKILL/принудительное убийство процесса
+(диспетчер задач, `kill -9`, смахивание из свежих приложений на
+некоторых лаунчерах Android до вызова `paused`) не перехватывается
+ничем, что выполняется внутри процесса — это не специфика AudiLoc, а
+факт про то, как вообще работают процессы в любой ОС. Реализованное
+покрывает весь набор "обычных" путей закрытия — назад/смахивание/
+переключение задач на мобильных, закрытие окна на десктопе — то, что
+пользователь на практике и называет "закрытием приложения".
 
 **"Порядок синхронизации" — как честно его понимать**: `crdt_sync`/
 `sql_crdt` не дают возможности буквально заставить "сначала домержить
@@ -127,7 +159,7 @@ Windows — это отдельная, гораздо более крупная 
 
 Новые: `lib/data/models/playback_state.dart`,
 `lib/data/repositories/playback_state_repository.dart`,
-`lib/services/playback/playback_state_writer.dart`,
+`lib/services/playback/playback_state_writer.dart` (+`saveCurrentState()`),
 `lib/features/player/models/playback_shortcuts_settings.dart`,
 `lib/features/player/widgets/playback_shortcuts.dart`,
 `lib/features/player/widgets/resume_playback_prompt.dart`.
@@ -147,8 +179,9 @@ Windows — это отдельная, гораздо более крупная 
 ## Верификация
 
 1. `flutter analyze` — 0 ошибок.
-2. `flutter test test/unit/` — 125 тестов проходят (120 + 5 новых для
-   `PlaybackStateRepository`).
+2. `flutter test test/unit/` — 130 тестов проходят (120 + 5 для
+   `PlaybackStateRepository` + 5 для `PlaybackStateWriter`, включая
+   `saveCurrentState()` вне play/pause-перехода).
 3. `flutter test test/widget/` — 8 тестов проходят, стабильно при
    повторных прогонах (см. docs/testing-notes.md — заодно найдена и
    исправлена настоящая причина многолетнего зависания

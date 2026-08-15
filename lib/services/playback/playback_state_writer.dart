@@ -6,13 +6,16 @@ import '../../data/repositories/playback_state_repository.dart';
 import '../../features/player/models/queue_source.dart';
 import 'player_service.dart';
 
-/// Persists "what's playing, and where" every time playback pauses —
-/// deliberately *only* on a playing→paused edge, not on every position
-/// tick, which would turn a CRDT-synced table into a write storm sent to
-/// every paired peer several times a second. Same lesson already learned
-/// the hard way about `devices.last_online_at` —
-/// docs/adr/0025-sync-and-discovery-reliability.md — applied here from
-/// the start; see docs/adr/0029-playback-state-sync.md.
+/// Persists "what's playing, and where". [_handlePlayingChanged] does
+/// this automatically *only* on a playing→paused edge, not on every
+/// position tick, which would turn a CRDT-synced table into a write
+/// storm sent to every paired peer several times a second — same lesson
+/// already learned the hard way about `devices.last_online_at`
+/// (docs/adr/0025-sync-and-discovery-reliability.md). [saveCurrentState]
+/// is the other, explicit trigger: [AudilocApp] calls it directly on
+/// app-lifecycle events (backgrounded, window closing) so leaving
+/// mid-playback — not just an explicit pause — still leaves a bookmark.
+/// See docs/adr/0029-playback-state-sync.md.
 class PlaybackStateWriter {
   PlaybackStateWriter({
     required PlayerService playerService,
@@ -43,9 +46,18 @@ class PlaybackStateWriter {
     // paused" (nothing changed) and "just started/resumed playing" must
     // not write.
     if (wasPlaying != true || playing) return;
+    unawaited(saveCurrentState());
+  }
 
+  /// Writes whatever's currently loaded, regardless of playing/paused —
+  /// unlike [_handlePlayingChanged], which only fires on an explicit
+  /// pause. Used by [AudilocApp] on app-lifecycle events (backgrounded /
+  /// window closing) so a bookmark still lands even if the user leaves
+  /// mid-playback rather than pausing first — see
+  /// docs/adr/0029-playback-state-sync.md. A no-op if nothing's loaded.
+  Future<void> saveCurrentState() async {
     final track = _playerService.currentTrack;
-    if (track == null) return; // playback stopped outright, nothing to bookmark
+    if (track == null) return;
 
     final source = _currentQueueSource();
     final (queueType, playlistId) = switch (source) {
@@ -54,14 +66,14 @@ class PlaybackStateWriter {
       LibraryQueueSource() || null => (PlaybackQueueType.library, null),
     };
 
-    unawaited(_repository.save(PlaybackState(
+    await _repository.save(PlaybackState(
       trackId: track.id,
       positionMs: _playerService.position.inMilliseconds,
       queueType: queueType,
       playlistId: playlistId,
       deviceId: _selfDevice.id,
       deviceName: _selfDevice.name,
-    )));
+    ));
   }
 
   Future<void> dispose() async {
