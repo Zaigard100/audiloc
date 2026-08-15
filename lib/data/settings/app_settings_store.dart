@@ -4,12 +4,15 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
 
-/// Device-level app settings — UI language and theme mode. Deliberately
-/// separate from [ProfilesStore]: both are properties of this
-/// installation/device, not of any one profile, so they must survive
-/// profile switches and stay the same for every profile sharing this
-/// device (see docs/adr/0027-localization.md,
-/// docs/adr/0028-settings-screen-and-theming.md).
+import '../../features/player/models/playback_shortcuts_settings.dart';
+
+/// Device-level app settings — UI language, theme mode, playback
+/// keyboard shortcuts. Deliberately separate from [ProfilesStore]: these
+/// are all properties of this installation/device, not of any one
+/// profile, so they must survive profile switches and stay the same for
+/// every profile sharing this device (see docs/adr/0027-localization.md,
+/// docs/adr/0028-settings-screen-and-theming.md,
+/// docs/adr/0029-playback-state-sync.md).
 class AppSettingsStore {
   AppSettingsStore(this.appSupportDir);
 
@@ -41,6 +44,25 @@ class AppSettingsStore {
   }
 
   Future<void> setThemeMode(ThemeMode mode) => _write('themeMode', mode.name);
+
+  Future<PlaybackShortcutsSettings> playbackShortcutsSettings() async {
+    final json = await _read();
+    const fallback = PlaybackShortcutsSettings();
+    return PlaybackShortcutsSettings(
+      enabled: json['keyboardShortcutsEnabled'] as bool? ?? fallback.enabled,
+      seekStepSeconds: json['seekStepSeconds'] as int? ?? fallback.seekStepSeconds,
+    );
+  }
+
+  Future<void> setPlaybackShortcutsSettings(PlaybackShortcutsSettings settings) async {
+    if (!await appSupportDir.exists()) await appSupportDir.create(recursive: true);
+    final current = await _read();
+    await _file.writeAsString(jsonEncode({
+      ...current,
+      'keyboardShortcutsEnabled': settings.enabled,
+      'seekStepSeconds': settings.seekStepSeconds,
+    }));
+  }
 
   Future<Map<String, Object?>> _read() async {
     if (!await _file.exists()) return const {};

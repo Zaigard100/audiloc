@@ -42,6 +42,38 @@ class AppLocalizationsEn extends AppLocalizations {
   String get commonAllow => 'Allow';
 
   @override
+  String get commonNo => 'No';
+
+  @override
+  String get resumePlaybackTitle => 'Resume playback?';
+
+  @override
+  String resumePlaybackBody(String trackTitle, String time, String device) {
+    return 'Continue with “$trackTitle”, $time, $device?';
+  }
+
+  @override
+  String get resumePlaybackContinue => 'Continue';
+
+  @override
+  String get settingsPlayback => 'Playback';
+
+  @override
+  String get settingsKeyboardShortcuts => 'Keyboard control';
+
+  @override
+  String get settingsKeyboardShortcutsSubtitle =>
+      'Space — pause, arrows — seek, media keys';
+
+  @override
+  String get settingsSeekStep => 'Seek step';
+
+  @override
+  String settingsSeekStepSeconds(int seconds) {
+    return '${seconds}s';
+  }
+
+  @override
   String get searchHint => 'Title, artist, album…';
 
   @override

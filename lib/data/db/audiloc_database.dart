@@ -23,7 +23,7 @@ class AudilocDatabase {
     final dbPath = path ?? await _defaultPath();
     final crdt = await SqliteCrdt.open(
       dbPath,
-      version: 4,
+      version: 5,
       onCreate: _createSchema,
       onUpgrade: _upgradeSchema,
     );
@@ -33,7 +33,7 @@ class AudilocDatabase {
   /// In-memory database for tests: fast, isolated, no filesystem access.
   static Future<AudilocDatabase> openInMemory() async {
     final crdt = await SqliteCrdt.openInMemory(
-      version: 4,
+      version: 5,
       onCreate: _createSchema,
     );
     return AudilocDatabase._(crdt);
@@ -97,6 +97,7 @@ class AudilocDatabase {
     ''');
     await _createTrackLocationsTable(db);
     await _createPlaylistLocationsTable(db);
+    await _createPlaybackStateTable(db);
   }
 
   /// `track_locations` holds where *this device* actually has each track's
@@ -142,6 +143,30 @@ class AudilocDatabase {
         )
       ''');
 
+  /// A single, deliberately-global row (`id = 'current'`, enforced by
+  /// [PlaybackStateRepository]) — "what's currently loaded, and where" is
+  /// a whole-profile concept, not something that makes sense to have one
+  /// of per device. Being an ordinary CRDT-tracked table, last-write-wins
+  /// by HLC already gives exactly the "only the single most recent
+  /// pause across every device counts" semantics
+  /// docs/adr/0029-playback-state-sync.md asks for, with no extra
+  /// bookkeeping. `device_id`/`device_name` are denormalized at write
+  /// time rather than resolved later via `devices` — simpler than
+  /// reaching for `sql_crdt`'s own per-row `node_id` bookkeeping column,
+  /// and survives the writing device later being unpaired/renamed.
+  static Future<void> _createPlaybackStateTable(CrdtTableExecutor db) => db.execute('''
+        CREATE TABLE playback_state (
+          id TEXT NOT NULL,
+          track_id TEXT NOT NULL,
+          position_ms INTEGER NOT NULL,
+          queue_type TEXT NOT NULL,
+          playlist_id TEXT,
+          device_id TEXT NOT NULL,
+          device_name TEXT NOT NULL,
+          PRIMARY KEY (id)
+        )
+      ''');
+
   static Future<void> _upgradeSchema(CrdtTableExecutor db, int from, int to) async {
     if (from < 2) {
       await _createTrackLocationsTable(db);
@@ -152,6 +177,9 @@ class AudilocDatabase {
     if (from < 4) {
       await db.execute('ALTER TABLE playlists ADD COLUMN cover_track_id TEXT');
       await _createPlaylistLocationsTable(db);
+    }
+    if (from < 5) {
+      await _createPlaybackStateTable(db);
     }
   }
 

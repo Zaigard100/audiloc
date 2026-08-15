@@ -16,6 +16,12 @@ class FavoritesQueueSource extends QueueSource {
 }
 
 class PlaylistQueueSource extends QueueSource {
-  const PlaylistQueueSource(this.name);
+  const PlaylistQueueSource(this.playlistId, this.name);
+
+  /// Needed to rebuild the queue when restoring/resuming a synced
+  /// playback position (docs/adr/0029-playback-state-sync.md) — [name]
+  /// alone is display-only and can't be looked up back into a specific
+  /// playlist (two playlists can share a name).
+  final String playlistId;
   final String name;
 }

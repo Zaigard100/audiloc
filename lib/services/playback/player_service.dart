@@ -22,8 +22,19 @@ abstract class PlayerService {
   bool get isPlaying;
   Track? get currentTrack;
 
-  /// Replaces the queue and starts playing at [startIndex].
-  Future<void> setQueue(List<Track> tracks, {int startIndex = 0});
+  /// Synchronous snapshot of the current position — unlike
+  /// [positionStream], usable at a single point in time (e.g. the moment
+  /// playback pauses, to persist a resume point — see
+  /// docs/adr/0029-playback-state-sync.md) without needing to be
+  /// mid-subscription.
+  Duration get position;
+
+  /// Replaces the queue, cued to [startIndex]. Plays immediately unless
+  /// [autoPlay] is `false` — used when restoring a synced/persisted
+  /// playback position (docs/adr/0029-playback-state-sync.md), which
+  /// should land paused exactly where it left off, not immediately start
+  /// making sound.
+  Future<void> setQueue(List<Track> tracks, {int startIndex = 0, bool autoPlay = true});
 
   Future<void> play();
   Future<void> pause();

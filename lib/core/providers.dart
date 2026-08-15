@@ -11,8 +11,10 @@ import '../data/profiles/profile.dart';
 import '../data/profiles/profiles_store.dart';
 import '../data/repositories/devices_repository.dart';
 import '../data/repositories/favorites_repository.dart';
+import '../data/repositories/playback_state_repository.dart';
 import '../data/repositories/playlists_repository.dart';
 import '../data/repositories/tracks_repository.dart';
+import '../features/player/models/playback_shortcuts_settings.dart';
 import '../services/dedupe/dedupe_service.dart';
 import '../services/library_import/library_import_service.dart';
 import '../services/library_import/tag_reader.dart';
@@ -156,8 +158,22 @@ final eraseAllDataProvider = Provider<Future<void> Function()>(
   (ref) => throw UnimplementedError('eraseAllDataProvider must be overridden by AudilocApp'),
 );
 
+/// Same pattern as [changeLanguageProvider]/[changeThemeModeProvider] —
+/// see docs/adr/0029-playback-state-sync.md.
+final changePlaybackShortcutsSettingsProvider = Provider<Future<void> Function(PlaybackShortcutsSettings)>(
+  (ref) => throw UnimplementedError('changePlaybackShortcutsSettingsProvider must be overridden by AudilocApp'),
+);
+
+final currentPlaybackShortcutsSettingsProvider = StateProvider<PlaybackShortcutsSettings>(
+  (ref) => throw UnimplementedError(
+      'currentPlaybackShortcutsSettingsProvider must be overridden by profile_session.dart'),
+);
+
 final tracksRepositoryProvider =
     Provider((ref) => TracksRepository(ref.watch(databaseProvider).crdt));
+
+final playbackStateRepositoryProvider =
+    Provider((ref) => PlaybackStateRepository(ref.watch(databaseProvider).crdt));
 
 final favoritesRepositoryProvider =
     Provider((ref) => FavoritesRepository(ref.watch(databaseProvider).crdt));

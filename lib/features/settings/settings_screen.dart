@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/providers.dart';
+import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../../l10n/l10n.dart';
 import '../about/about_screen.dart';
+import '../player/models/playback_shortcuts_settings.dart';
 
 /// Settings — reachable from the gear icon on the Устройства tab
 /// (replacing what used to be a direct link to "О приложении", now one
@@ -24,6 +26,13 @@ class SettingsScreen extends ConsumerWidget {
         children: [
           const _ThemePicker(),
           const _LanguagePicker(),
+          const Divider(height: 1),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+            child: Text(l10n.settingsPlayback, style: TextStyle(color: context.colors.onSurfaceMuted)),
+          ),
+          const _KeyboardShortcutsToggle(),
+          const _SeekStepPicker(),
           const Divider(height: 1),
           ListTile(
             leading: const Icon(Icons.info_outline),
@@ -224,5 +233,70 @@ class _LanguagePicker extends ConsumerWidget {
     );
     if (chosen == null) return;
     await ref.read(changeLanguageProvider)(chosen is Locale ? chosen : null);
+  }
+}
+
+/// See docs/adr/0029-playback-state-sync.md — Space/arrow-key/media-key
+/// playback control, on by default. Turning it off doesn't affect
+/// anything else on this screen.
+class _KeyboardShortcutsToggle extends ConsumerWidget {
+  const _KeyboardShortcutsToggle();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = context.l10n;
+    final settings = ref.watch(currentPlaybackShortcutsSettingsProvider);
+    return SwitchListTile(
+      secondary: const Icon(Icons.keyboard_outlined),
+      title: Text(l10n.settingsKeyboardShortcuts),
+      subtitle: Text(l10n.settingsKeyboardShortcutsSubtitle),
+      value: settings.enabled,
+      onChanged: (value) =>
+          ref.read(changePlaybackShortcutsSettingsProvider)(settings.copyWith(enabled: value)),
+    );
+  }
+}
+
+/// How far Left/Right arrow seeking jumps — only meaningful while
+/// [_KeyboardShortcutsToggle] is on, but shown regardless (matching
+/// [_ThemePicker]/[_LanguagePicker] always being visible too) rather than
+/// disappearing and reappearing as that toggle flips.
+class _SeekStepPicker extends ConsumerWidget {
+  const _SeekStepPicker();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = context.l10n;
+    final settings = ref.watch(currentPlaybackShortcutsSettingsProvider);
+    return ListTile(
+      leading: const Icon(Icons.fast_forward_outlined),
+      title: Text(l10n.settingsSeekStep),
+      subtitle: Text(l10n.settingsSeekStepSeconds(settings.seekStepSeconds)),
+      onTap: () => _pickSeekStep(context, ref, settings),
+    );
+  }
+
+  Future<void> _pickSeekStep(BuildContext context, WidgetRef ref, PlaybackShortcutsSettings settings) async {
+    final l10n = context.l10n;
+    final chosen = await showDialog<int>(
+      context: context,
+      builder: (dialogContext) => SimpleDialog(
+        title: Text(l10n.settingsSeekStep),
+        children: [
+          for (final seconds in PlaybackShortcutsSettings.seekStepChoices)
+            SimpleDialogOption(
+              onPressed: () => Navigator.of(dialogContext).pop(seconds),
+              child: Row(
+                children: [
+                  Expanded(child: Text(l10n.settingsSeekStepSeconds(seconds))),
+                  if (settings.seekStepSeconds == seconds) const Icon(Icons.check, color: AppTheme.accent),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+    if (chosen == null) return;
+    await ref.read(changePlaybackShortcutsSettingsProvider)(settings.copyWith(seekStepSeconds: chosen));
   }
 }

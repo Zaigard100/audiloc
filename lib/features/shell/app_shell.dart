@@ -9,6 +9,8 @@ import '../devices/devices_screen.dart';
 import '../devices/providers/devices_providers.dart';
 import '../library/library_screen.dart';
 import '../player/mini_player.dart';
+import '../player/providers/player_providers.dart';
+import '../player/widgets/resume_playback_prompt.dart';
 import '../playlists/playlists_screen.dart';
 import '../search/search_screen.dart';
 import 'widgets/share_offer_dialog.dart';
@@ -46,6 +48,16 @@ class _AppShellState extends ConsumerState<AppShell> {
   void initState() {
     super.initState();
     _pageController = PageController(initialPage: _index);
+    // `listenManual` (not `ref.listen` in build) specifically so
+    // `fireImmediately` is available — a state already sitting in the DB
+    // when this profile session opens (this device's own last session, or
+    // synced in before this device ever opened the app) needs to be
+    // restored too, not just live updates that arrive after this
+    // subscription already exists. See docs/adr/0029-playback-state-sync.md.
+    ref.listenManual(playbackStateProvider, (previous, next) {
+      final state = next.value;
+      if (state != null) handleIncomingPlaybackState(context, ref, state);
+    }, fireImmediately: true);
   }
 
   @override

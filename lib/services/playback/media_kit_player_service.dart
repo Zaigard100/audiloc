@@ -51,7 +51,10 @@ class MediaKitPlayerService implements PlayerService {
   Track? get currentTrack => _currentTrack;
 
   @override
-  Future<void> setQueue(List<Track> tracks, {int startIndex = 0}) async {
+  Duration get position => _player.state.position;
+
+  @override
+  Future<void> setQueue(List<Track> tracks, {int startIndex = 0, bool autoPlay = true}) async {
     // Tracks known only through synced metadata (file not downloaded to
     // this device yet, see Track.isAvailableLocally) have no path to
     // play — drop them rather than hand mpv a queue it can't open.
@@ -73,7 +76,7 @@ class MediaKitPlayerService implements PlayerService {
       [for (final track in playable) Media(track.path!, extras: {'trackId': track.id})],
       index: effectiveStart,
     );
-    await _player.open(playlist);
+    await _player.open(playlist, play: autoPlay);
     _currentTrack = playable[effectiveStart];
     _currentTrackController.add(_currentTrack);
   }

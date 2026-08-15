@@ -14,6 +14,7 @@ class FakePlayerService implements PlayerService {
 
   bool _isPlaying = false;
   Track? _currentTrack;
+  Duration _position = Duration.zero;
 
   List<Track> lastQueue = [];
   int? lastStartIndex;
@@ -37,11 +38,15 @@ class FakePlayerService implements PlayerService {
   Track? get currentTrack => _currentTrack;
 
   @override
-  Future<void> setQueue(List<Track> tracks, {int startIndex = 0}) async {
+  Duration get position => _position;
+
+  @override
+  Future<void> setQueue(List<Track> tracks, {int startIndex = 0, bool autoPlay = true}) async {
     lastQueue = tracks;
     lastStartIndex = startIndex;
     _currentTrack = tracks.isEmpty ? null : tracks[startIndex];
     _currentTrackController.add(_currentTrack);
+    if (autoPlay) await play();
   }
 
   @override
@@ -60,7 +65,9 @@ class FakePlayerService implements PlayerService {
   Future<void> playOrPause() => _isPlaying ? pause() : play();
 
   @override
-  Future<void> seek(Duration position) async {}
+  Future<void> seek(Duration position) async {
+    _position = position;
+  }
 
   @override
   Future<void> next() async {}

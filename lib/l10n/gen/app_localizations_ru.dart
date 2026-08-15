@@ -42,6 +42,38 @@ class AppLocalizationsRu extends AppLocalizations {
   String get commonAllow => 'Разрешить';
 
   @override
+  String get commonNo => 'Нет';
+
+  @override
+  String get resumePlaybackTitle => 'Продолжить воспроизведение?';
+
+  @override
+  String resumePlaybackBody(String trackTitle, String time, String device) {
+    return 'Хотите продолжить с «$trackTitle», $time, $device?';
+  }
+
+  @override
+  String get resumePlaybackContinue => 'Продолжить';
+
+  @override
+  String get settingsPlayback => 'Воспроизведение';
+
+  @override
+  String get settingsKeyboardShortcuts => 'Управление с клавиатуры';
+
+  @override
+  String get settingsKeyboardShortcutsSubtitle =>
+      'Пробел — пауза, стрелки — перемотка, медиаклавиши';
+
+  @override
+  String get settingsSeekStep => 'Шаг перемотки';
+
+  @override
+  String settingsSeekStepSeconds(int seconds) {
+    return '$seconds с';
+  }
+
+  @override
   String get searchHint => 'Название, исполнитель, альбом…';
 
   @override

@@ -49,7 +49,7 @@ class PlaylistDetailScreen extends ConsumerWidget {
                     key: ValueKey(item.entryId),
                     track: item.track,
                     onTap: () {
-                      ref.read(queueSourceProvider.notifier).state = PlaylistQueueSource(name);
+                      ref.read(queueSourceProvider.notifier).state = PlaylistQueueSource(playlistId, name);
                       ref
                           .read(playerServiceProvider)
                           .setQueue(items.map((e) => e.track).toList(), startIndex: index);

@@ -12,6 +12,19 @@
   "fieldName": "Name",
   "commonDecline": "Decline",
   "commonAllow": "Allow",
+  "commonNo": "No",
+
+  "resumePlaybackTitle": "Resume playback?",
+  "resumePlaybackBody": "Continue with “{trackTitle}”, {time}, {device}?",
+  "@resumePlaybackBody": {"placeholders": {"trackTitle": {"type": "String"}, "time": {"type": "String"}, "device": {"type": "String"}}},
+  "resumePlaybackContinue": "Continue",
+
+  "settingsPlayback": "Playback",
+  "settingsKeyboardShortcuts": "Keyboard control",
+  "settingsKeyboardShortcutsSubtitle": "Space — pause, arrows — seek, media keys",
+  "settingsSeekStep": "Seek step",
+  "settingsSeekStepSeconds": "{seconds}s",
+  "@settingsSeekStepSeconds": {"placeholders": {"seconds": {"type": "int"}}},
 
   "searchHint": "Title, artist, album…",
   "searchStartTyping": "Start typing to search",

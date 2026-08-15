@@ -14,6 +14,8 @@ import 'core/theme/app_theme.dart';
 import 'data/directory_erase.dart';
 import 'data/profiles/profiles_store.dart';
 import 'data/settings/app_settings_store.dart';
+import 'features/player/models/playback_shortcuts_settings.dart';
+import 'features/player/widgets/playback_shortcuts.dart';
 import 'features/profiles/initial_profile_name_screen.dart';
 import 'features/profiles/language_choice_screen.dart';
 import 'l10n/l10n.dart';
@@ -68,6 +70,10 @@ class _AudilocAppState extends State<AudilocApp> {
   /// Persisted via [_settingsStore], defaults to [ThemeMode.system] — see
   /// docs/adr/0028-settings-screen-and-theming.md.
   ThemeMode _themeMode = ThemeMode.system;
+
+  /// Persisted via [_settingsStore] — see
+  /// docs/adr/0029-playback-state-sync.md.
+  PlaybackShortcutsSettings _playbackShortcutsSettings = const PlaybackShortcutsSettings();
 
   /// Set when [_bootstrap] or [_openProfile] throws — without this, an
   /// exception anywhere in that startup chain (a port still held by a
@@ -134,12 +140,14 @@ class _AudilocAppState extends State<AudilocApp> {
       final settingsStore = AppSettingsStore(appSupportDir);
       final savedLocale = await settingsStore.languageLocale();
       final savedThemeMode = await settingsStore.themeMode();
+      final savedPlaybackShortcuts = await settingsStore.playbackShortcutsSettings();
       if (!mounted) return;
       setState(() {
         _profilesStore = store;
         _settingsStore = settingsStore;
         _locale = savedLocale;
         _themeMode = savedThemeMode;
+        _playbackShortcutsSettings = savedPlaybackShortcuts;
       });
 
       // A genuinely fresh install (nothing to migrate either) — ask for a
@@ -215,6 +223,15 @@ class _AudilocAppState extends State<AudilocApp> {
     _session?.container.read(currentThemeModeProvider.notifier).state = mode;
     if (!mounted) return;
     setState(() => _themeMode = mode);
+  }
+
+  /// Bound to the playback-shortcuts settings in Settings — same pattern
+  /// as [_changeThemeMode], see docs/adr/0029-playback-state-sync.md.
+  Future<void> _changePlaybackShortcutsSettings(PlaybackShortcutsSettings settings) async {
+    await _settingsStore!.setPlaybackShortcutsSettings(settings);
+    _session?.container.read(currentPlaybackShortcutsSettingsProvider.notifier).state = settings;
+    if (!mounted) return;
+    setState(() => _playbackShortcutsSettings = settings);
   }
 
   /// Bound to "Стереть все данные" in Settings, after its own double
@@ -350,6 +367,8 @@ class _AudilocAppState extends State<AudilocApp> {
         changeThemeMode: _changeThemeMode,
         initialThemeMode: _themeMode,
         eraseAllData: _eraseAllData,
+        changePlaybackShortcutsSettings: _changePlaybackShortcutsSettings,
+        initialPlaybackShortcutsSettings: _playbackShortcutsSettings,
       );
       if (!mounted) {
         await session.close();
@@ -446,38 +465,45 @@ class _AudilocAppState extends State<AudilocApp> {
         locale: _locale,
         routerConfig: appRouter,
         builder: (context, child) {
-          if (!_awaitingProfileAdoption || child == null) return child ?? const SizedBox.shrink();
-          // The app underneath is fully usable while this shows — pairing
-          // just hasn't completed yet (docs/adr/0013-account-profiles.md).
-          return Column(
-            children: [
-              Material(
-                color: AppTheme.accent,
-                child: SafeArea(
-                  bottom: false,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            context.l10n.pairingBannerText,
-                            style: const TextStyle(color: Colors.white, fontSize: 12),
+          // The pairing banner and the keyboard/media-key shortcuts both
+          // apply everywhere under the router, so both wrap the same
+          // `content`, not each other's separate branch — keeps the
+          // shortcuts active even while the banner is showing.
+          final content = !_awaitingProfileAdoption || child == null
+              ? (child ?? const SizedBox.shrink())
+              // The app underneath is fully usable while this shows —
+              // pairing just hasn't completed yet
+              // (docs/adr/0013-account-profiles.md).
+              : Column(
+                  children: [
+                    Material(
+                      color: AppTheme.accent,
+                      child: SafeArea(
+                        bottom: false,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  context.l10n.pairingBannerText,
+                                  style: const TextStyle(color: Colors.white, fontSize: 12),
+                                ),
+                              ),
+                              TextButton(
+                                onPressed: () => appRouter.go('/devices'),
+                                style: TextButton.styleFrom(foregroundColor: Colors.white),
+                                child: Text(context.l10n.navDevices),
+                              ),
+                            ],
                           ),
                         ),
-                        TextButton(
-                          onPressed: () => appRouter.go('/devices'),
-                          style: TextButton.styleFrom(foregroundColor: Colors.white),
-                          child: Text(context.l10n.navDevices),
-                        ),
-                      ],
+                      ),
                     ),
-                  ),
-                ),
-              ),
-              Expanded(child: child),
-            ],
-          );
+                    Expanded(child: child),
+                  ],
+                );
+          return PlaybackShortcuts(child: content);
         },
       ),
     );

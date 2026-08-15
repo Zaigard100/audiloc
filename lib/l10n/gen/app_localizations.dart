@@ -158,6 +158,60 @@ abstract class AppLocalizations {
   /// **'Разрешить'**
   String get commonAllow;
 
+  /// No description provided for @commonNo.
+  ///
+  /// In ru, this message translates to:
+  /// **'Нет'**
+  String get commonNo;
+
+  /// No description provided for @resumePlaybackTitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'Продолжить воспроизведение?'**
+  String get resumePlaybackTitle;
+
+  /// No description provided for @resumePlaybackBody.
+  ///
+  /// In ru, this message translates to:
+  /// **'Хотите продолжить с «{trackTitle}», {time}, {device}?'**
+  String resumePlaybackBody(String trackTitle, String time, String device);
+
+  /// No description provided for @resumePlaybackContinue.
+  ///
+  /// In ru, this message translates to:
+  /// **'Продолжить'**
+  String get resumePlaybackContinue;
+
+  /// No description provided for @settingsPlayback.
+  ///
+  /// In ru, this message translates to:
+  /// **'Воспроизведение'**
+  String get settingsPlayback;
+
+  /// No description provided for @settingsKeyboardShortcuts.
+  ///
+  /// In ru, this message translates to:
+  /// **'Управление с клавиатуры'**
+  String get settingsKeyboardShortcuts;
+
+  /// No description provided for @settingsKeyboardShortcutsSubtitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'Пробел — пауза, стрелки — перемотка, медиаклавиши'**
+  String get settingsKeyboardShortcutsSubtitle;
+
+  /// No description provided for @settingsSeekStep.
+  ///
+  /// In ru, this message translates to:
+  /// **'Шаг перемотки'**
+  String get settingsSeekStep;
+
+  /// No description provided for @settingsSeekStepSeconds.
+  ///
+  /// In ru, this message translates to:
+  /// **'{seconds} с'**
+  String settingsSeekStepSeconds(int seconds);
+
   /// No description provided for @searchHint.
   ///
   /// In ru, this message translates to:

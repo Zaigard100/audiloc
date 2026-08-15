@@ -8,11 +8,34 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'fake_player_service.dart';
+
 void main() {
+  late AudilocDatabase db;
+
+  // Opening the (Isolate-backed, sqflite_common_ffi) db here rather than
+  // as the first `await` inside the `testWidgets` body — doing it there
+  // deadlocks `pumpWidget` right after, apparently because the Isolate
+  // port round-trip and flutter_test's own zone/frame-pumping don't mix
+  // when both happen inside the same test-body zone. `setUp` runs
+  // outside that zone, so this dodges it entirely — same pattern already
+  // used successfully in mini_player_test.dart.
+  setUp(() async {
+    db = await AudilocDatabase.openInMemory();
+  });
+
+  tearDown(() => db.close());
+
   testWidgets('TrackTile: renders, favorite toggles offline-first, onTap fires', (tester) async {
-    final db = await AudilocDatabase.openInMemory();
-    addTearDown(db.close);
-    final container = ProviderContainer(overrides: [databaseProvider.overrideWithValue(db)]);
+    final container = ProviderContainer(overrides: [
+      databaseProvider.overrideWithValue(db),
+      // TrackTile now watches currentTrackProvider/isPlayingProvider (the
+      // "highlight what's playing" feature, docs/adr/0029) — those chain
+      // to playerServiceProvider, whose real implementation is
+      // MediaKitPlayerService and needs libmpv initialized. Not overriding
+      // it here is what made this test hang.
+      playerServiceProvider.overrideWithValue(FakePlayerService()),
+    ]);
     addTearDown(container.dispose);
 
     const track = Track(id: 't1', path: '/a.mp3', title: 'Song', artist: 'Artist', album: 'Album');
@@ -36,16 +59,19 @@ void main() {
 
     await tester.tap(find.byIcon(Icons.favorite_border));
     // The write goes through sqflite_common_ffi's background isolate.
-    // Plain pump() still drains the event loop each call (unlike
-    // pump(duration), which only fast-forwards flutter_test's simulated
-    // clock) — a handful of them is enough for the isolate round trip to
-    // land without needing runAsync()/container.listen(), both of which
-    // were observed to hang the *next* test's teardown in this Flutter
-    // version when mixed with real async I/O inside a widget test.
-    for (var i = 0; i < 30; i++) {
-      await tester.pump();
-      if (find.byIcon(Icons.favorite).evaluate().isNotEmpty) break;
-    }
+    // Plain `pump()` never gives that real Isolate round trip a chance to
+    // land — it only drains already-queued microtasks/frame callbacks, so
+    // `favoriteIdsProvider` sits on AsyncLoading forever without this.
+    // `runAsync` is what actually lets real async I/O interleave with
+    // pumped frames (the standard Flutter-test way to do this); a real
+    // delay between pumps is needed too, not just the pumps themselves.
+    await tester.runAsync(() async {
+      for (var i = 0; i < 30; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+        await tester.pump();
+        if (find.byIcon(Icons.favorite).evaluate().isNotEmpty) break;
+      }
+    });
 
     expect(find.byIcon(Icons.favorite), findsOneWidget);
     expect(find.byIcon(Icons.favorite_border), findsNothing);

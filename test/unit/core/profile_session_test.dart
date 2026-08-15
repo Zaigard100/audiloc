@@ -6,6 +6,7 @@ import 'package:audiloc/core/providers.dart';
 import 'package:audiloc/data/models/track.dart';
 import 'package:audiloc/data/profiles/profile.dart';
 import 'package:audiloc/data/profiles/profiles_store.dart';
+import 'package:audiloc/features/player/models/playback_shortcuts_settings.dart';
 import 'package:audiloc/services/playback/player_service.dart';
 import 'package:audiloc/services/sync/pairing/pairing_models.dart';
 import 'package:flutter/material.dart' show Locale, ThemeMode;
@@ -28,7 +29,9 @@ class _NoopPlayerService implements PlayerService {
   @override
   Track? get currentTrack => null;
   @override
-  Future<void> setQueue(List<Track> tracks, {int startIndex = 0}) async {}
+  Duration get position => Duration.zero;
+  @override
+  Future<void> setQueue(List<Track> tracks, {int startIndex = 0, bool autoPlay = true}) async {}
   @override
   Future<void> play() async {}
   @override
@@ -53,6 +56,7 @@ Future<void> _noopWaitForPairing() async {}
 Future<void> _noopChangeLanguage(Locale? locale) async {}
 Future<void> _noopChangeThemeMode(ThemeMode mode) async {}
 Future<void> _noopEraseAllData() async {}
+Future<void> _noopChangePlaybackShortcutsSettings(PlaybackShortcutsSettings settings) async {}
 
 void main() {
   test(
@@ -83,6 +87,8 @@ void main() {
       changeThemeMode: _noopChangeThemeMode,
       initialThemeMode: ThemeMode.system,
       eraseAllData: _noopEraseAllData,
+      changePlaybackShortcutsSettings: _noopChangePlaybackShortcutsSettings,
+      initialPlaybackShortcutsSettings: const PlaybackShortcutsSettings(),
       platformLabel: _testPlatformLabel,
     );
     await first.close();
@@ -103,6 +109,8 @@ void main() {
       changeThemeMode: _noopChangeThemeMode,
       initialThemeMode: ThemeMode.system,
       eraseAllData: _noopEraseAllData,
+      changePlaybackShortcutsSettings: _noopChangePlaybackShortcutsSettings,
+      initialPlaybackShortcutsSettings: const PlaybackShortcutsSettings(),
       platformLabel: _testPlatformLabel,
     );
     await second.close();
@@ -132,6 +140,8 @@ void main() {
       changeThemeMode: _noopChangeThemeMode,
       initialThemeMode: ThemeMode.system,
       eraseAllData: _noopEraseAllData,
+      changePlaybackShortcutsSettings: _noopChangePlaybackShortcutsSettings,
+      initialPlaybackShortcutsSettings: const PlaybackShortcutsSettings(),
       platformLabel: _testPlatformLabel,
     );
     addTearDown(session.close);
@@ -161,6 +171,8 @@ void main() {
       changeThemeMode: _noopChangeThemeMode,
       initialThemeMode: ThemeMode.system,
       eraseAllData: _noopEraseAllData,
+      changePlaybackShortcutsSettings: _noopChangePlaybackShortcutsSettings,
+      initialPlaybackShortcutsSettings: const PlaybackShortcutsSettings(),
       platformLabel: _testPlatformLabel,
     );
     await first.close();
@@ -180,6 +192,8 @@ void main() {
       changeThemeMode: _noopChangeThemeMode,
       initialThemeMode: ThemeMode.system,
       eraseAllData: _noopEraseAllData,
+      changePlaybackShortcutsSettings: _noopChangePlaybackShortcutsSettings,
+      initialPlaybackShortcutsSettings: const PlaybackShortcutsSettings(),
       platformLabel: _testPlatformLabel,
     );
     addTearDown(second.close);
@@ -209,6 +223,8 @@ void main() {
       changeThemeMode: _noopChangeThemeMode,
       initialThemeMode: ThemeMode.system,
       eraseAllData: _noopEraseAllData,
+      changePlaybackShortcutsSettings: _noopChangePlaybackShortcutsSettings,
+      initialPlaybackShortcutsSettings: const PlaybackShortcutsSettings(),
       platformLabel: _testPlatformLabel,
     );
     addTearDown(session.close);

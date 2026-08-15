@@ -8,6 +8,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/models/track.dart';
 import '../../../l10n/l10n.dart';
+import '../../player/providers/player_providers.dart';
 import '../providers/library_providers.dart';
 
 class TrackTile extends ConsumerWidget {
@@ -31,22 +32,47 @@ class TrackTile extends ConsumerWidget {
     final isTransferring = transfers.containsKey(track.id);
     final fraction = transfers[track.id];
     final l10n = context.l10n;
+    // Otherwise identical tracks in different lists (Библиотека, a
+    // playlist, search results) gave no visual clue which one the mini
+    // player was actually on — easy to lose track of, especially in a
+    // long list.
+    final isCurrent = ref.watch(currentTrackProvider).value?.id == track.id;
+    final isPlaying = isCurrent && (ref.watch(isPlayingProvider).value ?? false);
 
     final tile = ListTile(
       onTap: onTap,
       onLongPress: onLongPress,
-      leading: ClipRRect(
-        borderRadius: BorderRadius.circular(4),
-        child: SizedBox(
-          width: 48,
-          height: 48,
-          child: track.coverPath != null
-              ? Image.file(File(track.coverPath!), fit: BoxFit.cover)
-              : ColoredBox(
-                  color: context.colors.surfaceHigh,
-                  child: Icon(Icons.music_note, color: context.colors.onSurfaceMuted),
+      tileColor: isCurrent ? AppTheme.accent.withValues(alpha: 0.08) : null,
+      leading: Stack(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: SizedBox(
+              width: 48,
+              height: 48,
+              child: track.coverPath != null
+                  ? Image.file(File(track.coverPath!), fit: BoxFit.cover)
+                  : ColoredBox(
+                      color: context.colors.surfaceHigh,
+                      child: Icon(Icons.music_note, color: context.colors.onSurfaceMuted),
+                    ),
+            ),
+          ),
+          if (isCurrent)
+            Positioned(
+              right: 0,
+              bottom: 0,
+              child: Container(
+                padding: const EdgeInsets.all(2),
+                decoration: const BoxDecoration(color: AppTheme.accent, shape: BoxShape.circle),
+                child: Icon(
+                  isPlaying ? Icons.volume_up : Icons.pause,
+                  size: 10,
+                  color: Colors.white,
                 ),
-        ),
+              ),
+            ),
+        ],
       ),
       title: Row(
         children: [
@@ -61,7 +87,14 @@ class TrackTile extends ConsumerWidget {
             const SizedBox(width: 4),
           ],
           Expanded(
-            child: Text(track.displayTitle, maxLines: 1, overflow: TextOverflow.ellipsis),
+            child: Text(
+              track.displayTitle,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: isCurrent
+                  ? const TextStyle(color: AppTheme.accent, fontWeight: FontWeight.w600)
+                  : null,
+            ),
           ),
         ],
       ),

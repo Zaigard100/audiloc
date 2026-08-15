@@ -8,6 +8,8 @@ import '../data/db/audiloc_database.dart';
 import '../data/profiles/profile.dart';
 import '../data/profiles/profiles_store.dart';
 import '../data/repositories/devices_repository.dart';
+import '../features/player/models/playback_shortcuts_settings.dart';
+import '../features/player/providers/player_providers.dart';
 import '../services/playback/player_service.dart';
 import '../services/sync/device_identity_service.dart';
 import '../services/sync/pairing/pairing_models.dart';
@@ -95,6 +97,8 @@ Future<ProfileSessionHandle> openProfileSession({
   required Future<void> Function(ThemeMode) changeThemeMode,
   required ThemeMode initialThemeMode,
   required Future<void> Function() eraseAllData,
+  required Future<void> Function(PlaybackShortcutsSettings) changePlaybackShortcutsSettings,
+  required PlaybackShortcutsSettings initialPlaybackShortcutsSettings,
   Future<String> Function() platformLabel = platformDeviceLabel,
 }) async {
   final profiles = await profilesStore.list();
@@ -131,6 +135,8 @@ Future<ProfileSessionHandle> openProfileSession({
     changeThemeModeProvider.overrideWithValue(changeThemeMode),
     currentThemeModeProvider.overrideWith((ref) => initialThemeMode),
     eraseAllDataProvider.overrideWithValue(eraseAllData),
+    changePlaybackShortcutsSettingsProvider.overrideWithValue(changePlaybackShortcutsSettings),
+    currentPlaybackShortcutsSettingsProvider.overrideWith((ref) => initialPlaybackShortcutsSettings),
   ]);
 
   // The three fixed-port *bind* calls are awaited — deliberately *not*
@@ -162,6 +168,10 @@ Future<ProfileSessionHandle> openProfileSession({
   // so no-replay) responses stream, and a pairing response arriving before
   // anyone's listening would otherwise be silently lost.
   container.read(pairingServiceProvider);
+  // Same "force it to exist now" reasoning — subscribes to
+  // `playerService.playingStream` from the start of the session, not
+  // whenever some widget first happens to read `playbackStateProvider`.
+  container.read(playbackStateWriterProvider);
   // Not awaited — no reason to make the UI wait on it — but the Future is
   // kept so `close()` can wait for it later. See
   // `ProfileSessionHandle._backgroundWork`.
