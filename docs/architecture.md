@@ -9,22 +9,38 @@ lib/
                                 текущей сессией профиля и плеером
                                 (docs/adr/0013-account-profiles.md)
   core/
-    theme/                   — тёмная тема (без брендинга, ТЗ п.1)
+    theme/                   — светлая+тёмная тема, ThemeExtension
+                                (docs/adr/0028-settings-screen-and-theming.md)
     router/                  — go_router: вкладки + деталка плейлиста
     providers.dart           — граф зависимостей (Riverpod)
     profile_session.dart     — открыть БД+сервисы для профиля / закрыть
                                 в правильном порядке при переключении
   data/
-    models/                  — Track, Playlist, PlaylistTrack/Item, Device
+    models/                  — Track, Playlist, PlaylistTrack/Item, Device,
+                                PlaybackState (docs/data-model.md)
     profiles/                — Profile, ProfilesStore — не-CRDT реестр
                                 профилей на устройстве (docs/adr/0013)
+    settings/                — AppSettingsStore: тема/язык/шорткаты/
+                                удалённое управление/синк состояния —
+                                уровня устройства, не CRDT, не профиля
+                                (docs/data-model.md)
+    local_playback_state_store.dart — последняя сессия воспроизведения,
+                                профиль-скоуп, не CRDT, никогда не
+                                синкается (docs/adr/0029)
     db/                      — схема sqlite_crdt (docs/data-model.md)
     repositories/            — CRUD + watch() поверх CRDT-таблиц
   services/
     playback/                — PlayerService (интерфейс) + media_kit;
                                 AudilocAudioHandler зеркалит его в
                                 audio_service (лок-скрин/уведомление/
-                                гарнитура, Android-only)
+                                гарнитура, Android-only); PlaybackStateWriter
+                                пишет позицию по паузе/закрытию приложения
+                                (docs/adr/0029-playback-state-sync.md)
+    remote_control/          — WebSocket-сервер/клиент: play/pause/next/
+                                previous и загрузка трека с позиции с
+                                другого уже сопряжённого устройства, только
+                                если локальная настройка это разрешает
+                                (docs/adr/0030-remote-playback-control.md)
     library_import/          — скан папки → теги → sha256 id → tracks
     dedupe/                  — эвристика дублей (docs/adr/0007)
     sync/
@@ -46,7 +62,11 @@ lib/
                                  но только для уже сопряжённых (docs/adr/0011)
   features/
     library/ playlists/ search/ devices/ player/ shell/ profiles/
-                              — экраны, виджеты, feature-провайдеры
+    settings/ about/          — экраны, виджеты, feature-провайдеры;
+                                 settings/ — тема/язык/шорткаты/удалённое
+                                 управление/синк состояния, все — уровня
+                                 устройства (docs/adr/0028, docs/adr/0029,
+                                 docs/adr/0030)
 ```
 
 Правило зависимостей: `features` → `services`/`data`, `services` →
@@ -132,6 +152,10 @@ HTTP-каналом ([ADR 0010](adr/0010-built-in-file-transfer.md)):
 - `databaseProvider`/`selfDeviceProvider`/`profileDirProvider`/
   `currentProfileProvider`/`profilesStoreProvider`/`switchProfileProvider`/
   `joinProfileForPairingProvider`/`canJoinDifferentProfileProvider`/
-  `waitForPairingProvider` — плейсхолдеры, переопределяемые через
-  `overrideWithValue` — виджет-тесты подставляют свою in-memory БД тем
-  же способом, что и `openProfileSession`.
+  `waitForPairingProvider` и аналогичная пара `change*`/`current*` для
+  каждой настройки устройства (тема, язык, шорткаты, удалённое
+  управление, отправлять/принимать/сохранять локально состояние
+  воспроизведения) — плейсхолдеры, переопределяемые через
+  `overrideWithValue`/`overrideWith` — виджет-тесты подставляют свою
+  in-memory БД и нужные значения настроек тем же способом, что и
+  `openProfileSession`.

@@ -6,11 +6,16 @@ Cross-platform (Linux/Windows/Android) music player with automatic P2P
 library synchronization (tracks, tags, favorites, playlists) between
 devices on the local network — no cloud, no central server.
 
-Status: **1.0.0**. Discovery, confirmed pairing, metadata sync, audio
+Status: **1.0.4**. Discovery, confirmed pairing, metadata sync, audio
 file and cover transfer, accounts/profiles, "Share" a track/album
 between devices — all verified live on real devices (Linux + Android).
 Deduplication is still just a rough heuristic (not `chromaprint`).
-Details and known limitations: [`docs/roadmap.md`](docs/roadmap.md).
+Device settings (theme/language), the now-playing highlight,
+keyboard/media-key shortcuts, and local session restore have been
+verified live; cross-device playback-state sync and remote control of
+paired devices are new and marked experimental (off by default) — live
+multi-device verification hasn't been done yet. Details and known
+limitations: [`docs/roadmap.md`](docs/roadmap.md).
 
 ## Features
 
@@ -23,7 +28,25 @@ Details and known limitations: [`docs/roadmap.md`](docs/roadmap.md).
   playback notification, lock-screen and headset/Bluetooth button
   control (`audio_service`,
   `lib/services/playback/audiloc_audio_handler.dart`). Tabs can also be
-  switched with a swipe, not just by tapping the bottom bar.
+  switched with a swipe, not just by tapping the bottom bar. The
+  currently playing track is highlighted in lists; tapping it again
+  pauses/resumes instead of restarting from the beginning.
+- Space (play/pause), arrow keys (seek), and hardware media keys
+  play/pause/next/previous — while the window is focused; seek step and
+  on/off are in Settings (docs/adr/0029).
+- Playback state (track + position): local restore after restarting the
+  app — **on by default**, never sent anywhere. Separately, independently,
+  and **off by default** (experimental) — syncing that same state
+  between paired devices: separate "send"/"receive" toggles, an
+  incoming state from another device is offered via a dismissible
+  notification rather than a blocking dialog
+  (docs/adr/0029-playback-state-sync.md).
+- Remote playback control — a device can opt in (off by default,
+  experimental) to letting other already-paired devices control it over
+  the local network: play/pause/next/previous and a live progress bar
+  right in the Devices list; long-press/right-click — play what's
+  loaded here on it, or pick a track from what it actually has locally
+  (docs/adr/0030-remote-playback-control.md).
 - Playlists: creation, multi-select when adding tracks (with search),
   delete/rename, fractional-index ordering (docs/data-model.md), cover
   art — either from one of its own tracks or an image file.
@@ -48,9 +71,14 @@ Details and known limitations: [`docs/roadmap.md`](docs/roadmap.md).
 - File transfer — built in, no third-party software: audiloc's own
   HTTP server and client fetch missing tracks from online peers on the
   local network, resuming after an interruption (docs/adr/0010).
-- "About" (the "ⓘ" icon on the Devices tab) — author, version, license,
-  and a short guide to the less obvious features, right inside the app
-  (docs/adr/0024).
+- Settings (gear icon on the Devices tab) — theme (light/dark/system,
+  actually applied across every screen, not a stub), language
+  (Russian/English, chosen on first launch or later here), all the
+  toggles above, "Erase all data" (every profile on the device, double
+  confirmation), and "About" on its own screen
+  (docs/adr/0027-localization.md, docs/adr/0028-settings-screen-and-theming.md).
+- "About" — author, version, license, and a short guide to the less
+  obvious features, right inside the app (docs/adr/0024).
 
 ## Architecture
 
@@ -96,12 +124,12 @@ flutter analyze
 # Tests: all unit tests at once
 flutter test test/unit/
 
-# Tests: each widget test individually — see docs/testing-notes.md
-# (this Flutter build has a known shutdown hang after real sqflite
-# writes when running `flutter test` with no arguments)
-flutter test test/widget/mini_player_test.dart
-flutter test test/widget/track_tile_test.dart
-flutter test test/widget/library_screen_test.dart
+# Tests: all widget tests at once
+flutter test test/widget/
+
+# A bare `flutter test` with no arguments (unit+widget in one call) has
+# a known shutdown hang in this particular Flutter build — see
+# docs/testing-notes.md; the two separate calls above are stable.
 
 # Run on Linux desktop
 flutter run -d linux
@@ -117,23 +145,32 @@ Building for Android and Windows needs its own platform setup
 
 ## Tests
 
+~140 unit tests + 15 widget tests, all passing.
+
 - `test/unit/data/` — repositories (`TracksRepository`,
-  `FavoritesRepository`, `PlaylistsRepository`, `ProfilesStore`) on
-  `SqliteCrdt.openInMemory()`: CRUD, soft-delete/restore, fractional
-  playlist ordering.
+  `FavoritesRepository`, `PlaylistsRepository`, `ProfilesStore`,
+  `PlaybackStateRepository`) on `SqliteCrdt.openInMemory()`: CRUD,
+  soft-delete/restore, fractional playlist ordering.
 - `test/unit/services/` — dedup heuristic, library import (real sha256
   hashing + a fake `TagReader`), a **real** `crdt_sync` P2P round-trip
   between two in-memory nodes over an actual localhost socket, a
   **real** HTTP round-trip file transfer between
   `FileTransferServer`/`FileTransferClient` (including resuming an
   interrupted file), pairing (`PairingService`) and "Share"
-  (`ShareService`) — also real HTTP round-trips, not mocks.
+  (`ShareService`) — also real HTTP round-trips, not mocks; a **real**
+  WebSocket round-trip for remote control
+  (`RemoteControlServer`/`RemoteControlClient`), and playback-state
+  writes (`PlaybackStateWriter`) across every combination of local/
+  network saving.
 - `test/widget/` — mini-player, track tile (offline-first favorite
-  toggle), library screen (empty state / list).
+  toggle, now-playing highlight), library screen (empty state / list),
+  first launch (language choice / profile creation), playback-state
+  restore (both the local and cross-device paths — regression coverage
+  for real scenarios, not just "doesn't crash").
 
-All tests pass; for why they're worth running per directory/file
-rather than one bare `flutter test` in this specific environment, see
-[`docs/testing-notes.md`](docs/testing-notes.md).
+For why `test/unit/` and `test/widget/` are worth running as two
+separate calls rather than one bare `flutter test` in this specific
+environment, see [`docs/testing-notes.md`](docs/testing-notes.md).
 
 ## Repository structure
 
