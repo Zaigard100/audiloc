@@ -35,7 +35,10 @@ lib/
                                 audio_service (лок-скрин/уведомление/
                                 гарнитура, Android-only); PlaybackStateWriter
                                 пишет позицию по паузе/закрытию приложения
-                                (docs/adr/0029-playback-state-sync.md)
+                                (docs/adr/0029-playback-state-sync.md);
+                                shuffle/repeat — тоже через PlayerService,
+                                сессионные, не сохраняются
+                                (docs/adr/0031-shuffle-and-repeat.md)
     remote_control/          — WebSocket-сервер/клиент: play/pause/next/
                                 previous и загрузка трека с позиции с
                                 другого уже сопряжённого устройства, только

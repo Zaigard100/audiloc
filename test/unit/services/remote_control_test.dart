@@ -35,11 +35,19 @@ class _FakePlayerService implements PlayerService {
   @override
   Stream<bool> get completedStream => const Stream.empty();
   @override
+  Stream<bool> get shuffleStream => const Stream.empty();
+  @override
+  Stream<PlaybackRepeatMode> get repeatModeStream => const Stream.empty();
+  @override
   bool get isPlaying => _isPlaying;
   @override
   Track? get currentTrack => _currentTrack;
   @override
   Duration get position => _position;
+  @override
+  bool get isShuffleEnabled => false;
+  @override
+  PlaybackRepeatMode get repeatMode => PlaybackRepeatMode.all;
 
   @override
   Future<void> setQueue(List<Track> tracks, {int startIndex = 0, bool autoPlay = true, Duration? seekTo}) async {
@@ -77,6 +85,10 @@ class _FakePlayerService implements PlayerService {
   @override
   Future<void> previous() async => previousCalls++;
   @override
+  Future<void> setShuffle(bool enabled) async {}
+  @override
+  Future<void> setRepeatMode(PlaybackRepeatMode mode) async {}
+  @override
   Future<void> dispose() async {
     await _playingController.close();
     await _trackController.close();
@@ -107,7 +119,7 @@ void main() {
       playerService: player,
       devicesRepository: devicesRepository,
       tracksRepository: tracksRepository,
-      isAllowed: () => allowed,
+      isAllowed: (_) => allowed,
       port: port,
     );
     await server.start();

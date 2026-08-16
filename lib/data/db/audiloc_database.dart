@@ -23,7 +23,7 @@ class AudilocDatabase {
     final dbPath = path ?? await _defaultPath();
     final crdt = await SqliteCrdt.open(
       dbPath,
-      version: 5,
+      version: 6,
       onCreate: _createSchema,
       onUpgrade: _upgradeSchema,
     );
@@ -33,7 +33,7 @@ class AudilocDatabase {
   /// In-memory database for tests: fast, isolated, no filesystem access.
   static Future<AudilocDatabase> openInMemory() async {
     final crdt = await SqliteCrdt.openInMemory(
-      version: 5,
+      version: 6,
       onCreate: _createSchema,
     );
     return AudilocDatabase._(crdt);
@@ -98,6 +98,7 @@ class AudilocDatabase {
     await _createTrackLocationsTable(db);
     await _createPlaylistLocationsTable(db);
     await _createPlaybackStateTable(db);
+    await _createProfileSettingsTable(db);
   }
 
   /// `track_locations` holds where *this device* actually has each track's
@@ -167,6 +168,23 @@ class AudilocDatabase {
         )
       ''');
 
+  /// A single, deliberately-global row (`id = 'current'`, enforced by
+  /// [ProfileSettingsRepository]) for settings that are properties of the
+  /// *profile*, not of any one device — unlike [AppSettingsStore]'s
+  /// device-level settings.json. `sync_playback_enabled` replaced what
+  /// used to be two independent, device-local "отправлять"/"принимать"
+  /// toggles (see the ADR 0029 changelog): being an ordinary CRDT-tracked
+  /// row, flipping it on any one device propagates to every device in the
+  /// profile through the same merge that already carries everything else,
+  /// with no extra plumbing needed.
+  static Future<void> _createProfileSettingsTable(CrdtTableExecutor db) => db.execute('''
+        CREATE TABLE profile_settings (
+          id TEXT NOT NULL,
+          sync_playback_enabled INTEGER NOT NULL DEFAULT 0,
+          PRIMARY KEY (id)
+        )
+      ''');
+
   static Future<void> _upgradeSchema(CrdtTableExecutor db, int from, int to) async {
     if (from < 2) {
       await _createTrackLocationsTable(db);
@@ -180,6 +198,9 @@ class AudilocDatabase {
     }
     if (from < 5) {
       await _createPlaybackStateTable(db);
+    }
+    if (from < 6) {
+      await _createProfileSettingsTable(db);
     }
   }
 

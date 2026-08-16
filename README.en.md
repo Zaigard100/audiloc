@@ -23,14 +23,16 @@ limitations: [`docs/roadmap.md`](docs/roadmap.md).
   sha256 as the track id (idempotent re-import). Long-press (or
   right-click on desktop) a track for a menu: edit
   (title/artist/album/genre/cover), add to playlist, share, delete.
-- Player: bottom mini-player + full-screen (swipe up/tap), queue,
-  favorites — offline-first, no waiting on the network. On Android —
-  playback notification, lock-screen and headset/Bluetooth button
-  control (`audio_service`,
+- Player: bottom mini-player + full-screen (swipe up/tap, swipe down to
+  collapse back), queue, favorites — offline-first, no waiting on the
+  network. On Android — playback notification, lock-screen and
+  headset/Bluetooth button control (`audio_service`,
   `lib/services/playback/audiloc_audio_handler.dart`). Tabs can also be
   switched with a swipe, not just by tapping the bottom bar. The
   currently playing track is highlighted in lists; tapping it again
-  pauses/resumes instead of restarting from the beginning.
+  pauses/resumes instead of restarting from the beginning. The
+  full-screen player also has shuffle and repeat (whole queue on loop —
+  default — or a single track), docs/adr/0031-shuffle-and-repeat.md.
 - Space (play/pause), arrow keys (seek), and hardware media keys
   play/pause/next/previous — while the window is focused; seek step and
   on/off are in Settings (docs/adr/0029).

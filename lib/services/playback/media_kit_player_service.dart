@@ -11,7 +11,22 @@ import 'player_service.dart';
 /// this class.
 class MediaKitPlayerService implements PlayerService {
   MediaKitPlayerService() : _player = Player() {
+    // Loop-the-whole-queue is the default (docs/adr/0031-shuffle-and-repeat.md)
+    // — fire-and-forget, nothing downstream waits on this having landed.
+    unawaited(_player.setPlaylistMode(PlaylistMode.loop));
     _playlistSub = _player.stream.playlist.listen((playlist) {
+      // `playlist-(un)shuffle` (see [setShuffle]) reorders mpv's own
+      // playlist in place rather than touching our `_queue` — rebuild it
+      // from whatever order mpv now reports, keyed by the `trackId` extra
+      // every `Media` carries (set in [setQueue]), so `_queue[index]`
+      // below always matches what's actually about to play.
+      final reordered = [
+        for (final media in playlist.medias)
+          if (_tracksById[media.extras?['trackId']] case final track?) track,
+      ];
+      if (reordered.length == playlist.medias.length && reordered.isNotEmpty) {
+        _queue = reordered;
+      }
       final index = playlist.index;
       final track = (index >= 0 && index < _queue.length) ? _queue[index] : null;
       if (track != _currentTrack) {
@@ -23,9 +38,14 @@ class MediaKitPlayerService implements PlayerService {
 
   final Player _player;
   final _currentTrackController = StreamController<Track?>.broadcast();
+  final _shuffleController = StreamController<bool>.broadcast();
+  final _repeatModeController = StreamController<PlaybackRepeatMode>.broadcast();
   late final StreamSubscription<Playlist> _playlistSub;
   List<Track> _queue = const [];
+  final Map<String, Track> _tracksById = {};
   Track? _currentTrack;
+  bool _shuffleEnabled = false;
+  PlaybackRepeatMode _repeatMode = PlaybackRepeatMode.all;
 
   @override
   Stream<bool> get playingStream => _player.stream.playing;
@@ -54,6 +74,18 @@ class MediaKitPlayerService implements PlayerService {
   Duration get position => _player.state.position;
 
   @override
+  Stream<bool> get shuffleStream => _shuffleController.stream;
+
+  @override
+  Stream<PlaybackRepeatMode> get repeatModeStream => _repeatModeController.stream;
+
+  @override
+  bool get isShuffleEnabled => _shuffleEnabled;
+
+  @override
+  PlaybackRepeatMode get repeatMode => _repeatMode;
+
+  @override
   Future<void> setQueue(
     List<Track> tracks, {
     int startIndex = 0,
@@ -65,6 +97,9 @@ class MediaKitPlayerService implements PlayerService {
     // play — drop them rather than hand mpv a queue it can't open.
     final playable = tracks.where((t) => t.isAvailableLocally).toList();
     _queue = playable;
+    _tracksById
+      ..clear()
+      ..addEntries(playable.map((t) => MapEntry(t.id, t)));
 
     if (playable.isEmpty) {
       await _player.stop();
@@ -94,6 +129,11 @@ class MediaKitPlayerService implements PlayerService {
       await _seekAfterOpen(seekTo);
       if (autoPlay) await _player.play();
     }
+    // `open()` resets mpv's own shuffle flag internally (it clears and
+    // reloads the whole native playlist) — reapply ours so the toggle
+    // stays sticky across queue changes instead of silently going back
+    // to unshuffled every time the user picks a new track/playlist.
+    if (_shuffleEnabled) await _player.setShuffle(true);
     _currentTrack = playable[effectiveStart];
     _currentTrackController.add(_currentTrack);
   }
@@ -148,9 +188,29 @@ class MediaKitPlayerService implements PlayerService {
   Future<void> previous() => _player.previous();
 
   @override
+  Future<void> setShuffle(bool enabled) async {
+    _shuffleEnabled = enabled;
+    _shuffleController.add(enabled);
+    await _player.setShuffle(enabled);
+  }
+
+  @override
+  Future<void> setRepeatMode(PlaybackRepeatMode mode) async {
+    _repeatMode = mode;
+    _repeatModeController.add(mode);
+    await _player.setPlaylistMode(switch (mode) {
+      PlaybackRepeatMode.off => PlaylistMode.none,
+      PlaybackRepeatMode.all => PlaylistMode.loop,
+      PlaybackRepeatMode.one => PlaylistMode.single,
+    });
+  }
+
+  @override
   Future<void> dispose() async {
     await _playlistSub.cancel();
     await _currentTrackController.close();
+    await _shuffleController.close();
+    await _repeatModeController.close();
     await _player.dispose();
   }
 }

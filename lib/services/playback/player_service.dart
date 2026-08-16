@@ -1,5 +1,13 @@
 import '../../data/models/track.dart';
 
+/// How the queue behaves once it runs out (or, for [one], on every track):
+/// [off] stops after the last track, [all] wraps back to the first track
+/// (default — see docs/adr/0031-shuffle-and-repeat.md), [one] repeats the
+/// current track indefinitely. Mirrors `media_kit`'s `PlaylistMode`
+/// one-to-one, kept as our own enum so the UI/provider layer never needs
+/// to import `media_kit` (see the class doc below).
+enum PlaybackRepeatMode { off, all, one }
+
 class PlaybackPositionState {
   const PlaybackPositionState({required this.position, required this.duration});
 
@@ -18,9 +26,13 @@ abstract class PlayerService {
   Stream<PlaybackPositionState> get positionStream;
   Stream<Track?> get currentTrackStream;
   Stream<bool> get completedStream;
+  Stream<bool> get shuffleStream;
+  Stream<PlaybackRepeatMode> get repeatModeStream;
 
   bool get isPlaying;
   Track? get currentTrack;
+  bool get isShuffleEnabled;
+  PlaybackRepeatMode get repeatMode;
 
   /// Synchronous snapshot of the current position — unlike
   /// [positionStream], usable at a single point in time (e.g. the moment
@@ -49,6 +61,15 @@ abstract class PlayerService {
   Future<void> seek(Duration position);
   Future<void> next();
   Future<void> previous();
+
+  /// Randomizes play order within the current queue (library/playlist,
+  /// whatever it was set from) rather than reordering the queue itself —
+  /// `next`/`previous` then walk that random order. Sticky across
+  /// `next`/`previous`, but a fresh `setQueue` call needs it reapplied
+  /// (see `MediaKitPlayerService.setQueue`'s doc).
+  Future<void> setShuffle(bool enabled);
+
+  Future<void> setRepeatMode(PlaybackRepeatMode mode);
 
   Future<void> dispose();
 }

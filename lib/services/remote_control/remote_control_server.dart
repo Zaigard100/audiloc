@@ -31,7 +31,7 @@ class RemoteControlServer {
     required PlayerService playerService,
     required DevicesRepository devicesRepository,
     required TracksRepository tracksRepository,
-    required bool Function() isAllowed,
+    required bool Function(String callerDeviceId) isAllowed,
     this.port = 8546,
   })  : _playerService = playerService,
         _devicesRepository = devicesRepository,
@@ -41,7 +41,12 @@ class RemoteControlServer {
   final PlayerService _playerService;
   final DevicesRepository _devicesRepository;
   final TracksRepository _tracksRepository;
-  final bool Function() _isAllowed;
+
+  /// Takes the connecting device's id — since
+  /// docs/adr/0033-playback-ownership-and-handoff.md, "allowed" isn't
+  /// just the device-level toggle (ADR 0030) anymore: a device that just
+  /// received a handoff must also accept its initiator, toggle or not.
+  final bool Function(String callerDeviceId) _isAllowed;
   final int port;
 
   HttpServer? _server;
@@ -123,7 +128,7 @@ class RemoteControlServer {
     if (deviceId == null) return null;
 
     final paired = await _devicesRepository.byId(deviceId) != null;
-    if (!paired || !_isAllowed()) {
+    if (!paired || !_isAllowed(deviceId)) {
       _send(socket, const {'type': 'rejected'});
       return null;
     }
@@ -155,6 +160,8 @@ class RemoteControlServer {
         await _playerService.next();
       case RemotePrevious():
         await _playerService.previous();
+      case RemoteSeek(:final positionMs):
+        await _playerService.seek(Duration(milliseconds: positionMs));
       case RemoteLoadAndPlay(:final trackIds, :final startIndex, :final positionMs):
         if (startIndex < 0 || startIndex >= trackIds.length) return;
         final startId = trackIds[startIndex];

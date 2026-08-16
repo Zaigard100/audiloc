@@ -72,35 +72,24 @@ class AppSettingsStore {
 
   Future<void> setAllowRemoteControl(bool value) => _write('allowRemoteControl', value);
 
-  /// Whether this device pushes its own playback position into the
-  /// cross-device-synced CRDT table at all (docs/adr/0029-playback-state-sync.md)
-  /// — **off** by default: the user explicitly asked for this once the
-  /// feature had already needed several follow-up fixes (see the ADR's
-  /// regression log), and wants it opt-in and labeled experimental
-  /// rather than on by default until it's proven out more. Independent
-  /// of [saveLocalSession] — restoring this device's own last session
-  /// after its own restart no longer depends on this at all, only on
-  /// whether other devices get to see/receive it.
-  Future<bool> sendPlaybackStateSync() async => (await _read())['sendPlaybackStateSync'] as bool? ?? false;
+  /// Whether this device should try to keep running in the background —
+  /// only ever shown in Settings while the profile-wide sync toggle
+  /// (`ProfileSettingsRepository`) is on, so sync/remote control keep
+  /// working while the app isn't in the foreground. Off by default,
+  /// device-level: this device's own OS-level capability, not a choice
+  /// any other device in the profile can make for it. See
+  /// docs/adr/0032-unified-profile-sync-and-background-mode.md.
+  Future<bool> keepAliveInBackground() async => (await _read())['keepAliveInBackground'] as bool? ?? false;
 
-  Future<void> setSendPlaybackStateSync(bool value) => _write('sendPlaybackStateSync', value);
-
-  /// Whether this device acts on an incoming playback-state row written
-  /// by a *different* device — **off** by default, same reasoning as
-  /// [sendPlaybackStateSync]. Doesn't affect [saveLocalSession] at all —
-  /// restoring this device's own last session was never "receiving a
-  /// sync from elsewhere" to begin with.
-  Future<bool> receivePlaybackStateSync() async =>
-      (await _read())['receivePlaybackStateSync'] as bool? ?? false;
-
-  Future<void> setReceivePlaybackStateSync(bool value) => _write('receivePlaybackStateSync', value);
+  Future<void> setKeepAliveInBackground(bool value) => _write('keepAliveInBackground', value);
 
   /// Whether this device remembers its own last-paused track/position
   /// and restores it after its own restart — purely local
   /// (`LocalPlaybackStateStore`), never synced anywhere, independent of
-  /// [sendPlaybackStateSync]/[receivePlaybackStateSync]. **On** by
-  /// default, unlike those two: nothing here ever leaves the device, so
-  /// it doesn't carry the same "still experimental" risk.
+  /// the profile-wide sync toggle (`ProfileSettingsRepository`,
+  /// docs/adr/0032-unified-profile-sync-and-background-mode.md). **On**
+  /// by default, unlike that one: nothing here ever leaves the device,
+  /// so it doesn't carry the same "still experimental" risk.
   Future<bool> saveLocalSession() async => (await _read())['saveLocalSession'] as bool? ?? true;
 
   Future<void> setSaveLocalSession(bool value) => _write('saveLocalSession', value);

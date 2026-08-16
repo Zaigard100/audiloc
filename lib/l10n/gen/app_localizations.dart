@@ -224,29 +224,59 @@ abstract class AppLocalizations {
   /// **'Только на этом устройстве, никуда не отправляется. Запоминает последний трек и позицию и продолжает с них при следующем запуске'**
   String get settingsSaveLocalSessionSubtitle;
 
-  /// No description provided for @settingsSendPlaybackStateSync.
+  /// No description provided for @settingsSyncPlaybackState.
   ///
   /// In ru, this message translates to:
-  /// **'Отправлять состояние воспроизведения'**
-  String get settingsSendPlaybackStateSync;
+  /// **'Синхронизировать состояние воспроизведения'**
+  String get settingsSyncPlaybackState;
 
-  /// No description provided for @settingsSendPlaybackStateSyncSubtitle.
+  /// No description provided for @settingsSyncPlaybackStateSubtitle.
   ///
   /// In ru, this message translates to:
-  /// **'Экспериментально, может работать нестабильно. Синхронизирует позицию последнего трека этого устройства на другие устройства'**
-  String get settingsSendPlaybackStateSyncSubtitle;
+  /// **'Экспериментально, может работать нестабильно. Действует сразу на всех устройствах этого профиля: включив здесь, вы включаете и отправку, и приём позиции воспроизведения между ними'**
+  String get settingsSyncPlaybackStateSubtitle;
 
-  /// No description provided for @settingsReceivePlaybackStateSync.
+  /// No description provided for @settingsKeepAliveInBackground.
   ///
   /// In ru, this message translates to:
-  /// **'Принимать состояние воспроизведения'**
-  String get settingsReceivePlaybackStateSync;
+  /// **'Работать в фоне'**
+  String get settingsKeepAliveInBackground;
 
-  /// No description provided for @settingsReceivePlaybackStateSyncSubtitle.
+  /// No description provided for @settingsKeepAliveInBackgroundSubtitle.
   ///
   /// In ru, this message translates to:
-  /// **'Экспериментально, может работать нестабильно. Позволяет применять или предлагать продолжить с позиции, присланной другим устройством'**
-  String get settingsReceivePlaybackStateSyncSubtitle;
+  /// **'Только на этом устройстве. Приложение продолжит синхронизироваться и принимать удалённое управление, даже когда экран выключен или окно свёрнуто'**
+  String get settingsKeepAliveInBackgroundSubtitle;
+
+  /// No description provided for @playbackTargetPickerTitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'Воспроизвести на устройстве'**
+  String get playbackTargetPickerTitle;
+
+  /// No description provided for @playbackTargetThisDevice.
+  ///
+  /// In ru, this message translates to:
+  /// **'Это устройство'**
+  String get playbackTargetThisDevice;
+
+  /// No description provided for @playbackTargetNoDevices.
+  ///
+  /// In ru, this message translates to:
+  /// **'Нет доступных устройств поблизости. Включите синхронизацию воспроизведения на другом устройстве профиля'**
+  String get playbackTargetNoDevices;
+
+  /// No description provided for @playbackTargetHandoffFailed.
+  ///
+  /// In ru, this message translates to:
+  /// **'Не удалось передать воспроизведение на «{device}»'**
+  String playbackTargetHandoffFailed(String device);
+
+  /// No description provided for @playbackTargetPlayingOn.
+  ///
+  /// In ru, this message translates to:
+  /// **'Играет на «{device}»'**
+  String playbackTargetPlayingOn(String device);
 
   /// No description provided for @deviceActionResumeHere.
   ///
@@ -523,6 +553,36 @@ abstract class AppLocalizations {
   /// In ru, this message translates to:
   /// **'Играет: Плейлист «{name}»'**
   String playerSourcePlaylist(String name);
+
+  /// No description provided for @playerShuffleOff.
+  ///
+  /// In ru, this message translates to:
+  /// **'Случайный порядок: выкл'**
+  String get playerShuffleOff;
+
+  /// No description provided for @playerShuffleOn.
+  ///
+  /// In ru, this message translates to:
+  /// **'Случайный порядок: вкл'**
+  String get playerShuffleOn;
+
+  /// No description provided for @playerRepeatOff.
+  ///
+  /// In ru, this message translates to:
+  /// **'Повтор: выкл'**
+  String get playerRepeatOff;
+
+  /// No description provided for @playerRepeatAll.
+  ///
+  /// In ru, this message translates to:
+  /// **'Повтор: все треки'**
+  String get playerRepeatAll;
+
+  /// No description provided for @playerRepeatOne.
+  ///
+  /// In ru, this message translates to:
+  /// **'Повтор: один трек'**
+  String get playerRepeatOne;
 
   /// No description provided for @trackActionEdit.
   ///

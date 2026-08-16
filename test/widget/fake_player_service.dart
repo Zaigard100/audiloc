@@ -11,10 +11,14 @@ class FakePlayerService implements PlayerService {
   final _positionController = StreamController<PlaybackPositionState>.broadcast();
   final _currentTrackController = StreamController<Track?>.broadcast();
   final _completedController = StreamController<bool>.broadcast();
+  final _shuffleController = StreamController<bool>.broadcast();
+  final _repeatModeController = StreamController<PlaybackRepeatMode>.broadcast();
 
   bool _isPlaying = false;
   Track? _currentTrack;
   Duration _position = Duration.zero;
+  bool _shuffleEnabled = false;
+  PlaybackRepeatMode _repeatMode = PlaybackRepeatMode.all;
 
   List<Track> lastQueue = [];
   int? lastStartIndex;
@@ -32,6 +36,12 @@ class FakePlayerService implements PlayerService {
   Stream<bool> get completedStream => _completedController.stream;
 
   @override
+  Stream<bool> get shuffleStream => _shuffleController.stream;
+
+  @override
+  Stream<PlaybackRepeatMode> get repeatModeStream => _repeatModeController.stream;
+
+  @override
   bool get isPlaying => _isPlaying;
 
   @override
@@ -39,6 +49,12 @@ class FakePlayerService implements PlayerService {
 
   @override
   Duration get position => _position;
+
+  @override
+  bool get isShuffleEnabled => _shuffleEnabled;
+
+  @override
+  PlaybackRepeatMode get repeatMode => _repeatMode;
 
   @override
   Future<void> setQueue(
@@ -82,11 +98,25 @@ class FakePlayerService implements PlayerService {
   Future<void> previous() async {}
 
   @override
+  Future<void> setShuffle(bool enabled) async {
+    _shuffleEnabled = enabled;
+    _shuffleController.add(enabled);
+  }
+
+  @override
+  Future<void> setRepeatMode(PlaybackRepeatMode mode) async {
+    _repeatMode = mode;
+    _repeatModeController.add(mode);
+  }
+
+  @override
   Future<void> dispose() async {
     await _playingController.close();
     await _positionController.close();
     await _currentTrackController.close();
     await _completedController.close();
+    await _shuffleController.close();
+    await _repeatModeController.close();
   }
 
   void emitTrack(Track? track) {

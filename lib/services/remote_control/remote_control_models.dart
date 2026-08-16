@@ -61,6 +61,7 @@ sealed class RemoteCommand {
         'pause' => const RemotePause(),
         'next' => const RemoteNext(),
         'previous' => const RemotePrevious(),
+        'seek' when json['positionMs'] is int => RemoteSeek(positionMs: json['positionMs']! as int),
         'loadAndPlay' when json['trackIds'] is List => RemoteLoadAndPlay(
             trackIds: (json['trackIds']! as List).cast<String>(),
             startIndex: json['startIndex'] as int? ?? 0,
@@ -92,6 +93,17 @@ class RemotePrevious extends RemoteCommand {
   const RemotePrevious();
   @override
   Map<String, Object?> toJson() => const {'type': 'command', 'action': 'previous'};
+}
+
+/// Added for the full player screen's remote-control mode
+/// (docs/adr/0033-playback-ownership-and-handoff.md) — the Devices tab's
+/// inline quick-controls (ADR 0030) deliberately don't expose seeking
+/// (display-only progress bar), so this was never needed there.
+class RemoteSeek extends RemoteCommand {
+  const RemoteSeek({required this.positionMs});
+  final int positionMs;
+  @override
+  Map<String, Object?> toJson() => {'type': 'command', 'action': 'seek', 'positionMs': positionMs};
 }
 
 class RemoteLoadAndPlay extends RemoteCommand {

@@ -35,8 +35,8 @@ class SettingsScreen extends ConsumerWidget {
           const _SeekStepPicker(),
           const _AllowRemoteControlToggle(),
           const _SaveLocalSessionToggle(),
-          const _SendPlaybackStateSyncToggle(),
-          const _ReceivePlaybackStateSyncToggle(),
+          const _SyncPlaybackStateToggle(),
+          const _KeepAliveInBackgroundToggle(),
           const Divider(height: 1),
           ListTile(
             leading: const Icon(Icons.info_outline),
@@ -351,38 +351,50 @@ class _SaveLocalSessionToggle extends ConsumerWidget {
 /// several follow-up fixes (see docs/adr/0029-playback-state-sync.md's
 /// regression log). Independent of [_SaveLocalSessionToggle] — this
 /// device's own restore-after-restart no longer depends on this at all.
-class _SendPlaybackStateSyncToggle extends ConsumerWidget {
-  const _SendPlaybackStateSyncToggle();
+/// Unlike every other toggle on this screen, this one is profile-wide,
+/// not device-level (docs/adr/0032-unified-profile-sync-and-background-mode.md):
+/// it's a CRDT row, written directly via [profileSettingsRepositoryProvider]
+/// rather than through the `changeXProvider`/`AudilocApp` plumbing the
+/// device-level toggles use, so flipping it here propagates to every
+/// device sharing this profile.
+class _SyncPlaybackStateToggle extends ConsumerWidget {
+  const _SyncPlaybackStateToggle();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = context.l10n;
-    final enabled = ref.watch(currentSendPlaybackStateSyncProvider);
+    final enabled = ref.watch(profileSyncEnabledProvider).value ?? false;
     return SwitchListTile(
-      secondary: const Icon(Icons.upload_outlined),
-      title: Text(l10n.settingsSendPlaybackStateSync),
-      subtitle: Text(l10n.settingsSendPlaybackStateSyncSubtitle),
+      secondary: const Icon(Icons.sync_outlined),
+      title: Text(l10n.settingsSyncPlaybackState),
+      subtitle: Text(l10n.settingsSyncPlaybackStateSubtitle),
       value: enabled,
-      onChanged: (value) => ref.read(changeSendPlaybackStateSyncProvider)(value),
+      onChanged: (value) => ref.read(profileSettingsRepositoryProvider).setSyncPlaybackEnabled(value),
     );
   }
 }
 
-/// Same "off by default, experimental" reasoning as
-/// [_SendPlaybackStateSyncToggle] — see docs/adr/0029-playback-state-sync.md.
-class _ReceivePlaybackStateSyncToggle extends ConsumerWidget {
-  const _ReceivePlaybackStateSyncToggle();
+/// Only rendered while [_SyncPlaybackStateToggle] is on — background
+/// operation only matters if there's something to keep syncing/remote
+/// -controlling while the app isn't in the foreground. Device-level (not
+/// CRDT), off by default — see
+/// docs/adr/0032-unified-profile-sync-and-background-mode.md.
+class _KeepAliveInBackgroundToggle extends ConsumerWidget {
+  const _KeepAliveInBackgroundToggle();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final syncEnabled = ref.watch(profileSyncEnabledProvider).value ?? false;
+    if (!syncEnabled) return const SizedBox.shrink();
+
     final l10n = context.l10n;
-    final enabled = ref.watch(currentReceivePlaybackStateSyncProvider);
+    final enabled = ref.watch(currentKeepAliveInBackgroundProvider);
     return SwitchListTile(
-      secondary: const Icon(Icons.download_outlined),
-      title: Text(l10n.settingsReceivePlaybackStateSync),
-      subtitle: Text(l10n.settingsReceivePlaybackStateSyncSubtitle),
+      secondary: const Icon(Icons.all_inclusive_outlined),
+      title: Text(l10n.settingsKeepAliveInBackground),
+      subtitle: Text(l10n.settingsKeepAliveInBackgroundSubtitle),
       value: enabled,
-      onChanged: (value) => ref.read(changeReceivePlaybackStateSyncProvider)(value),
+      onChanged: (value) => ref.read(changeKeepAliveInBackgroundProvider)(value),
     );
   }
 }

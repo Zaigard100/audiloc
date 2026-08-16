@@ -30,8 +30,13 @@ Future<void> handleIncomingPlaybackState(BuildContext context, WidgetRef ref, Pl
   // independent of whether cross-device sync is even on.
   if (state.deviceId == self.id) return;
 
-  // Settings "принимать" toggle.
-  if (!ref.read(currentReceivePlaybackStateSyncProvider)) return;
+  // The unified profile-wide sync toggle — a one-shot CRDT read, not
+  // `ref.read(profileSyncEnabledProvider).value`: this runs from a
+  // `fireImmediately: true` listener that can fire before that
+  // `StreamProvider`'s underlying CRDT watch has delivered its first
+  // emission, which would otherwise read as `null`/false and silently
+  // drop an incoming state even when sync is actually on.
+  if (!await ref.read(profileSettingsRepositoryProvider).isSyncPlaybackEnabled()) return;
 
   // `playerService.currentTrack` (a plain synchronous getter), not
   // `ref.read(currentTrackProvider).value` — the latter goes through a

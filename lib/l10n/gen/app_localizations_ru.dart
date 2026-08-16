@@ -82,20 +82,39 @@ class AppLocalizationsRu extends AppLocalizations {
       'Только на этом устройстве, никуда не отправляется. Запоминает последний трек и позицию и продолжает с них при следующем запуске';
 
   @override
-  String get settingsSendPlaybackStateSync =>
-      'Отправлять состояние воспроизведения';
+  String get settingsSyncPlaybackState =>
+      'Синхронизировать состояние воспроизведения';
 
   @override
-  String get settingsSendPlaybackStateSyncSubtitle =>
-      'Экспериментально, может работать нестабильно. Синхронизирует позицию последнего трека этого устройства на другие устройства';
+  String get settingsSyncPlaybackStateSubtitle =>
+      'Экспериментально, может работать нестабильно. Действует сразу на всех устройствах этого профиля: включив здесь, вы включаете и отправку, и приём позиции воспроизведения между ними';
 
   @override
-  String get settingsReceivePlaybackStateSync =>
-      'Принимать состояние воспроизведения';
+  String get settingsKeepAliveInBackground => 'Работать в фоне';
 
   @override
-  String get settingsReceivePlaybackStateSyncSubtitle =>
-      'Экспериментально, может работать нестабильно. Позволяет применять или предлагать продолжить с позиции, присланной другим устройством';
+  String get settingsKeepAliveInBackgroundSubtitle =>
+      'Только на этом устройстве. Приложение продолжит синхронизироваться и принимать удалённое управление, даже когда экран выключен или окно свёрнуто';
+
+  @override
+  String get playbackTargetPickerTitle => 'Воспроизвести на устройстве';
+
+  @override
+  String get playbackTargetThisDevice => 'Это устройство';
+
+  @override
+  String get playbackTargetNoDevices =>
+      'Нет доступных устройств поблизости. Включите синхронизацию воспроизведения на другом устройстве профиля';
+
+  @override
+  String playbackTargetHandoffFailed(String device) {
+    return 'Не удалось передать воспроизведение на «$device»';
+  }
+
+  @override
+  String playbackTargetPlayingOn(String device) {
+    return 'Играет на «$device»';
+  }
 
   @override
   String get deviceActionResumeHere => 'Запустить то, что у меня на паузе';
@@ -256,6 +275,21 @@ class AppLocalizationsRu extends AppLocalizations {
   String playerSourcePlaylist(String name) {
     return 'Играет: Плейлист «$name»';
   }
+
+  @override
+  String get playerShuffleOff => 'Случайный порядок: выкл';
+
+  @override
+  String get playerShuffleOn => 'Случайный порядок: вкл';
+
+  @override
+  String get playerRepeatOff => 'Повтор: выкл';
+
+  @override
+  String get playerRepeatAll => 'Повтор: все треки';
+
+  @override
+  String get playerRepeatOne => 'Повтор: один трек';
 
   @override
   String get trackActionEdit => 'Редактировать';

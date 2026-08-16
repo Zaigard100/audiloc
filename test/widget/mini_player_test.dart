@@ -71,13 +71,29 @@ void main() {
   });
 
   testWidgets('tapping the bar opens the full player', (tester) async {
-    await tester.pumpWidget(buildApp());
-    playerService.emitTrack(const Track(id: 't1', path: '/a.mp3', title: 'My Song'));
-    await tester.pump();
+    // `runAsync` (not just `pump`/`pumpAndSettle`) — `FullPlayerScreen`
+    // now reads the profile-wide sync toggle
+    // (docs/adr/0032-unified-profile-sync-and-background-mode.md), a
+    // real CRDT/sqflite query; without this the underlying sqflite
+    // transaction lock's own internal timer never gets to actually
+    // resolve inside the fake-async test zone, and the test fails at
+    // teardown with "A Timer is still pending" — same reasoning as
+    // `resume_playback_test.dart`'s use of `runAsync`.
+    await tester.runAsync(() async {
+      await tester.pumpWidget(buildApp());
+      playerService.emitTrack(const Track(id: 't1', path: '/a.mp3', title: 'My Song'));
+      for (var i = 0; i < 10 && find.text('My Song').evaluate().isEmpty; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+        await tester.pump();
+      }
 
-    await tester.tap(find.text('My Song'));
-    await tester.pumpAndSettle();
+      await tester.tap(find.text('My Song'));
+      for (var i = 0; i < 30 && find.text('Сейчас играет').evaluate().isEmpty; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+        await tester.pump();
+      }
 
-    expect(find.text('Сейчас играет'), findsOneWidget);
+      expect(find.text('Сейчас играет'), findsOneWidget);
+    });
   });
 }

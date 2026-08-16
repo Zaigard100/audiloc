@@ -14,6 +14,7 @@ import '../data/repositories/devices_repository.dart';
 import '../data/repositories/favorites_repository.dart';
 import '../data/repositories/playback_state_repository.dart';
 import '../data/repositories/playlists_repository.dart';
+import '../data/repositories/profile_settings_repository.dart';
 import '../data/repositories/tracks_repository.dart';
 import '../features/player/models/playback_shortcuts_settings.dart';
 import '../services/dedupe/dedupe_service.dart';
@@ -21,6 +22,9 @@ import '../services/library_import/library_import_service.dart';
 import '../services/library_import/tag_reader.dart';
 import '../services/playback/media_kit_player_service.dart';
 import '../services/playback/player_service.dart';
+import '../services/playback_ownership/ownership_claiming_player_service.dart';
+import '../services/playback_ownership/playback_ownership_coordinator.dart';
+import '../services/playback_ownership/playback_ownership_server.dart';
 import '../services/remote_control/remote_control_server.dart';
 import '../services/sync/device_identity_service.dart';
 import '../services/sync/discovery/discovery_service.dart';
@@ -183,33 +187,21 @@ final currentAllowRemoteControlProvider = StateProvider<bool>(
       throw UnimplementedError('currentAllowRemoteControlProvider must be overridden by profile_session.dart'),
 );
 
-/// Same pattern again — see docs/adr/0029-playback-state-sync.md's
-/// send/receive toggles. [changeSendPlaybackStateSyncProvider] gates
-/// `PlaybackStateWriter.saveCurrentState()` itself (both the
-/// pause-triggered write and the app-lifecycle "closed without pausing"
-/// one); [changeReceivePlaybackStateSyncProvider] gates whether
-/// `handleIncomingPlaybackState` acts on a row written by a *different*
-/// device.
-final changeSendPlaybackStateSyncProvider = Provider<Future<void> Function(bool)>(
-  (ref) => throw UnimplementedError('changeSendPlaybackStateSyncProvider must be overridden by AudilocApp'),
+/// Same pattern again — see
+/// docs/adr/0032-unified-profile-sync-and-background-mode.md. Only shown
+/// in Settings while [profileSyncEnabledProvider] is on; device-level
+/// (not CRDT), off by default, same reasoning as
+/// [currentAllowRemoteControlProvider].
+final changeKeepAliveInBackgroundProvider = Provider<Future<void> Function(bool)>(
+  (ref) => throw UnimplementedError('changeKeepAliveInBackgroundProvider must be overridden by AudilocApp'),
 );
 
-final currentSendPlaybackStateSyncProvider = StateProvider<bool>(
+final currentKeepAliveInBackgroundProvider = StateProvider<bool>(
   (ref) => throw UnimplementedError(
-      'currentSendPlaybackStateSyncProvider must be overridden by profile_session.dart'),
+      'currentKeepAliveInBackgroundProvider must be overridden by profile_session.dart'),
 );
 
-final changeReceivePlaybackStateSyncProvider = Provider<Future<void> Function(bool)>(
-  (ref) =>
-      throw UnimplementedError('changeReceivePlaybackStateSyncProvider must be overridden by AudilocApp'),
-);
-
-final currentReceivePlaybackStateSyncProvider = StateProvider<bool>(
-  (ref) => throw UnimplementedError(
-      'currentReceivePlaybackStateSyncProvider must be overridden by profile_session.dart'),
-);
-
-/// Separate from send/receive above — this one's purely local (see
+/// Separate from profile-wide sync below — this one's purely local (see
 /// [LocalPlaybackStateStore]/`local_session_restore.dart`), on by
 /// default (unlike the cross-device toggles): restoring this device's
 /// own last session never leaves the device, so it isn't the same
@@ -234,6 +226,25 @@ final tracksRepositoryProvider =
 final playbackStateRepositoryProvider =
     Provider((ref) => PlaybackStateRepository(ref.watch(databaseProvider).crdt));
 
+final profileSettingsRepositoryProvider =
+    Provider((ref) => ProfileSettingsRepository(ref.watch(databaseProvider).crdt));
+
+/// Replaces what used to be two independent, device-local
+/// "отправлять"/"принимать" toggles — a single value, shared for the
+/// whole profile via the CRDT `profile_settings` row (unlike
+/// [currentAllowRemoteControlProvider]/[currentSaveLocalSessionProvider],
+/// which stay device-level). Gates both
+/// `PlaybackStateWriter.saveCurrentState()` (the send side) and
+/// `handleIncomingPlaybackState` (the receive side) — see
+/// docs/adr/0032-unified-profile-sync-and-background-mode.md. Written
+/// directly via `ref.read(profileSettingsRepositoryProvider).setSyncPlaybackEnabled(...)`
+/// from the settings toggle — a CRDT write, not a device-level setting,
+/// so it doesn't need the `changeXProvider`/`AudilocApp` plumbing the
+/// device-level toggles use.
+final profileSyncEnabledProvider = StreamProvider<bool>(
+  (ref) => ref.watch(profileSettingsRepositoryProvider).watchSyncPlaybackEnabled(),
+);
+
 final favoritesRepositoryProvider =
     Provider((ref) => FavoritesRepository(ref.watch(databaseProvider).crdt));
 
@@ -247,11 +258,28 @@ final deviceIdentityServiceProvider = Provider(
   (ref) => DeviceIdentityService(ref.watch(databaseProvider), ref.watch(devicesRepositoryProvider)),
 );
 
-final playerServiceProvider = Provider<PlayerService>((ref) {
+/// The bare local audio engine, undecorated — [playerServiceProvider] is
+/// what the rest of the app actually reads; this exists separately so
+/// [playbackOwnershipCoordinatorProvider] (which needs to call `pause()`
+/// on this device's *own* engine when it loses a claim) doesn't have to
+/// depend on [playerServiceProvider] itself, which in turn depends on
+/// the coordinator — see [playerServiceProvider]'s doc.
+final rawPlayerServiceProvider = Provider<PlayerService>((ref) {
   final service = MediaKitPlayerService();
   ref.onDispose(service.dispose);
   return service;
 });
+
+/// Wraps [rawPlayerServiceProvider] in [OwnershipClaimingPlayerService] —
+/// unconditionally, so every reader (mini player, keyboard shortcuts,
+/// `PlaybackStateWriter`, incoming remote control from another device)
+/// gets ownership-claiming behavior for free, with no effect at all
+/// while [profileSyncEnabledProvider] is off. See
+/// docs/adr/0033-playback-ownership-and-handoff.md.
+final playerServiceProvider = Provider<PlayerService>((ref) => OwnershipClaimingPlayerService(
+      ref.watch(rawPlayerServiceProvider),
+      ref.watch(playbackOwnershipCoordinatorProvider),
+    ));
 
 final dedupeServiceProvider = Provider<DedupeService>((ref) => DedupeService());
 
@@ -440,9 +468,54 @@ final remoteControlServerProvider = Provider<RemoteControlServer>((ref) {
     playerService: ref.watch(playerServiceProvider),
     devicesRepository: ref.watch(devicesRepositoryProvider),
     tracksRepository: ref.watch(tracksRepositoryProvider),
-    isAllowed: () => ref.read(currentAllowRemoteControlProvider),
+    // Additive: the device-level toggle (ADR 0030) OR the caller being
+    // whoever this device most recently received a handoff from (ADR
+    // 0033) — that explicit ack already is the consent to be
+    // controlled by it.
+    isAllowed: (callerDeviceId) =>
+        ref.read(currentAllowRemoteControlProvider) ||
+        callerDeviceId == ref.read(playbackOwnershipCoordinatorProvider).lastHandoffInitiator,
     port: remoteControlPort,
   );
   ref.onDispose(server.dispose);
   return server;
+});
+
+const playbackOwnershipPort = 8547;
+
+/// Listens for ownership links from other devices, always — same
+/// "listens always, checks per-connection" posture as
+/// [remoteControlServerProvider], but gated by [profileSyncEnabledProvider]
+/// instead of the "allow remote control" toggle. See
+/// docs/adr/0033-playback-ownership-and-handoff.md.
+final playbackOwnershipServerProvider = Provider<PlaybackOwnershipServer>((ref) {
+  final server = PlaybackOwnershipServer(
+    devicesRepository: ref.watch(devicesRepositoryProvider),
+    isSyncEnabled: () => ref.read(profileSyncEnabledProvider).value ?? false,
+    port: playbackOwnershipPort,
+  );
+  ref.onDispose(server.dispose);
+  return server;
+});
+
+/// Keeps a live ownership link to every online, paired, sync-enabled
+/// peer and resolves who's currently allowed to make sound — see
+/// [PlaybackOwnershipCoordinator]'s doc and
+/// docs/adr/0033-playback-ownership-and-handoff.md. Deliberately watches
+/// [rawPlayerServiceProvider], not [playerServiceProvider] — see the
+/// latter's doc for why.
+final playbackOwnershipCoordinatorProvider = Provider<PlaybackOwnershipCoordinator>((ref) {
+  final self = ref.watch(selfDeviceProvider);
+  final coordinator = PlaybackOwnershipCoordinator(
+    selfDeviceId: self.id,
+    selfDeviceName: self.name,
+    discoveryService: ref.watch(discoveryServiceProvider),
+    devicesRepository: ref.watch(devicesRepositoryProvider),
+    profileSettingsRepository: ref.watch(profileSettingsRepositoryProvider),
+    playerService: ref.watch(rawPlayerServiceProvider),
+    server: ref.watch(playbackOwnershipServerProvider),
+    port: playbackOwnershipPort,
+  );
+  ref.onDispose(coordinator.dispose);
+  return coordinator;
 });

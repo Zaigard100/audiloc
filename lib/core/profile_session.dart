@@ -56,6 +56,10 @@ class ProfileSessionHandle {
     await _step('pairingServer', () => container.read(pairingServerProvider).dispose());
     await _step('shareServer', () => container.read(shareServerProvider).dispose());
     await _step('remoteControlServer', () => container.read(remoteControlServerProvider).dispose());
+    await _step(
+        'playbackOwnershipCoordinator', () => container.read(playbackOwnershipCoordinatorProvider).dispose());
+    await _step(
+        'playbackOwnershipServer', () => container.read(playbackOwnershipServerProvider).dispose());
     await _step('fileTransferServer', () => container.read(fileTransferServerProvider).dispose());
     await _step(
         'fileSyncService', () async => (await container.read(fileSyncServiceProvider.future)).dispose());
@@ -102,10 +106,8 @@ Future<ProfileSessionHandle> openProfileSession({
   required PlaybackShortcutsSettings initialPlaybackShortcutsSettings,
   required Future<void> Function(bool) changeAllowRemoteControl,
   required bool initialAllowRemoteControl,
-  required Future<void> Function(bool) changeSendPlaybackStateSync,
-  required bool initialSendPlaybackStateSync,
-  required Future<void> Function(bool) changeReceivePlaybackStateSync,
-  required bool initialReceivePlaybackStateSync,
+  required Future<void> Function(bool) changeKeepAliveInBackground,
+  required bool initialKeepAliveInBackground,
   required Future<void> Function(bool) changeSaveLocalSession,
   required bool initialSaveLocalSession,
   Future<String> Function() platformLabel = platformDeviceLabel,
@@ -131,7 +133,10 @@ Future<ProfileSessionHandle> openProfileSession({
   final container = ProviderContainer(overrides: [
     databaseProvider.overrideWithValue(database),
     selfDeviceProvider.overrideWithValue(selfDevice),
-    playerServiceProvider.overrideWithValue(playerService),
+    // Not `playerServiceProvider` itself — that provider now computes a
+    // decorated wrapper around this raw engine instance (see
+    // `rawPlayerServiceProvider`'s doc, docs/adr/0033-playback-ownership-and-handoff.md).
+    rawPlayerServiceProvider.overrideWithValue(playerService),
     profileDirProvider.overrideWithValue(profileDir),
     currentProfileProvider.overrideWith((ref) => profile),
     profilesStoreProvider.overrideWithValue(profilesStore),
@@ -148,10 +153,8 @@ Future<ProfileSessionHandle> openProfileSession({
     currentPlaybackShortcutsSettingsProvider.overrideWith((ref) => initialPlaybackShortcutsSettings),
     changeAllowRemoteControlProvider.overrideWithValue(changeAllowRemoteControl),
     currentAllowRemoteControlProvider.overrideWith((ref) => initialAllowRemoteControl),
-    changeSendPlaybackStateSyncProvider.overrideWithValue(changeSendPlaybackStateSync),
-    currentSendPlaybackStateSyncProvider.overrideWith((ref) => initialSendPlaybackStateSync),
-    changeReceivePlaybackStateSyncProvider.overrideWithValue(changeReceivePlaybackStateSync),
-    currentReceivePlaybackStateSyncProvider.overrideWith((ref) => initialReceivePlaybackStateSync),
+    changeKeepAliveInBackgroundProvider.overrideWithValue(changeKeepAliveInBackground),
+    currentKeepAliveInBackgroundProvider.overrideWith((ref) => initialKeepAliveInBackground),
     changeSaveLocalSessionProvider.overrideWithValue(changeSaveLocalSession),
     currentSaveLocalSessionProvider.overrideWith((ref) => initialSaveLocalSession),
   ]);
@@ -180,6 +183,13 @@ Future<ProfileSessionHandle> openProfileSession({
   await container.read(pairingServerProvider).start();
   await container.read(shareServerProvider).start();
   await container.read(remoteControlServerProvider).start();
+  // Also starts `playbackOwnershipServerProvider` (its own dependency) —
+  // constructing the coordinator here, rather than leaving it to whenever
+  // some widget first reads it, is what makes it start subscribing to
+  // discovery events from session-open time, same "force it to exist
+  // now" reasoning as `pairingServiceProvider`/`playbackStateWriterProvider`
+  // below.
+  await container.read(playbackOwnershipCoordinatorProvider).start();
   await container.read(fileTransferServerProvider).start();
   // Forces PairingService to exist now rather than whenever some widget
   // first reads it — its constructor is what subscribes to the (broadcast,

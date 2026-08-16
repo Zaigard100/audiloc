@@ -24,6 +24,17 @@ final currentTrackProvider = StreamProvider(
   (ref) => ref.watch(playerServiceProvider).currentTrackStream,
 );
 
+/// Play-order toggles (docs/adr/0031-shuffle-and-repeat.md) — session-only,
+/// not persisted: they reset to the defaults below on every app launch,
+/// same as the queue itself.
+final shuffleEnabledProvider = StreamProvider<bool>(
+  (ref) => ref.watch(playerServiceProvider).shuffleStream,
+);
+
+final repeatModeProvider = StreamProvider<PlaybackRepeatMode>(
+  (ref) => ref.watch(playerServiceProvider).repeatModeStream,
+);
+
 /// The single synced "last paused here" row for this profile — see
 /// [PlaybackStateWriter] (writer side) and
 /// docs/adr/0029-playback-state-sync.md.
@@ -42,7 +53,7 @@ final playbackStateWriterProvider = Provider<PlaybackStateWriter>((ref) {
     localStore: ref.watch(localPlaybackStateStoreProvider),
     selfDevice: ref.watch(selfDeviceProvider),
     currentQueueSource: () => ref.read(queueSourceProvider),
-    isSendEnabled: () => ref.read(currentSendPlaybackStateSyncProvider),
+    isSendEnabled: () => ref.read(profileSyncEnabledProvider).value ?? false,
     isLocalSaveEnabled: () => ref.read(currentSaveLocalSessionProvider),
   );
   writer.start();

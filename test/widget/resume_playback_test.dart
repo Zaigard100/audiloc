@@ -4,6 +4,7 @@ import 'package:audiloc/data/models/device.dart';
 import 'package:audiloc/data/models/playback_state.dart';
 import 'package:audiloc/data/models/track.dart';
 import 'package:audiloc/data/repositories/playback_state_repository.dart';
+import 'package:audiloc/data/repositories/profile_settings_repository.dart';
 import 'package:audiloc/data/repositories/tracks_repository.dart';
 import 'package:audiloc/features/player/providers/player_providers.dart';
 import 'package:audiloc/features/player/widgets/resume_playback_prompt.dart';
@@ -72,12 +73,12 @@ void main() {
         deviceId: 'self',
         deviceName: 'Ноутбук',
       ));
+      await ProfileSettingsRepository(db.crdt).setSyncPlaybackEnabled(true);
 
       final container = ProviderContainer(overrides: [
         databaseProvider.overrideWithValue(db),
         playerServiceProvider.overrideWithValue(playerService),
         selfDeviceProvider.overrideWithValue(self),
-        currentReceivePlaybackStateSyncProvider.overrideWith((ref) => true),
       ]);
       addTearDown(container.dispose);
 
@@ -112,18 +113,18 @@ void main() {
         deviceId: 'other-device',
         deviceName: 'Телефон',
       ));
+      // The row's deviceId ('other-device') isn't self, so
+      // handleIncomingPlaybackState now gates on the unified sync
+      // setting before it even resolves the queue — on here since this
+      // test is specifically about the "ask first" path, not about the
+      // setting itself.
+      await ProfileSettingsRepository(db.crdt).setSyncPlaybackEnabled(true);
       playerService.emitTrack(const Track(id: 'already-playing', path: '/b.mp3', title: 'Other'));
 
       final container = ProviderContainer(overrides: [
         databaseProvider.overrideWithValue(db),
         playerServiceProvider.overrideWithValue(playerService),
         selfDeviceProvider.overrideWithValue(self),
-        // The row's deviceId ('other-device') isn't self, so
-        // handleIncomingPlaybackState now gates on the "принимать"
-        // setting before it even resolves the queue — on here since
-        // this test is specifically about that "ask first" path, not
-        // about the setting itself.
-        currentReceivePlaybackStateSyncProvider.overrideWith((ref) => true),
       ]);
       addTearDown(container.dispose);
 
@@ -164,7 +165,7 @@ void main() {
   });
 
   testWidgets(
-      'a state from a different device is ignored entirely when "принимать" is off — '
+      'a state from a different device is ignored entirely when the sync toggle is off — '
       'no snackbar, nothing applied', (tester) async {
     await tester.runAsync(() async {
       await TracksRepository(db.crdt).upsert(track);
@@ -175,12 +176,14 @@ void main() {
         deviceId: 'other-device',
         deviceName: 'Телефон',
       ));
+      // Off by default — no explicit write needed, but left implicit on
+      // purpose so this test exercises the real default, not a value it
+      // set itself.
 
       final container = ProviderContainer(overrides: [
         databaseProvider.overrideWithValue(db),
         playerServiceProvider.overrideWithValue(playerService),
         selfDeviceProvider.overrideWithValue(self),
-        currentReceivePlaybackStateSyncProvider.overrideWith((ref) => false),
       ]);
       addTearDown(container.dispose);
 

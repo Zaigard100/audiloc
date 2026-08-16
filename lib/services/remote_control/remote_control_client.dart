@@ -99,6 +99,7 @@ class RemoteControlClient {
   void pause() => _send(const RemotePause());
   void next() => _send(const RemoteNext());
   void previous() => _send(const RemotePrevious());
+  void seek(Duration position) => _send(RemoteSeek(positionMs: position.inMilliseconds));
 
   /// [trackIds] is the *whole* queue to load, [startIndex] which entry to
   /// start at and seek to [position] — a single-track queue would leave

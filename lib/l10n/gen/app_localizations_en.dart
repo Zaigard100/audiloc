@@ -82,18 +82,38 @@ class AppLocalizationsEn extends AppLocalizations {
       'This device only, never sent anywhere. Remembers the last track and position and continues from them next launch';
 
   @override
-  String get settingsSendPlaybackStateSync => 'Send playback state';
+  String get settingsSyncPlaybackState => 'Sync playback state';
 
   @override
-  String get settingsSendPlaybackStateSyncSubtitle =>
-      'Experimental, may be unstable. Syncs this device\'s last track position to other devices';
+  String get settingsSyncPlaybackStateSubtitle =>
+      'Experimental, may be unstable. Applies to every device on this profile at once: turning it on here turns on both sending and receiving playback position between them';
 
   @override
-  String get settingsReceivePlaybackStateSync => 'Receive playback state';
+  String get settingsKeepAliveInBackground => 'Run in background';
 
   @override
-  String get settingsReceivePlaybackStateSyncSubtitle =>
-      'Experimental, may be unstable. Lets a position sent by another device apply here, or prompt to continue from it';
+  String get settingsKeepAliveInBackgroundSubtitle =>
+      'This device only. The app keeps syncing and accepting remote control even while the screen is off or the window is minimized';
+
+  @override
+  String get playbackTargetPickerTitle => 'Play on device';
+
+  @override
+  String get playbackTargetThisDevice => 'This device';
+
+  @override
+  String get playbackTargetNoDevices =>
+      'No devices nearby right now. Turn on playback sync on another device in this profile';
+
+  @override
+  String playbackTargetHandoffFailed(String device) {
+    return 'Couldn\'t hand off playback to \"$device\"';
+  }
+
+  @override
+  String playbackTargetPlayingOn(String device) {
+    return 'Playing on \"$device\"';
+  }
 
   @override
   String get deviceActionResumeHere => 'Play what\'s paused here';
@@ -255,6 +275,21 @@ class AppLocalizationsEn extends AppLocalizations {
   String playerSourcePlaylist(String name) {
     return 'Playing: Playlist “$name”';
   }
+
+  @override
+  String get playerShuffleOff => 'Shuffle: off';
+
+  @override
+  String get playerShuffleOn => 'Shuffle: on';
+
+  @override
+  String get playerRepeatOff => 'Repeat: off';
+
+  @override
+  String get playerRepeatAll => 'Repeat: all';
+
+  @override
+  String get playerRepeatOne => 'Repeat: one track';
 
   @override
   String get trackActionEdit => 'Edit';
