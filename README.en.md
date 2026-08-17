@@ -6,16 +6,20 @@ Cross-platform (Linux/Windows/Android) music player with automatic P2P
 library synchronization (tracks, tags, favorites, playlists) between
 devices on the local network — no cloud, no central server.
 
-Status: **1.0.4**. Discovery, confirmed pairing, metadata sync, audio
+Status: **1.0.5**. Discovery, confirmed pairing, metadata sync, audio
 file and cover transfer, accounts/profiles, "Share" a track/album
 between devices — all verified live on real devices (Linux + Android).
 Deduplication is still just a rough heuristic (not `chromaprint`).
 Device settings (theme/language), the now-playing highlight,
 keyboard/media-key shortcuts, and local session restore have been
-verified live; cross-device playback-state sync and remote control of
-paired devices are new and marked experimental (off by default) — live
-multi-device verification hasn't been done yet. Details and known
-limitations: [`docs/roadmap.md`](docs/roadmap.md).
+verified live. Playback-state sync (one profile-wide toggle), remote
+control of paired devices, and a "single active player per profile"
+mode with Spotify Connect–style manual handoff are new and
+experimental (network sync is off by default) — live testing on a
+real device pair already caught and fixed several protocol races (see
+[ADR 0033](docs/adr/0033-playback-ownership-and-handoff.md)), and work
+continues. Details and known limitations:
+[`docs/roadmap.md`](docs/roadmap.md).
 
 ## Features
 
@@ -39,10 +43,16 @@ limitations: [`docs/roadmap.md`](docs/roadmap.md).
 - Playback state (track + position): local restore after restarting the
   app — **on by default**, never sent anywhere. Separately, independently,
   and **off by default** (experimental) — syncing that same state
-  between paired devices: separate "send"/"receive" toggles, an
-  incoming state from another device is offered via a dismissible
-  notification rather than a blocking dialog
-  (docs/adr/0029-playback-state-sync.md).
+  across the profile's devices: one shared toggle, applies to every
+  device on the profile at once after sync
+  (docs/adr/0032-unified-profile-sync-and-background-mode.md).
+- "Single active player" mode (Spotify Connect–style) — while sync is
+  on, playback is actually running on only one device in the profile at
+  a time. From the full-screen player (device icon in the app bar) you
+  can manually hand off playback to another device — the queue and
+  position travel with the handoff, and the player switches into
+  remote-control mode for that device (play/pause/next/prev/seek/
+  shuffle/repeat) (docs/adr/0033-playback-ownership-and-handoff.md).
 - Remote playback control — a device can opt in (off by default,
   experimental) to letting other already-paired devices control it over
   the local network: play/pause/next/previous and a live progress bar
@@ -136,8 +146,12 @@ flutter test test/widget/
 # Run on Linux desktop
 flutter run -d linux
 
-# Build the Linux binary
-flutter build linux --release
+# Build the Linux binary. `--no-tree-shake-icons` is required: a
+# release build without it silently drops some Material icon glyphs
+# (seen with Icons.cast, Icons.cast_connected, Icons.smartphone,
+# Icons.speaker_outlined) even though they're referenced directly in
+# code — you get a "tofu" box/digit instead of the icon.
+flutter build linux --release --no-tree-shake-icons
 ```
 
 Building for Android and Windows needs its own platform setup
@@ -147,7 +161,7 @@ Building for Android and Windows needs its own platform setup
 
 ## Tests
 
-~140 unit tests + 15 widget tests, all passing.
+~150 unit tests + 15 widget tests, all passing.
 
 - `test/unit/data/` — repositories (`TracksRepository`,
   `FavoritesRepository`, `PlaylistsRepository`, `ProfilesStore`,
@@ -161,9 +175,11 @@ Building for Android and Windows needs its own platform setup
   interrupted file), pairing (`PairingService`) and "Share"
   (`ShareService`) — also real HTTP round-trips, not mocks; a **real**
   WebSocket round-trip for remote control
-  (`RemoteControlServer`/`RemoteControlClient`), and playback-state
-  writes (`PlaybackStateWriter`) across every combination of local/
-  network saving.
+  (`RemoteControlServer`/`RemoteControlClient`) and the playback
+  ownership protocol (`PlaybackOwnershipCoordinator` — claim/ack/
+  reject, simultaneous-claim races, atomic handoff carrying the queue,
+  link loss), and playback-state writes (`PlaybackStateWriter`) across
+  every combination of local/network saving.
 - `test/widget/` — mini-player, track tile (offline-first favorite
   toggle, now-playing highlight), library screen (empty state / list),
   first launch (language choice / profile creation), playback-state

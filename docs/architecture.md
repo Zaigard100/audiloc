@@ -21,9 +21,9 @@ lib/
     profiles/                — Profile, ProfilesStore — не-CRDT реестр
                                 профилей на устройстве (docs/adr/0013)
     settings/                — AppSettingsStore: тема/язык/шорткаты/
-                                удалённое управление/синк состояния —
-                                уровня устройства, не CRDT, не профиля
-                                (docs/data-model.md)
+                                удалённое управление/сохранение локальной
+                                сессии — уровня устройства, не CRDT, не
+                                профиля (docs/data-model.md)
     local_playback_state_store.dart — последняя сессия воспроизведения,
                                 профиль-скоуп, не CRDT, никогда не
                                 синкается (docs/adr/0029)
@@ -39,10 +39,28 @@ lib/
                                 shuffle/repeat — тоже через PlayerService,
                                 сессионные, не сохраняются
                                 (docs/adr/0031-shuffle-and-repeat.md)
+    playback_ownership/      — живой WS-протокол (порт 8547), отдельный от
+                                remote_control/: держит связь со всеми
+                                online sync-enabled устройствами профиля,
+                                гарантирует, что играет только одно из них
+                                разом, и резолвит ручной хендофф —
+                                claimForDevice() несёт очередь+позицию
+                                прямо в claim'е, ack только после того,
+                                как цель реально загрузила и запустила
+                                очередь (один атомарный раунд-трип, не
+                                claim-потом-отдельно-загрузка)
+                                (docs/adr/0033-playback-ownership-and-handoff.md);
+                                OwnershipClaimingPlayerService — декоратор
+                                PlayerService, посылает claim при
+                                независимом локальном play()
     remote_control/          — WebSocket-сервер/клиент: play/pause/next/
-                                previous и загрузка трека с позиции с
-                                другого уже сопряжённого устройства, только
-                                если локальная настройка это разрешает
+                                previous/seek/shuffle/repeat и загрузка
+                                трека с позиции с другого уже сопряжённого
+                                устройства — разрешено либо локальной
+                                настройкой "разрешить удалённое
+                                управление", либо тем, что звонящий сейчас
+                                держит живой линк владения (см.
+                                playback_ownership/ выше)
                                 (docs/adr/0030-remote-playback-control.md)
     library_import/          — скан папки → теги → sha256 id → tracks
     dedupe/                  — эвристика дублей (docs/adr/0007)
@@ -67,9 +85,16 @@ lib/
     library/ playlists/ search/ devices/ player/ shell/ profiles/
     settings/ about/          — экраны, виджеты, feature-провайдеры;
                                  settings/ — тема/язык/шорткаты/удалённое
-                                 управление/синк состояния, все — уровня
-                                 устройства (docs/adr/0028, docs/adr/0029,
-                                 docs/adr/0030)
+                                 управление, уровня устройства, плюс
+                                 профильный (CRDT) тумблер синка
+                                 воспроизведения (docs/adr/0028,
+                                 docs/adr/0032, docs/adr/0030);
+                                 player/providers/ — ActivePlaybackController
+                                 и activePlaybackTargetProvider,
+                                 маршрутизируют полноэкранный плеер и
+                                 списки треков в playerServiceProvider
+                                 либо в удалённое устройство-владельца
+                                 (docs/adr/0033)
 ```
 
 Правило зависимостей: `features` → `services`/`data`, `services` →
@@ -156,9 +181,16 @@ HTTP-каналом ([ADR 0010](adr/0010-built-in-file-transfer.md)):
   `currentProfileProvider`/`profilesStoreProvider`/`switchProfileProvider`/
   `joinProfileForPairingProvider`/`canJoinDifferentProfileProvider`/
   `waitForPairingProvider` и аналогичная пара `change*`/`current*` для
-  каждой настройки устройства (тема, язык, шорткаты, удалённое
-  управление, отправлять/принимать/сохранять локально состояние
-  воспроизведения) — плейсхолдеры, переопределяемые через
-  `overrideWithValue`/`overrideWith` — виджет-тесты подставляют свою
-  in-memory БД и нужные значения настроек тем же способом, что и
-  `openProfileSession`.
+  каждой device-level настройки (тема, язык, шорткаты, удалённое
+  управление, сохранение локальной сессии) — плейсхолдеры,
+  переопределяемые через `overrideWithValue`/`overrideWith` — виджет-тесты
+  подставляют свою in-memory БД и нужные значения настроек тем же
+  способом, что и `openProfileSession`. Профильный тумблер синка
+  воспроизведения (`profileSyncEnabledProvider`) — не плейсхолдер, а
+  обычный `StreamProvider` поверх CRDT-таблицы `profile_settings`, тестам
+  подставлять нечего — читается через ту же in-memory БД.
+- `PlaybackOwnershipCoordinator` конструируется с реальным
+  `PlaybackOwnershipServer`/`TracksRepository`/`PlayerService` —
+  `test/unit/services/playback_ownership_coordinator_test.dart` гоняет
+  настоящие WS-раунд-трипы между двумя узлами на разных loopback-адресах,
+  без единого мока протокола.
