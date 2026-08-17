@@ -90,6 +90,28 @@ class DiscoveryService {
     await startDiscovery();
   }
 
+  /// Same underlying fix as [restart] — tears down and re-establishes
+  /// the native mDNS listener/broadcast, the only thing that actually
+  /// recovers a stuck one (see [restart]'s doc) — but *without*
+  /// [PeerPresenceTracker.reset]'s immediate "every known peer just
+  /// went offline" signal. [restart] is for the deliberate, user-visible
+  /// "обновить" button, where that flicker is an expected, momentary
+  /// side effect of an explicit action; this is for
+  /// [SyncOrchestrator]'s own periodic self-healing timer, where nobody
+  /// asked for anything and peers that are still genuinely online must
+  /// not visibly flap offline-then-online-again once a minute. Any peer
+  /// still actually there gets an ordinary [PeerPresenceTracker.markFound]
+  /// once re-discovered, which is a no-op for the UI (already known
+  /// online); one that's genuinely gone still gets caught by the normal
+  /// debounced [PeerPresenceTracker.scheduleLost] path, same as any
+  /// other loss.
+  Future<void> refresh(int port) async {
+    await stopAdvertising();
+    await stopDiscovery();
+    await startAdvertising(port);
+    await startDiscovery();
+  }
+
   void _handleEvent(BonsoirDiscoveryEvent event) {
     final discovery = _discovery;
     if (discovery == null) return;

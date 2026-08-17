@@ -72,17 +72,6 @@ class AppSettingsStore {
 
   Future<void> setAllowRemoteControl(bool value) => _write('allowRemoteControl', value);
 
-  /// Whether this device should try to keep running in the background —
-  /// only ever shown in Settings while the profile-wide sync toggle
-  /// (`ProfileSettingsRepository`) is on, so sync/remote control keep
-  /// working while the app isn't in the foreground. Off by default,
-  /// device-level: this device's own OS-level capability, not a choice
-  /// any other device in the profile can make for it. See
-  /// docs/adr/0032-unified-profile-sync-and-background-mode.md.
-  Future<bool> keepAliveInBackground() async => (await _read())['keepAliveInBackground'] as bool? ?? false;
-
-  Future<void> setKeepAliveInBackground(bool value) => _write('keepAliveInBackground', value);
-
   /// Whether this device remembers its own last-paused track/position
   /// and restores it after its own restart — purely local
   /// (`LocalPlaybackStateStore`), never synced anywhere, independent of

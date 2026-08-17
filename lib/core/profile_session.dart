@@ -106,8 +106,6 @@ Future<ProfileSessionHandle> openProfileSession({
   required PlaybackShortcutsSettings initialPlaybackShortcutsSettings,
   required Future<void> Function(bool) changeAllowRemoteControl,
   required bool initialAllowRemoteControl,
-  required Future<void> Function(bool) changeKeepAliveInBackground,
-  required bool initialKeepAliveInBackground,
   required Future<void> Function(bool) changeSaveLocalSession,
   required bool initialSaveLocalSession,
   Future<String> Function() platformLabel = platformDeviceLabel,
@@ -153,11 +151,21 @@ Future<ProfileSessionHandle> openProfileSession({
     currentPlaybackShortcutsSettingsProvider.overrideWith((ref) => initialPlaybackShortcutsSettings),
     changeAllowRemoteControlProvider.overrideWithValue(changeAllowRemoteControl),
     currentAllowRemoteControlProvider.overrideWith((ref) => initialAllowRemoteControl),
-    changeKeepAliveInBackgroundProvider.overrideWithValue(changeKeepAliveInBackground),
-    currentKeepAliveInBackgroundProvider.overrideWith((ref) => initialKeepAliveInBackground),
     changeSaveLocalSessionProvider.overrideWithValue(changeSaveLocalSession),
     currentSaveLocalSessionProvider.overrideWith((ref) => initialSaveLocalSession),
   ]);
+
+  // Forces `profileSyncEnabledProvider`'s CRDT watch to start warming up
+  // from session-open time, well before the servers started below could
+  // plausibly see a real connection attempt — otherwise its *first*
+  // touch could be the very first incoming hello (an already-online
+  // peer's discovery replaying immediately), whose `isAllowed`/
+  // `isSyncEnabled` closures read a still-`null` `.value` as `false`
+  // and wrongly reject a device that actually has sync on. Same "force
+  // it to exist now" reasoning as `pairingServiceProvider` below, just
+  // earlier — this specifically needs to win a race against network
+  // I/O, not merely against some widget getting around to watching it.
+  container.read(profileSyncEnabledProvider);
 
   // The three fixed-port *bind* calls are awaited — deliberately *not*
   // `unawaited`, unlike everything else below. `close()` assumes these

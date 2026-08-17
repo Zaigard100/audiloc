@@ -27,6 +27,10 @@ sealed class OwnershipMessage {
               (r) => r.name == json['reason'],
               orElse: () => ClaimReason.localPlay,
             ),
+            queueTrackIds:
+                json['queueTrackIds'] is List ? (json['queueTrackIds']! as List).cast<String>() : const [],
+            queueIndex: json['queueIndex'] as int? ?? -1,
+            positionMs: json['positionMs'] as int? ?? 0,
           ),
         'claim_ack' when json['claimId'] is String => OwnershipClaimAck(
           claimId: json['claimId']! as String,
@@ -55,15 +59,24 @@ class OwnershipClaim extends OwnershipMessage {
     required this.deviceId,
     required this.claimId,
     required this.reason,
+    this.queueTrackIds = const [],
+    this.queueIndex = -1,
+    this.positionMs = 0,
   });
 
   factory OwnershipClaim.now({
     required String deviceId,
     required ClaimReason reason,
+    List<String> queueTrackIds = const [],
+    int queueIndex = -1,
+    int positionMs = 0,
   }) => OwnershipClaim(
     deviceId: deviceId,
     claimId: '${DateTime.now().millisecondsSinceEpoch}-$deviceId',
     reason: reason,
+    queueTrackIds: queueTrackIds,
+    queueIndex: queueIndex,
+    positionMs: positionMs,
   );
 
   /// The device becoming owner — usually the sender itself (a reactive
@@ -73,6 +86,23 @@ class OwnershipClaim extends OwnershipMessage {
   final String deviceId;
   final String claimId;
   final ClaimReason reason;
+
+  /// Only meaningful for [ClaimReason.manualHandoff] — the initiator's
+  /// whole queue and position, carried *in the claim itself* rather
+  /// than as a separate follow-up message, so accepting a handoff is a
+  /// single round trip: the target only ever sends [OwnershipClaimAck]
+  /// after it has *already* successfully loaded and started this queue
+  /// (see `PlaybackOwnershipCoordinator._handleTargetedClaim`), never
+  /// before. This is what makes the ack mean "I am now actually
+  /// playing this", not just "I agree to try" — a separate
+  /// claim-then-loadAndPlay sequence left a window where the claim
+  /// half could succeed (ownership flips) while the follow-up
+  /// queue-transfer half failed independently (a `RemoteControlServer`
+  /// connection timeout, say), stranding the initiator paused with
+  /// nothing actually playing anywhere.
+  final List<String> queueTrackIds;
+  final int queueIndex;
+  final int positionMs;
 
   int get _millis =>
       int.tryParse(claimId.substring(0, claimId.indexOf('-'))) ?? 0;
@@ -92,6 +122,9 @@ class OwnershipClaim extends OwnershipMessage {
     'deviceId': deviceId,
     'claimId': claimId,
     'reason': reason.name,
+    'queueTrackIds': queueTrackIds,
+    'queueIndex': queueIndex,
+    'positionMs': positionMs,
   };
 }
 

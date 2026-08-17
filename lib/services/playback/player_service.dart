@@ -41,6 +41,14 @@ abstract class PlayerService {
   /// mid-subscription.
   Duration get position;
 
+  /// Synchronous snapshot of the whole current queue, in play order —
+  /// used to let another device pull the *whole* queue back from this
+  /// one (docs/adr/0033-playback-ownership-and-handoff.md), not just
+  /// the single current track, which would leave that device's own
+  /// next/previous with nothing to move to (the same regression ADR
+  /// 0030 already fixed once for the forward handoff direction).
+  List<Track> get queue;
+
   /// Replaces the queue, cued to [startIndex]. Plays immediately unless
   /// [autoPlay] is `false` — used when restoring a synced/persisted
   /// playback position (docs/adr/0029-playback-state-sync.md), which

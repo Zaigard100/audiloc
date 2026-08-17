@@ -44,6 +44,9 @@ class _FakePlayerService implements PlayerService {
   Track? get currentTrack => _currentTrack;
   @override
   Duration get position => _position;
+
+  @override
+  List<Track> get queue => lastQueue ?? const [];
   @override
   bool get isShuffleEnabled => false;
   @override

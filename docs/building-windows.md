@@ -50,8 +50,12 @@ flutter pub get
 # Отладочный запуск (если есть Windows-машина под рукой)
 flutter run -d windows
 
-# Релизная сборка
-flutter build windows
+# Релизная сборка. `--no-tree-shake-icons` обязателен — без него
+# release-сборка у части Material-иконок (замечено на Icons.cast,
+# Icons.cast_connected, Icons.smartphone, Icons.speaker_outlined)
+# молча выкидывает глиф из шрифта, хотя иконка используется напрямую
+# в коде — вместо иконки видна "тофу"-плашка/цифра
+flutter build windows --no-tree-shake-icons
 ```
 
 Готовое приложение окажется в:

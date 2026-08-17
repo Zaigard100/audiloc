@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/providers.dart';
+import '../providers/active_playback_controller.dart';
 
 /// Wraps [child] with keyboard playback controls — Space to play/pause,
 /// Left/Right arrows to seek back/forward by the configured step, plus
@@ -36,23 +37,27 @@ class PlaybackShortcuts extends ConsumerWidget {
     final settings = ref.watch(currentPlaybackShortcutsSettingsProvider);
     if (!settings.enabled) return child;
 
-    final playerService = ref.watch(playerServiceProvider);
+    // Ownership-aware (docs/adr/0033-playback-ownership-and-handoff.md) —
+    // controls whichever device currently owns playback, same as the
+    // full player screen/mini player, not just this device's own local
+    // engine.
+    final controller = ref.watch(activePlaybackControllerProvider);
     final step = Duration(seconds: settings.seekStepSeconds);
 
     void seekBy(Duration delta) {
-      if (playerService.currentTrack == null) return;
-      final target = playerService.position + delta;
-      playerService.seek(target < Duration.zero ? Duration.zero : target);
+      if (ref.read(activePlaybackCurrentTrackProvider).value == null) return;
+      final target = ref.read(activePlaybackPositionProvider).position + delta;
+      controller.seek(target < Duration.zero ? Duration.zero : target);
     }
 
     return CallbackShortcuts(
       bindings: {
-        const SingleActivator(LogicalKeyboardKey.space): playerService.playOrPause,
-        const SingleActivator(LogicalKeyboardKey.mediaPlayPause): playerService.playOrPause,
+        const SingleActivator(LogicalKeyboardKey.space): controller.playOrPause,
+        const SingleActivator(LogicalKeyboardKey.mediaPlayPause): controller.playOrPause,
         const SingleActivator(LogicalKeyboardKey.arrowRight): () => seekBy(step),
         const SingleActivator(LogicalKeyboardKey.arrowLeft): () => seekBy(-step),
-        const SingleActivator(LogicalKeyboardKey.mediaTrackNext): playerService.next,
-        const SingleActivator(LogicalKeyboardKey.mediaTrackPrevious): playerService.previous,
+        const SingleActivator(LogicalKeyboardKey.mediaTrackNext): controller.next,
+        const SingleActivator(LogicalKeyboardKey.mediaTrackPrevious): controller.previous,
       },
       child: Focus(autofocus: true, child: child),
     );

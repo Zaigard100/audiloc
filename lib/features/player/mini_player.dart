@@ -8,7 +8,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../library/providers/library_providers.dart';
 import 'full_player_screen.dart';
-import 'providers/player_providers.dart';
+import 'providers/active_playback_controller.dart';
 
 /// Bottom mini-player (ТЗ п.6.1): cover, progress, favorite, play/pause.
 /// Tap or swipe up to expand into [FullPlayerScreen].
@@ -17,11 +17,15 @@ class MiniPlayer extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final track = ref.watch(currentTrackProvider).value;
+    // Ownership-aware (docs/adr/0033-playback-ownership-and-handoff.md) —
+    // shows/controls whichever device currently owns playback, not just
+    // this device's own local player; otherwise this bar would go blank
+    // or show stale local state the moment another device took over.
+    final track = ref.watch(activePlaybackCurrentTrackProvider).value;
     if (track == null) return const SizedBox.shrink();
 
-    final isPlaying = ref.watch(isPlayingProvider).value ?? false;
-    final position = ref.watch(playbackPositionProvider).value;
+    final isPlaying = ref.watch(activePlaybackIsPlayingProvider);
+    final position = ref.watch(activePlaybackPositionProvider);
     final isFavorite = ref.watch(favoriteIdsProvider).value?.contains(track.id) ?? false;
 
     void openFullPlayer() {
@@ -42,9 +46,7 @@ class MiniPlayer extends ConsumerWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             LinearProgressIndicator(
-              value: position == null || position.duration == Duration.zero
-                  ? 0
-                  : position.fraction.clamp(0, 1),
+              value: position.duration == Duration.zero ? 0 : position.fraction.clamp(0, 1),
               minHeight: 2,
               backgroundColor: context.colors.divider,
               valueColor: const AlwaysStoppedAnimation(AppTheme.accent),
@@ -84,7 +86,7 @@ class MiniPlayer extends ConsumerWidget {
                     icon: Icon(isPlaying ? Icons.pause_circle_filled : Icons.play_circle_filled),
                     iconSize: 36,
                     color: context.colors.onSurface,
-                    onPressed: () => ref.read(playerServiceProvider).playOrPause(),
+                    onPressed: () => ref.read(activePlaybackControllerProvider).playOrPause(),
                   ),
                 ],
               ),

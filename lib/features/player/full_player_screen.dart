@@ -56,12 +56,8 @@ class _FullPlayerScreenState extends ConsumerState<FullPlayerScreen> {
         ? false
         : ref.watch(favoriteIdsProvider).value?.contains(track.id) ?? false;
     final queueSource = ref.watch(queueSourceProvider);
-    // Session-only play-order toggles have no equivalent on the wire to
-    // a remote device (ADR 0030 never needed one) — disabled rather
-    // than silently no-op'd while this screen isn't showing this
-    // device's own player.
-    final shuffleEnabled = !isRemote && (ref.watch(shuffleEnabledProvider).value ?? false);
-    final repeatMode = ref.watch(repeatModeProvider).value ?? PlaybackRepeatMode.all;
+    final shuffleEnabled = ref.watch(activePlaybackShuffleEnabledProvider);
+    final repeatMode = ref.watch(activePlaybackRepeatModeProvider);
     final syncEnabled = ref.watch(profileSyncEnabledProvider).value ?? false;
     final controller = ref.read(activePlaybackControllerProvider);
     final l10n = context.l10n;
@@ -85,14 +81,6 @@ class _FullPlayerScreenState extends ConsumerState<FullPlayerScreen> {
             onPressed: () => Navigator.of(context).pop(),
           ),
           title: Text(l10n.playerNowPlayingTitle),
-          actions: [
-            if (syncEnabled)
-              IconButton(
-                icon: Icon(isRemote ? Icons.cast_connected : Icons.cast),
-                tooltip: l10n.playbackTargetPickerTitle,
-                onPressed: () => showPlaybackTargetPicker(context, ref),
-              ),
-          ],
         ),
         body: track == null
             ? Center(child: Text(l10n.playerNothingPlaying))
@@ -184,7 +172,24 @@ class _FullPlayerScreenState extends ConsumerState<FullPlayerScreen> {
                                   iconSize: 40,
                                   onPressed: controller.next,
                                 ),
-                                const SizedBox(width: 28),
+                                if (syncEnabled)
+                                  IconButton(
+                                    // Not Icons.cast/cast_connected — on
+                                    // Linux desktop builds that glyph
+                                    // doesn't render (shows a fallback
+                                    // "tofu" box instead), while
+                                    // Icons.devices/devices_other are
+                                    // already proven to render correctly
+                                    // there (`device_tile.dart`, shipped
+                                    // since ADR 0030).
+                                    icon: Icon(isRemote ? Icons.devices : Icons.devices_other),
+                                    color: isRemote ? AppTheme.accent : context.colors.onSurfaceMuted,
+                                    iconSize: 28,
+                                    tooltip: l10n.playbackTargetPickerTitle,
+                                    onPressed: () => showPlaybackTargetPicker(context, ref),
+                                  )
+                                else
+                                  const SizedBox(width: 28),
                               ],
                             ),
                             const SizedBox(height: 12),
@@ -195,9 +200,7 @@ class _FullPlayerScreenState extends ConsumerState<FullPlayerScreen> {
                                   icon: const Icon(Icons.shuffle),
                                   tooltip: shuffleEnabled ? l10n.playerShuffleOn : l10n.playerShuffleOff,
                                   color: shuffleEnabled ? AppTheme.accent : context.colors.onSurfaceMuted,
-                                  onPressed: isRemote
-                                      ? null
-                                      : () => ref.read(playerServiceProvider).setShuffle(!shuffleEnabled),
+                                  onPressed: () => controller.setShuffle(!shuffleEnabled),
                                 ),
                                 const SizedBox(width: 32),
                                 IconButton(
@@ -206,10 +209,7 @@ class _FullPlayerScreenState extends ConsumerState<FullPlayerScreen> {
                                   color: repeatMode == PlaybackRepeatMode.off
                                       ? context.colors.onSurfaceMuted
                                       : AppTheme.accent,
-                                  onPressed: isRemote
-                                      ? null
-                                      : () =>
-                                          ref.read(playerServiceProvider).setRepeatMode(_nextRepeatMode(repeatMode)),
+                                  onPressed: () => controller.setRepeatMode(_nextRepeatMode(repeatMode)),
                                 ),
                               ],
                             ),

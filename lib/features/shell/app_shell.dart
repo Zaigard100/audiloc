@@ -56,7 +56,7 @@ class _AppShellState extends ConsumerState<AppShell> {
     // see `local_session_restore.dart`'s doc for why the ordering isn't
     // actually load-bearing) so that if a genuine cross-device update
     // also lands moments later, it correctly finds something already
-    // loaded here and asks before overwriting it.
+    // loaded here and leaves it alone rather than overwriting it.
     unawaited(restoreLocalSession(ref));
     // `listenManual` (not `ref.listen` in build) specifically so
     // `fireImmediately` is available — a cross-device row already
@@ -65,7 +65,7 @@ class _AppShellState extends ConsumerState<AppShell> {
     // subscription already exists. See docs/adr/0029-playback-state-sync.md.
     ref.listenManual(playbackStateProvider, (previous, next) {
       final state = next.value;
-      if (state != null) handleIncomingPlaybackState(context, ref, state);
+      if (state != null) handleIncomingPlaybackState(ref, state);
     }, fireImmediately: true);
   }
 

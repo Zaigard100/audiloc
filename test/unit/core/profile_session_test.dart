@@ -35,6 +35,8 @@ class _NoopPlayerService implements PlayerService {
   @override
   Duration get position => Duration.zero;
   @override
+  List<Track> get queue => const [];
+  @override
   bool get isShuffleEnabled => false;
   @override
   PlaybackRepeatMode get repeatMode => PlaybackRepeatMode.all;
@@ -75,7 +77,6 @@ Future<void> _noopChangeThemeMode(ThemeMode mode) async {}
 Future<void> _noopEraseAllData() async {}
 Future<void> _noopChangePlaybackShortcutsSettings(PlaybackShortcutsSettings settings) async {}
 Future<void> _noopChangeAllowRemoteControl(bool value) async {}
-Future<void> _noopChangeKeepAliveInBackground(bool value) async {}
 Future<void> _noopChangeSaveLocalSession(bool value) async {}
 
 void main() {
@@ -111,8 +112,6 @@ void main() {
       initialPlaybackShortcutsSettings: const PlaybackShortcutsSettings(),
       changeAllowRemoteControl: _noopChangeAllowRemoteControl,
       initialAllowRemoteControl: false,
-      changeKeepAliveInBackground: _noopChangeKeepAliveInBackground,
-      initialKeepAliveInBackground: false,
       changeSaveLocalSession: _noopChangeSaveLocalSession,
       initialSaveLocalSession: true,
       platformLabel: _testPlatformLabel,
@@ -139,8 +138,6 @@ void main() {
       initialPlaybackShortcutsSettings: const PlaybackShortcutsSettings(),
       changeAllowRemoteControl: _noopChangeAllowRemoteControl,
       initialAllowRemoteControl: false,
-      changeKeepAliveInBackground: _noopChangeKeepAliveInBackground,
-      initialKeepAliveInBackground: false,
       changeSaveLocalSession: _noopChangeSaveLocalSession,
       initialSaveLocalSession: true,
       platformLabel: _testPlatformLabel,
@@ -176,8 +173,6 @@ void main() {
       initialPlaybackShortcutsSettings: const PlaybackShortcutsSettings(),
       changeAllowRemoteControl: _noopChangeAllowRemoteControl,
       initialAllowRemoteControl: false,
-      changeKeepAliveInBackground: _noopChangeKeepAliveInBackground,
-      initialKeepAliveInBackground: false,
       changeSaveLocalSession: _noopChangeSaveLocalSession,
       initialSaveLocalSession: true,
       platformLabel: _testPlatformLabel,
@@ -213,8 +208,6 @@ void main() {
       initialPlaybackShortcutsSettings: const PlaybackShortcutsSettings(),
       changeAllowRemoteControl: _noopChangeAllowRemoteControl,
       initialAllowRemoteControl: false,
-      changeKeepAliveInBackground: _noopChangeKeepAliveInBackground,
-      initialKeepAliveInBackground: false,
       changeSaveLocalSession: _noopChangeSaveLocalSession,
       initialSaveLocalSession: true,
       platformLabel: _testPlatformLabel,
@@ -240,8 +233,6 @@ void main() {
       initialPlaybackShortcutsSettings: const PlaybackShortcutsSettings(),
       changeAllowRemoteControl: _noopChangeAllowRemoteControl,
       initialAllowRemoteControl: false,
-      changeKeepAliveInBackground: _noopChangeKeepAliveInBackground,
-      initialKeepAliveInBackground: false,
       changeSaveLocalSession: _noopChangeSaveLocalSession,
       initialSaveLocalSession: true,
       platformLabel: _testPlatformLabel,
@@ -277,8 +268,6 @@ void main() {
       initialPlaybackShortcutsSettings: const PlaybackShortcutsSettings(),
       changeAllowRemoteControl: _noopChangeAllowRemoteControl,
       initialAllowRemoteControl: false,
-      changeKeepAliveInBackground: _noopChangeKeepAliveInBackground,
-      initialKeepAliveInBackground: false,
       changeSaveLocalSession: _noopChangeSaveLocalSession,
       initialSaveLocalSession: true,
       platformLabel: _testPlatformLabel,

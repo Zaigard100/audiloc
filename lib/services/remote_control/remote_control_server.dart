@@ -162,6 +162,12 @@ class RemoteControlServer {
         await _playerService.previous();
       case RemoteSeek(:final positionMs):
         await _playerService.seek(Duration(milliseconds: positionMs));
+      case RemoteSetShuffle(:final enabled):
+        await _playerService.setShuffle(enabled);
+      case RemoteSetRepeatMode(:final mode):
+        await _playerService.setRepeatMode(
+          PlaybackRepeatMode.values.firstWhere((m) => m.name == mode, orElse: () => PlaybackRepeatMode.all),
+        );
       case RemoteLoadAndPlay(:final trackIds, :final startIndex, :final positionMs):
         if (startIndex < 0 || startIndex >= trackIds.length) return;
         final startId = trackIds[startIndex];
@@ -219,6 +225,8 @@ class _RemoteConnection {
   StreamSubscription<bool>? _playingSub;
   StreamSubscription<Track?>? _trackSub;
   StreamSubscription<PlaybackPositionState>? _positionSub;
+  StreamSubscription<bool>? _shuffleSub;
+  StreamSubscription<PlaybackRepeatMode>? _repeatSub;
   Timer? _pushTimer;
   Duration _lastDuration = Duration.zero;
 
@@ -232,6 +240,8 @@ class _RemoteConnection {
     _pushState();
     _playingSub = _playerService.playingStream.listen((_) => _pushState());
     _trackSub = _playerService.currentTrackStream.listen((_) => _pushState());
+    _shuffleSub = _playerService.shuffleStream.listen((_) => _pushState());
+    _repeatSub = _playerService.repeatModeStream.listen((_) => _pushState());
     // Position alone doesn't get its own push per change — same
     // "no write/push storms" lesson already applied elsewhere
     // (docs/adr/0025, docs/adr/0029) — a plain once-a-second tick is
@@ -241,6 +251,7 @@ class _RemoteConnection {
 
   void _pushState() {
     final track = _playerService.currentTrack;
+    final queue = _playerService.queue;
     try {
       socket.add(jsonEncode(RemoteState(
         trackId: track?.id,
@@ -249,6 +260,10 @@ class _RemoteConnection {
         positionMs: _playerService.position.inMilliseconds,
         durationMs: _lastDuration.inMilliseconds,
         isPlaying: _playerService.isPlaying,
+        shuffleEnabled: _playerService.isShuffleEnabled,
+        repeatMode: _playerService.repeatMode.name,
+        queueTrackIds: [for (final t in queue) t.id],
+        queueIndex: track == null ? -1 : queue.indexWhere((t) => t.id == track.id),
       ).toJson()));
     } catch (_) {
       // Socket already closing — the onDone/onError handlers in
@@ -260,6 +275,8 @@ class _RemoteConnection {
     _playingSub?.cancel();
     _trackSub?.cancel();
     _positionSub?.cancel();
+    _shuffleSub?.cancel();
+    _repeatSub?.cancel();
     _pushTimer?.cancel();
   }
 }

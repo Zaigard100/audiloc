@@ -74,6 +74,9 @@ class MediaKitPlayerService implements PlayerService {
   Duration get position => _player.state.position;
 
   @override
+  List<Track> get queue => _queue;
+
+  @override
   Stream<bool> get shuffleStream => _shuffleController.stream;
 
   @override

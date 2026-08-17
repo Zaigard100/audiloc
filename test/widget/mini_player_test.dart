@@ -40,49 +40,68 @@ void main() {
         ),
       );
 
-  testWidgets('renders nothing when nothing is playing', (tester) async {
-    await tester.pumpWidget(buildApp());
-    await tester.pump();
+  // `runAsync` + real-delay poll loops (not just `pump`/`pumpAndSettle`)
+  // in every test below — `MiniPlayer`/`FullPlayerScreen` now read the
+  // profile-wide sync toggle (docs/adr/0032, ADR 0033's
+  // `activePlayback*` providers), a real CRDT/sqflite query; without
+  // this the underlying sqflite transaction lock's own internal timer
+  // never gets to actually resolve inside the fake-async test zone, and
+  // the test fails at teardown with "A Timer is still pending" — same
+  // reasoning as `resume_playback_test.dart`'s use of `runAsync`.
 
-    expect(find.byType(MiniPlayer), findsOneWidget);
-    expect(find.byType(SizedBox), findsWidgets); // the shrink-wrapped empty state
+  testWidgets('renders nothing when nothing is playing', (tester) async {
+    await tester.runAsync(() async {
+      await tester.pumpWidget(buildApp());
+      for (var i = 0; i < 100; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+        await tester.pump();
+      }
+
+      expect(find.byType(MiniPlayer), findsOneWidget);
+      expect(find.byType(SizedBox), findsWidgets); // the shrink-wrapped empty state
+    });
   });
 
   testWidgets('shows track title and artist once playback starts', (tester) async {
-    await tester.pumpWidget(buildApp());
-    playerService.emitTrack(const Track(id: 't1', path: '/a.mp3', title: 'My Song', artist: 'My Artist'));
-    await tester.pump();
+    await tester.runAsync(() async {
+      await tester.pumpWidget(buildApp());
+      playerService.emitTrack(const Track(id: 't1', path: '/a.mp3', title: 'My Song', artist: 'My Artist'));
+      for (var i = 0; i < 20 && find.text('My Song').evaluate().isEmpty; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+        await tester.pump();
+      }
 
-    expect(find.text('My Song'), findsOneWidget);
-    expect(find.text('My Artist'), findsOneWidget);
+      expect(find.text('My Song'), findsOneWidget);
+      expect(find.text('My Artist'), findsOneWidget);
+    });
   });
 
   testWidgets('tapping play/pause toggles the fake player', (tester) async {
-    await tester.pumpWidget(buildApp());
-    playerService.emitTrack(const Track(id: 't1', path: '/a.mp3', title: 'My Song'));
-    await tester.pump();
-
-    expect(find.byIcon(Icons.play_circle_filled), findsOneWidget);
-    await tester.tap(find.byIcon(Icons.play_circle_filled));
-    await tester.pump();
-
-    expect(playerService.isPlaying, isTrue);
-    expect(find.byIcon(Icons.pause_circle_filled), findsOneWidget);
-  });
-
-  testWidgets('tapping the bar opens the full player', (tester) async {
-    // `runAsync` (not just `pump`/`pumpAndSettle`) — `FullPlayerScreen`
-    // now reads the profile-wide sync toggle
-    // (docs/adr/0032-unified-profile-sync-and-background-mode.md), a
-    // real CRDT/sqflite query; without this the underlying sqflite
-    // transaction lock's own internal timer never gets to actually
-    // resolve inside the fake-async test zone, and the test fails at
-    // teardown with "A Timer is still pending" — same reasoning as
-    // `resume_playback_test.dart`'s use of `runAsync`.
     await tester.runAsync(() async {
       await tester.pumpWidget(buildApp());
       playerService.emitTrack(const Track(id: 't1', path: '/a.mp3', title: 'My Song'));
-      for (var i = 0; i < 10 && find.text('My Song').evaluate().isEmpty; i++) {
+      for (var i = 0; i < 100 && find.byIcon(Icons.play_circle_filled).evaluate().isEmpty; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+        await tester.pump();
+      }
+      expect(find.byIcon(Icons.play_circle_filled), findsOneWidget);
+
+      await tester.tap(find.byIcon(Icons.play_circle_filled));
+      for (var i = 0; i < 100 && find.byIcon(Icons.pause_circle_filled).evaluate().isEmpty; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+        await tester.pump();
+      }
+
+      expect(playerService.isPlaying, isTrue);
+      expect(find.byIcon(Icons.pause_circle_filled), findsOneWidget);
+    });
+  });
+
+  testWidgets('tapping the bar opens the full player', (tester) async {
+    await tester.runAsync(() async {
+      await tester.pumpWidget(buildApp());
+      playerService.emitTrack(const Track(id: 't1', path: '/a.mp3', title: 'My Song'));
+      for (var i = 0; i < 100 && find.text('My Song').evaluate().isEmpty; i++) {
         await Future<void>.delayed(const Duration(milliseconds: 10));
         await tester.pump();
       }

@@ -9,6 +9,7 @@ import '../../core/theme/app_colors.dart';
 import '../../l10n/l10n.dart';
 import '../../services/library_import/library_import_service.dart';
 import '../player/models/queue_source.dart';
+import '../player/providers/active_playback_controller.dart';
 import '../player/providers/player_providers.dart';
 import 'providers/library_providers.dart';
 import 'widgets/track_actions_sheet.dart';
@@ -155,7 +156,7 @@ class _SortedTrackList extends ConsumerWidget {
           track: track,
           onTap: () {
             ref.read(queueSourceProvider.notifier).state = const LibraryQueueSource();
-            ref.read(playerServiceProvider).setQueue(tracks, startIndex: index);
+            ref.read(activePlaybackControllerProvider).playQueue(tracks, startIndex: index);
           },
           onLongPress: () => showTrackActionsSheet(context, ref, track),
         );

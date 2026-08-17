@@ -51,6 +51,9 @@ class FakePlayerService implements PlayerService {
   Duration get position => _position;
 
   @override
+  List<Track> get queue => lastQueue;
+
+  @override
   bool get isShuffleEnabled => _shuffleEnabled;
 
   @override

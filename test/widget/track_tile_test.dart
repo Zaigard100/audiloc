@@ -82,50 +82,80 @@ void main() {
 
   testWidgets('tapping the already-current track toggles play/pause instead of restarting it',
       (tester) async {
-    final player = FakePlayerService();
-    final container = ProviderContainer(overrides: [
-      databaseProvider.overrideWithValue(db),
-      playerServiceProvider.overrideWithValue(player),
-    ]);
-    addTearDown(container.dispose);
+    // `runAsync` — `TrackTile` now watches `activePlaybackCurrentTrackProvider`/
+    // `activePlaybackIsPlayingProvider` (docs/adr/0033-playback-ownership-and-handoff.md),
+    // which chain to a real CRDT/sqflite query
+    // (`profileSyncEnabledProvider`); without this the underlying
+    // sqflite transaction lock's own internal timer never gets to
+    // actually resolve inside the fake-async test zone — same
+    // reasoning as `mini_player_test.dart`'s use of `runAsync`.
+    await tester.runAsync(() async {
+      final player = FakePlayerService();
+      final container = ProviderContainer(overrides: [
+        databaseProvider.overrideWithValue(db),
+        playerServiceProvider.overrideWithValue(player),
+      ]);
+      addTearDown(container.dispose);
 
-    const track = Track(id: 't1', path: '/a.mp3', title: 'Song', artist: 'Artist', album: 'Album');
-    var tapped = false;
+      const track = Track(id: 't1', path: '/a.mp3', title: 'Song', artist: 'Artist', album: 'Album');
+      var tapped = false;
 
-    await tester.pumpWidget(UncontrolledProviderScope(
-      container: container,
-      child: MaterialApp(
-        theme: AppTheme.dark(),
-        locale: const Locale('ru'),
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        supportedLocales: AppLocalizations.supportedLocales,
-        home: Scaffold(body: TrackTile(track: track, onTap: () => tapped = true)),
-      ),
-    ));
-    await tester.pump();
+      await tester.pumpWidget(UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          theme: AppTheme.dark(),
+          locale: const Locale('ru'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(body: TrackTile(track: track, onTap: () => tapped = true)),
+        ),
+      ));
+      await tester.pump();
 
-    // Not current yet — tapping still just fires the caller's onTap
-    // (opens/starts the queue at this row), same as any other tile.
-    await tester.tap(find.text('Song'));
-    expect(tapped, isTrue);
-    expect(player.isPlaying, isFalse);
+      // Not current yet — tapping still just fires the caller's onTap
+      // (opens/starts the queue at this row), same as any other tile.
+      await tester.tap(find.text('Song'));
+      expect(tapped, isTrue);
+      expect(player.isPlaying, isFalse);
 
-    tapped = false;
-    player.emitTrack(track);
-    player.emitPlaying(true);
-    await tester.pump();
+      tapped = false;
+      player.emitTrack(track);
+      player.emitPlaying(true);
+      // `isCurrent`/`isPlaying` now come from
+      // `activePlaybackCurrentTrackProvider`/`activePlaybackIsPlayingProvider`
+      // (docs/adr/0033-playback-ownership-and-handoff.md), which chain
+      // through `activePlaybackTargetProvider` -> `profileSyncEnabledProvider`
+      // -> a real CRDT/sqflite query — same real-Isolate-round-trip
+      // reasoning as the favorite-toggle poll loop above, not just an
+      // extra same-tick provider hop, so a fixed couple of `pump()`s
+      // isn't reliably enough; poll for the "now playing" badge instead.
+      for (var i = 0; i < 30; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+        await tester.pump();
+        if (find.byIcon(Icons.volume_up).evaluate().isNotEmpty) break;
+      }
+      expect(find.byIcon(Icons.volume_up), findsOneWidget);
 
-    // Now current and playing — tapping the same row pauses it instead
-    // of restarting it from 0, and does *not* call the caller's onTap.
-    await tester.tap(find.text('Song'));
-    await tester.pump();
-    expect(tapped, isFalse);
-    expect(player.isPlaying, isFalse);
+      // Now current and playing — tapping the same row pauses it instead
+      // of restarting it from 0, and does *not* call the caller's onTap.
+      await tester.tap(find.text('Song'));
+      for (var i = 0; i < 30; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+        await tester.pump();
+        if (!player.isPlaying) break;
+      }
+      expect(tapped, isFalse);
+      expect(player.isPlaying, isFalse);
 
-    // Tapping again while current and paused resumes it.
-    await tester.tap(find.text('Song'));
-    await tester.pump();
-    expect(tapped, isFalse);
-    expect(player.isPlaying, isTrue);
+      // Tapping again while current and paused resumes it.
+      await tester.tap(find.text('Song'));
+      for (var i = 0; i < 30; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+        await tester.pump();
+        if (player.isPlaying) break;
+      }
+      expect(tapped, isFalse);
+      expect(player.isPlaying, isTrue);
+    });
   });
 }

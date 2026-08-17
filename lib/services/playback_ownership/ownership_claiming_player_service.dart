@@ -45,6 +45,8 @@ class OwnershipClaimingPlayerService implements PlayerService {
   PlaybackRepeatMode get repeatMode => _inner.repeatMode;
   @override
   Duration get position => _inner.position;
+  @override
+  List<Track> get queue => _inner.queue;
 
   @override
   Future<void> setQueue(

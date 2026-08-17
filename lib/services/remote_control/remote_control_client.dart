@@ -100,6 +100,8 @@ class RemoteControlClient {
   void next() => _send(const RemoteNext());
   void previous() => _send(const RemotePrevious());
   void seek(Duration position) => _send(RemoteSeek(positionMs: position.inMilliseconds));
+  void setShuffle(bool enabled) => _send(RemoteSetShuffle(enabled: enabled));
+  void setRepeatMode(String mode) => _send(RemoteSetRepeatMode(mode: mode));
 
   /// [trackIds] is the *whole* queue to load, [startIndex] which entry to
   /// start at and seek to [position] — a single-track queue would leave

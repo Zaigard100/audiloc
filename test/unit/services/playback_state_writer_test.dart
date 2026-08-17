@@ -37,6 +37,8 @@ class _FakePlayerService implements PlayerService {
   @override
   Duration get position => positionValue;
   @override
+  List<Track> get queue => const [];
+  @override
   bool get isShuffleEnabled => false;
   @override
   PlaybackRepeatMode get repeatMode => PlaybackRepeatMode.all;

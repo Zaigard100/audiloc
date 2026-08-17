@@ -42,14 +42,6 @@ class AppLocalizationsRu extends AppLocalizations {
   String get commonAllow => 'Разрешить';
 
   @override
-  String resumePlaybackBody(String trackTitle, String time, String device) {
-    return 'Хотите продолжить с «$trackTitle», $time, $device?';
-  }
-
-  @override
-  String get resumePlaybackContinue => 'Продолжить';
-
-  @override
   String get settingsPlayback => 'Воспроизведение';
 
   @override
@@ -88,13 +80,6 @@ class AppLocalizationsRu extends AppLocalizations {
   @override
   String get settingsSyncPlaybackStateSubtitle =>
       'Экспериментально, может работать нестабильно. Действует сразу на всех устройствах этого профиля: включив здесь, вы включаете и отправку, и приём позиции воспроизведения между ними';
-
-  @override
-  String get settingsKeepAliveInBackground => 'Работать в фоне';
-
-  @override
-  String get settingsKeepAliveInBackgroundSubtitle =>
-      'Только на этом устройстве. Приложение продолжит синхронизироваться и принимать удалённое управление, даже когда экран выключен или окно свёрнуто';
 
   @override
   String get playbackTargetPickerTitle => 'Воспроизвести на устройстве';

@@ -1,12 +1,8 @@
-import 'dart:async';
-
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/providers.dart';
 import '../../../data/models/playback_state.dart';
 import '../../../data/models/track.dart';
-import '../../../l10n/l10n.dart';
 import '../models/queue_source.dart';
 import '../providers/player_providers.dart';
 import '../providers/queue_resolution.dart';
@@ -20,10 +16,14 @@ import '../providers/queue_resolution.dart';
 /// "принимать" setting:
 /// - Nothing loaded locally yet — silently apply, paused, ready to
 ///   resume with a tap.
-/// - Something's already loaded here (playing or paused, whether from
-///   the local-session restore or the user just having started
-///   something) — doesn't get yanked away unannounced; ask first.
-Future<void> handleIncomingPlaybackState(BuildContext context, WidgetRef ref, PlaybackState state) async {
+/// - Something's already loaded here (playing or paused) — left alone
+///   entirely. This used to show a "Продолжить с «Трек», 0:30,
+///   Устройство?" `SnackBar`, removed at the user's explicit request
+///   once the live ownership protocol (docs/adr/0033-playback-ownership-and-handoff.md)
+///   made it redundant/confusing alongside explicit handoff — "who's
+///   playing" is now always visible and controllable directly, not
+///   something to be asked about from a lagged bookmark.
+Future<void> handleIncomingPlaybackState(WidgetRef ref, PlaybackState state) async {
   final self = ref.read(selfDeviceProvider);
   // Our own writes never need acting on here — restoring this device's
   // own last session is `local_session_restore.dart`'s job now, entirely
@@ -67,40 +67,9 @@ Future<void> handleIncomingPlaybackState(BuildContext context, WidgetRef ref, Pl
   if (resolved == null) return;
   final (tracks, startIndex, source) = resolved;
 
-  if (hasLocalTrack) {
-    // A modal `AlertDialog` here blocked the whole app until answered —
-    // too intrusive for something that arrives unprompted while the
-    // user's in the middle of doing something else. A `SnackBar` is the
-    // opposite: non-blocking (the rest of the UI stays fully usable
-    // underneath it), swipe-to-dismiss by default
-    // (`SnackBar.dismissDirection`, `DismissDirection.down`), and simply
-    // times out and disappears on its own if ignored — "увидел,
-    // смахнул/забыл" is exactly its normal behavior, no explicit "Нет"
-    // button needed for that. Only tapping the action actually applies
-    // the incoming state; doing nothing leaves local playback untouched.
-    if (!context.mounted) return;
-    final l10n = context.l10n;
-    final messenger = ScaffoldMessenger.of(context);
-    messenger.hideCurrentSnackBar();
-    messenger.showSnackBar(SnackBar(
-      content: Text(l10n.resumePlaybackBody(
-        tracks[startIndex].displayTitle,
-        _formatPosition(state.position),
-        state.deviceName,
-      )),
-      duration: const Duration(seconds: 8),
-      behavior: SnackBarBehavior.floating,
-      action: SnackBarAction(
-        label: l10n.resumePlaybackContinue,
-        // Tapping "Продолжить" is an explicit, deliberate choice to
-        // resume right now — unlike the silent cold-start restore below,
-        // there's no reason to land paused and make the user press play
-        // a second time.
-        onPressed: () => unawaited(_applyResume(ref, tracks, startIndex, source, state, autoPlay: true)),
-      ),
-    ));
-    return;
-  }
+  // Something's already loaded here — leave it alone entirely, no
+  // prompt (see this function's doc for why the old SnackBar is gone).
+  if (hasLocalTrack) return;
 
   await _applyResume(ref, tracks, startIndex, source, state, autoPlay: false);
 }
@@ -120,10 +89,4 @@ Future<void> _applyResume(
   // `MediaKitPlayerService.setQueue`'s doc.
   await playerService.setQueue(tracks, startIndex: startIndex, autoPlay: autoPlay, seekTo: state.position);
   ref.read(queueSourceProvider.notifier).state = source;
-}
-
-String _formatPosition(Duration d) {
-  final minutes = d.inMinutes.remainder(60).toString().padLeft(2, '0');
-  final seconds = d.inSeconds.remainder(60).toString().padLeft(2, '0');
-  return '$minutes:$seconds';
 }

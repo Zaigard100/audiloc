@@ -140,8 +140,12 @@ flutter test test/widget/
 # Запуск на Linux desktop
 flutter run -d linux
 
-# Сборка Linux-бинаря
-flutter build linux --release
+# Сборка Linux-бинаря. `--no-tree-shake-icons` обязателен: релизная
+# сборка без него у некоторых Material-иконок (замечено на Icons.cast,
+# Icons.cast_connected, Icons.smartphone, Icons.speaker_outlined)
+# молча выкидывает глиф из шрифта, хотя иконка используется напрямую
+# в коде — вместо иконки видна "тофу"-плашка/цифра.
+flutter build linux --release --no-tree-shake-icons
 ```
 
 Сборка под Android и Windows требует своей платформенной подготовки

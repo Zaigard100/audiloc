@@ -19,18 +19,24 @@ import 'playback_ownership_models.dart';
 /// (`playback_ownership_server.dart`/`playback_ownership_client.dart`).
 /// Callers feed it messages via [handleIncoming]/[handleClosed] instead.
 ///
-/// Owns its own liveness: sends a heartbeat every 2s and calls [onLost]
-/// if nothing at all (heartbeat or otherwise) has been received for 6s —
-/// 3 missed heartbeats, matching `PeerPresenceTracker`'s existing 6s
-/// `PeerLost` debounce (docs/adr/0025-sync-and-discovery-reliability.md)
-/// so both signals a `PlaybackOwnershipCoordinator` reacts to agree on
-/// timing.
+/// Owns its own liveness: sends a heartbeat every 4s and calls [onLost]
+/// if nothing at all (heartbeat or otherwise) has been received for
+/// 20s — deliberately more forgiving than `PeerPresenceTracker`'s 6s
+/// mDNS `PeerLost` debounce (docs/adr/0025-sync-and-discovery-reliability.md):
+/// mDNS presence is "is the peer still broadcasting", cheap to declare
+/// lost and re-detect moments later from the next re-announce; this is
+/// "is our live ownership socket still good", and declaring it lost
+/// pauses local playback (see `PlaybackOwnershipCoordinator._handleIncomingSelfClaim`/
+/// `_handleGossip`) — a false positive from an ordinary OS scheduling
+/// hiccup (a phone's network stack briefly deprioritized while the
+/// screen is off, a momentary Wi-Fi blip) is far more disruptive here
+/// than being a few extra seconds slow to notice a *genuine* drop.
 class PlaybackOwnershipLink {
   PlaybackOwnershipLink({
     required this.remoteDeviceId,
     required WebSocket socket,
-    Duration heartbeatInterval = const Duration(seconds: 2),
-    Duration lostTimeout = const Duration(seconds: 6),
+    Duration heartbeatInterval = const Duration(seconds: 4),
+    Duration lostTimeout = const Duration(seconds: 20),
   })  : _socket = socket,
         _lostTimeout = lostTimeout {
     _lastReceivedAt = DateTime.now();

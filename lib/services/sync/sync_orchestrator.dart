@@ -43,6 +43,7 @@ class SyncOrchestrator {
   final _recentSyncController = StreamController<SyncStats>.broadcast();
 
   int? _metadataSyncPort;
+  Timer? _refreshTimer;
 
   /// Feeds the "синхронизировано N изменений" badge (ТЗ п.6.6).
   Stream<SyncStats> get recentSyncs => _recentSyncController.stream;
@@ -60,6 +61,20 @@ class SyncOrchestrator {
       // the app from working. Sync is a bonus, not a gate (ТЗ п.7); the
       // metadata sync server above is already up regardless.
     }
+    // Automatic counterpart to [restartDiscovery]'s manual button — the
+    // user asked for devices that are genuinely online to just always
+    // show up, without having to remember to press "обновить" whenever
+    // that happens. Runs [DiscoveryService.refresh], not [.restart]: no
+    // [PeerPresenceTracker.reset], so peers that are still actually
+    // online never visibly flap offline-then-online every cycle — only
+    // the native mDNS listener/broadcast gets torn down and
+    // re-established, the same recovery the manual button already
+    // relies on for a listener that silently got stuck (Wi-Fi network
+    // switch, doze/sleep). 45s: frequent enough that "стал доступен"
+    // shows up promptly, far below the sync-storm territory ADR
+    // 0025 hit at "on every mDNS re-announce" (bonsoir itself
+    // re-announces roughly every few seconds).
+    _refreshTimer = Timer.periodic(const Duration(seconds: 45), (_) => restartDiscovery(gentle: true));
   }
 
   /// Bound to the manual "обновить" button on the Устройства screen —
@@ -70,11 +85,20 @@ class SyncOrchestrator {
   /// (a Wi-Fi network switch, doze/sleep, a long time backgrounded) is
   /// invisible from inside a running discovery stream — nothing short of
   /// actually tearing it down and starting a fresh one recovers from it.
-  Future<void> restartDiscovery() async {
+  ///
+  /// [gentle] (only ever `true` for the periodic timer in [start]) skips
+  /// [PeerPresenceTracker.reset]'s immediate "everyone just went
+  /// offline" signal — see [DiscoveryService.refresh]'s doc for why the
+  /// manual button and the automatic timer need different behavior here.
+  Future<void> restartDiscovery({bool gentle = false}) async {
     final port = _metadataSyncPort;
     if (port == null) return; // start() never ran yet — nothing to restart
     try {
-      await _discoveryService.restart(port);
+      if (gentle) {
+        await _discoveryService.refresh(port);
+      } else {
+        await _discoveryService.restart(port);
+      }
     } catch (_) {
       // Same reasoning as start() — mDNS is a bonus, not a gate.
     }
@@ -136,6 +160,7 @@ class SyncOrchestrator {
   /// stream). [_discoveryService] and [_metadataSyncService] are injected
   /// and owned by their own providers, which dispose them independently.
   Future<void> dispose() async {
+    _refreshTimer?.cancel();
     await _discoverySub.cancel();
     await _statsSub.cancel();
     await _recentSyncController.close();

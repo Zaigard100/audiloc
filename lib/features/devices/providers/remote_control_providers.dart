@@ -23,6 +23,8 @@ class RemoteControlController {
   void next() => client.next();
   void previous() => client.previous();
   void seek(Duration position) => client.seek(position);
+  void setShuffle(bool enabled) => client.setShuffle(enabled);
+  void setRepeatMode(String mode) => client.setRepeatMode(mode);
   void loadAndPlay(List<String> trackIds, int startIndex, Duration position) =>
       client.loadAndPlay(trackIds, startIndex, position);
 }

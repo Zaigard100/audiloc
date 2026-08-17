@@ -65,13 +65,18 @@
 cd /path/to/AudiLoc
 flutter pub get
 
-# APK для тестирования на конкретном устройстве/эмуляторе
+# APK для тестирования на конкретном устройстве/эмуляторе — debug-сборки
+# не режут иконочный шрифт, флаг ниже им не нужен
 flutter build apk --debug
-# или сразу release (см. про подпись ниже)
-flutter build apk --release
+# или сразу release (см. про подпись ниже). `--no-tree-shake-icons`
+# обязателен для release/appbundle: без него у части Material-иконок
+# (замечено на Icons.cast, Icons.cast_connected, Icons.smartphone,
+# Icons.speaker_outlined) release-тришейкинг молча выкидывает глиф из
+# шрифта, хотя иконка используется напрямую в коде
+flutter build apk --release --no-tree-shake-icons
 
 # App Bundle — то, что реально нужно для публикации в Google Play
-flutter build appbundle --release
+flutter build appbundle --release --no-tree-shake-icons
 
 # Запуск на подключённом устройстве/эмуляторе с логами
 flutter run -d <device-id>   # id устройств: `flutter devices`

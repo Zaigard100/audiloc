@@ -25,7 +25,16 @@ class DeviceTile extends ConsumerWidget {
     // device anyway, but gating here too skips creating the family entry
     // at all for the common case of a paired-but-offline device.
     final remote = isOnline ? ref.watch(remoteControlConnectionProvider(device.id)).value : null;
-    final canControl = remote?.status == RemoteControlStatus.accepted;
+    // Hidden entirely while profile-wide sync is on
+    // (docs/adr/0033-playback-ownership-and-handoff.md) — control now
+    // happens from the player's own cast/handoff picker, which already
+    // shows exactly one active target; keeping this inline duplicate
+    // around too would just be a second, easy-to-miss place the same
+    // buttons could stop working from (e.g. loadAndPlay here would
+    // silently fight the ownership protocol instead of going through
+    // it).
+    final syncEnabled = ref.watch(profileSyncEnabledProvider).value ?? false;
+    final canControl = !syncEnabled && remote?.status == RemoteControlStatus.accepted;
 
     final tile = ListTile(
       leading: CircleAvatar(

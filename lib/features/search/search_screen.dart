@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/providers.dart';
 import '../../core/theme/app_colors.dart';
 import '../../l10n/l10n.dart';
 import '../library/providers/library_providers.dart';
 import '../library/widgets/track_tile.dart';
 import '../player/models/queue_source.dart';
+import '../player/providers/active_playback_controller.dart';
 import '../player/providers/player_providers.dart';
 
 /// Поиск tab (ТЗ п.6.2): filters the already-loaded local library in
@@ -62,7 +62,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                       track: track,
                       onTap: () {
                         ref.read(queueSourceProvider.notifier).state = const LibraryQueueSource();
-                        ref.read(playerServiceProvider).setQueue(results, startIndex: index);
+                        ref.read(activePlaybackControllerProvider).playQueue(results, startIndex: index);
                       },
                     );
                   },

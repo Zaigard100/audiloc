@@ -187,20 +187,6 @@ final currentAllowRemoteControlProvider = StateProvider<bool>(
       throw UnimplementedError('currentAllowRemoteControlProvider must be overridden by profile_session.dart'),
 );
 
-/// Same pattern again — see
-/// docs/adr/0032-unified-profile-sync-and-background-mode.md. Only shown
-/// in Settings while [profileSyncEnabledProvider] is on; device-level
-/// (not CRDT), off by default, same reasoning as
-/// [currentAllowRemoteControlProvider].
-final changeKeepAliveInBackgroundProvider = Provider<Future<void> Function(bool)>(
-  (ref) => throw UnimplementedError('changeKeepAliveInBackgroundProvider must be overridden by AudilocApp'),
-);
-
-final currentKeepAliveInBackgroundProvider = StateProvider<bool>(
-  (ref) => throw UnimplementedError(
-      'currentKeepAliveInBackgroundProvider must be overridden by profile_session.dart'),
-);
-
 /// Separate from profile-wide sync below — this one's purely local (see
 /// [LocalPlaybackStateStore]/`local_session_restore.dart`), on by
 /// default (unlike the cross-device toggles): restoring this device's
@@ -469,12 +455,16 @@ final remoteControlServerProvider = Provider<RemoteControlServer>((ref) {
     devicesRepository: ref.watch(devicesRepositoryProvider),
     tracksRepository: ref.watch(tracksRepositoryProvider),
     // Additive: the device-level toggle (ADR 0030) OR the caller being
-    // whoever this device most recently received a handoff from (ADR
-    // 0033) — that explicit ack already is the consent to be
-    // controlled by it.
+    // any device this one currently has a live ownership-mesh link to
+    // (paired + online + sync-enabled right now, ADR 0033) — being part
+    // of the same profile's sync mesh already is the consent to see/
+    // control whichever device in it currently owns playback; requiring
+    // the separate toggle *too* was exactly what made "видно на всех
+    // устройствах" fail for every device except the one that performed
+    // the handoff.
     isAllowed: (callerDeviceId) =>
         ref.read(currentAllowRemoteControlProvider) ||
-        callerDeviceId == ref.read(playbackOwnershipCoordinatorProvider).lastHandoffInitiator,
+        ref.read(playbackOwnershipCoordinatorProvider).linkedDeviceIds.contains(callerDeviceId),
     port: remoteControlPort,
   );
   ref.onDispose(server.dispose);
@@ -513,6 +503,7 @@ final playbackOwnershipCoordinatorProvider = Provider<PlaybackOwnershipCoordinat
     devicesRepository: ref.watch(devicesRepositoryProvider),
     profileSettingsRepository: ref.watch(profileSettingsRepositoryProvider),
     playerService: ref.watch(rawPlayerServiceProvider),
+    tracksRepository: ref.watch(tracksRepositoryProvider),
     server: ref.watch(playbackOwnershipServerProvider),
     port: playbackOwnershipPort,
   );

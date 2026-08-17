@@ -130,3 +130,19 @@ ref.read(profileSettingsRepositoryProvider).isSyncPlaybackEnabled()`,
    "работать в фоне" появляется только при включённом синке и исчезает
    при выключении — не выполнялась в этом заходе, платформенный эффект
    ещё не реализован.
+
+## Дополнение — тумблер "работать в фоне" убран
+
+Платформенный эффект (§2 выше) так и не был реализован — ни Android
+foreground-уведомление, ни трей на десктопе. По прямому запросу
+пользователя ("насчёт фоновой работы — она не реализована и
+реализована не будет, его потом удалим") тумблер убран целиком: ARB-строки
+`settingsKeepAliveInBackground(Subtitle)`, `AppSettingsStore.keepAliveInBackground()`/
+`setKeepAliveInBackground()`, `change/currentKeepAliveInBackgroundProvider`,
+`openProfileSession`'s `change/initialKeepAliveInBackground` параметры,
+`lib/app.dart`'s `_keepAliveInBackground` поле/`_changeKeepAliveInBackground`
+метод, и `_KeepAliveInBackgroundToggle` в `settings_screen.dart`.
+
+Раздел "2. Тумблер «работать в фоне»" выше остаётся как исторический
+контекст решения, но описанный им код в дереве больше не существует.
+Часть 1 (единый профильный тумблер синка) этот шаг не затрагивает.

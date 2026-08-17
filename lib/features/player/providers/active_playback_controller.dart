@@ -7,15 +7,18 @@ import '../../devices/providers/remote_control_providers.dart';
 import 'player_providers.dart';
 import 'playback_ownership_providers.dart';
 
-/// Talks to whichever device the full player screen should currently
-/// control — this device's own `playerServiceProvider`, or a remote
-/// device via `RemoteControlController`/`Client` (ADR 0030's existing
-/// live channel), based on [activePlaybackTargetProvider]. Used **only**
-/// by `full_player_screen.dart` — every other reader in the app (mini
-/// player, keyboard shortcuts, `PlaybackStateWriter`, incoming remote
-/// control from another device) keeps talking to `playerServiceProvider`
-/// directly, unaffected by which device the player screen happens to be
-/// showing. See docs/adr/0033-playback-ownership-and-handoff.md.
+/// Talks to whichever device currently owns playback — this device's
+/// own `playerServiceProvider`, or a remote device via
+/// `RemoteControlController`/`Client` (ADR 0030's existing live
+/// channel), based on [activePlaybackTargetProvider]. Used by the full
+/// player screen and every "tap a track to play it" list (library,
+/// favorites, playlists, search) — picking a track while another
+/// device owns playback sends it there instead of silently stealing
+/// ownership back to this device. Keyboard shortcuts,
+/// `PlaybackStateWriter`, and incoming remote control from another
+/// device keep talking to `playerServiceProvider` directly — those are
+/// about *this device's own* engine specifically, not "whichever device
+/// is active" (see docs/adr/0033-playback-ownership-and-handoff.md).
 class ActivePlaybackController {
   ActivePlaybackController(this._ref);
   final Ref _ref;
@@ -85,6 +88,44 @@ class ActivePlaybackController {
         _ref.read(remoteControlControllerProvider(deviceId)).previous();
     }
   }
+
+  /// Backs every "tap a track to play it" list — replaces every
+  /// `playerServiceProvider.setQueue(...)` call site that used to play
+  /// unconditionally on this device regardless of who currently owns
+  /// playback. Remote mode sends the whole tapped list via the existing
+  /// `loadAndPlay` (ADR 0030), starting at [startIndex], from position
+  /// zero — there's no "current position" to preserve, this is a fresh
+  /// selection, not a resume.
+  Future<void> playQueue(List<Track> tracks, {required int startIndex}) async {
+    switch (_target) {
+      case LocalPlaybackTarget():
+        await _ref.read(playerServiceProvider).setQueue(tracks, startIndex: startIndex);
+      case RemotePlaybackTarget(:final deviceId):
+        _ref.read(remoteControlControllerProvider(deviceId)).loadAndPlay(
+              tracks.map((t) => t.id).toList(),
+              startIndex,
+              Duration.zero,
+            );
+    }
+  }
+
+  Future<void> setShuffle(bool enabled) async {
+    switch (_target) {
+      case LocalPlaybackTarget():
+        await _ref.read(playerServiceProvider).setShuffle(enabled);
+      case RemotePlaybackTarget(:final deviceId):
+        _ref.read(remoteControlControllerProvider(deviceId)).setShuffle(enabled);
+    }
+  }
+
+  Future<void> setRepeatMode(PlaybackRepeatMode mode) async {
+    switch (_target) {
+      case LocalPlaybackTarget():
+        await _ref.read(playerServiceProvider).setRepeatMode(mode);
+      case RemotePlaybackTarget(:final deviceId):
+        _ref.read(remoteControlControllerProvider(deviceId)).setRepeatMode(mode.name);
+    }
+  }
 }
 
 final activePlaybackControllerProvider =
@@ -118,6 +159,29 @@ final activePlaybackPositionProvider = Provider<PlaybackPositionState>((ref) {
   }
 });
 
+final activePlaybackShuffleEnabledProvider = Provider<bool>((ref) {
+  final target = ref.watch(activePlaybackTargetProvider).value ?? const LocalPlaybackTarget();
+  return switch (target) {
+    LocalPlaybackTarget() => ref.watch(shuffleEnabledProvider).value ?? false,
+    RemotePlaybackTarget(:final deviceId) =>
+      ref.watch(remoteControlConnectionProvider(deviceId)).value?.state?.shuffleEnabled ?? false,
+  };
+});
+
+final activePlaybackRepeatModeProvider = Provider<PlaybackRepeatMode>((ref) {
+  final target = ref.watch(activePlaybackTargetProvider).value ?? const LocalPlaybackTarget();
+  switch (target) {
+    case LocalPlaybackTarget():
+      return ref.watch(repeatModeProvider).value ?? PlaybackRepeatMode.all;
+    case RemotePlaybackTarget(:final deviceId):
+      final modeName = ref.watch(remoteControlConnectionProvider(deviceId)).value?.state?.repeatMode;
+      return PlaybackRepeatMode.values.firstWhere(
+        (m) => m.name == modeName,
+        orElse: () => PlaybackRepeatMode.all,
+      );
+  }
+});
+
 /// Remote mode resolves the full `Track` (for cover art / favorite
 /// toggle) from the synced `tracks` table by id — `RemoteState` itself
 /// only carries `trackId`/`title`/`artist` as a fallback for the rare
@@ -126,7 +190,22 @@ final activePlaybackCurrentTrackProvider = StreamProvider<Track?>((ref) {
   final target = ref.watch(activePlaybackTargetProvider).value ?? const LocalPlaybackTarget();
   switch (target) {
     case LocalPlaybackTarget():
-      return ref.watch(playerServiceProvider).currentTrackStream;
+      // `Stream.value(ref.watch(currentTrackProvider).value)`, not a
+      // fresh `playerServiceProvider.currentTrackStream` watch — this
+      // provider rebuilds every time `activePlaybackTargetProvider`
+      // does (even when the resolved target doesn't actually change,
+      // e.g. its own upstream `profileSyncEnabledProvider` merely
+      // finishing its first CRDT load), and re-subscribing directly to
+      // the *raw* engine stream on every rebuild loses whatever was
+      // emitted between the old subscription tearing down and the new
+      // one attaching — `currentTrackController` is a plain broadcast
+      // `StreamController` with no replay. Reading the already-stable,
+      // continuously-subscribed `currentTrackProvider`'s current
+      // `.value` instead (same fix `activePlaybackIsPlayingProvider`/
+      // `activePlaybackPositionProvider` already apply) can't ever miss
+      // an update: a fresh rebuild here is itself only triggered when
+      // that value actually changes, so it's always read up to date.
+      return Stream.value(ref.watch(currentTrackProvider).value);
     case RemotePlaybackTarget(:final deviceId):
       final trackId = ref.watch(remoteControlConnectionProvider(deviceId)).value?.state?.trackId;
       if (trackId == null) return Stream.value(null);

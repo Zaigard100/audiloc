@@ -1,7 +1,9 @@
 import 'dart:async';
 
+import '../../data/models/track.dart';
 import '../../data/repositories/devices_repository.dart';
 import '../../data/repositories/profile_settings_repository.dart';
+import '../../data/repositories/tracks_repository.dart';
 import '../playback/player_service.dart';
 import '../sync/discovery/discovered_peer.dart';
 import '../sync/discovery/discovery_event.dart';
@@ -32,16 +34,27 @@ class PlaybackOwnershipCoordinator {
     required DevicesRepository devicesRepository,
     required ProfileSettingsRepository profileSettingsRepository,
     required PlayerService playerService,
+    required TracksRepository tracksRepository,
     required PlaybackOwnershipServer server,
     this.port = 8547,
   }) : _devicesRepository = devicesRepository,
        _playerService = playerService,
+       _tracksRepository = tracksRepository,
        _server = server {
     _discoverySub = discoveryService.events.listen(_handleDiscoveryEvent);
     _acceptedSub = server.onAccepted.listen(_registerLink);
     _syncEnabledSub = profileSettingsRepository
         .watchSyncPlaybackEnabled()
         .listen(_handleSyncEnabledChanged);
+    // Belt-and-braces on top of the reactive `PeerFound`-triggered
+    // dial in `_maybeDial`: that alone depends on mDNS re-announcing a
+    // peer again after a failed/dropped dial attempt (it does, but on
+    // its own schedule, not ours) — this instead periodically checks
+    // every peer we already know is online for a link we *should* have
+    // but don't, and retries. Directly targets "handoff silently stops
+    // working"/"both devices end up playing" once a link has quietly
+    // gone missing and nothing happened to prompt a retry.
+    _reconcileTimer = Timer.periodic(const Duration(seconds: 15), (_) => _reconcileLinks());
   }
 
   final String selfDeviceId;
@@ -49,11 +62,13 @@ class PlaybackOwnershipCoordinator {
   final int port;
   final DevicesRepository _devicesRepository;
   final PlayerService _playerService;
+  final TracksRepository _tracksRepository;
   final PlaybackOwnershipServer _server;
 
   late final StreamSubscription<DiscoveryEvent> _discoverySub;
   late final StreamSubscription<PlaybackOwnershipLink> _acceptedSub;
   late final StreamSubscription<bool> _syncEnabledSub;
+  Timer? _reconcileTimer;
 
   final _links = <String, PlaybackOwnershipLink>{};
   final _linkMessageSubs = <String, StreamSubscription<OwnershipMessage>>{};
@@ -62,19 +77,12 @@ class PlaybackOwnershipCoordinator {
   bool _syncEnabled = false;
   String? _currentOwner;
   OwnershipClaim? _selfClaim;
-  String? _lastHandoffInitiator;
 
   final _ownerController = StreamController<String?>.broadcast();
 
   /// `null` means unclaimed — no device currently owns playback.
   String? get currentOwner => _currentOwner;
   Stream<String?> get ownerChanges => _ownerController.stream;
-
-  /// The device that most recently handed playback off to this one, if
-  /// any — used by `RemoteControlServer`'s additive accept path so that
-  /// device can immediately remote-control the result of its own
-  /// handoff. See [_handleTargetedClaim].
-  String? get lastHandoffInitiator => _lastHandoffInitiator;
 
   /// Paired, online devices this coordinator currently has a live
   /// ownership link to — i.e. confirmed sync-enabled *right now*, not
@@ -96,13 +104,25 @@ class PlaybackOwnershipCoordinator {
     }
   }
 
-  /// Manual handoff — asks [targetDeviceId] specifically to become
-  /// owner, and waits for it to ack/reject/time out (3s). Returns
-  /// `false` without touching anything if there's no live link to that
-  /// device, sync is off, or the target declines/doesn't answer in
-  /// time — callers must not touch local playback unless this returns
-  /// `true` (see `playback_target_picker_sheet.dart`).
-  Future<bool> claimForDevice(String targetDeviceId) async {
+  /// Manual handoff — asks [targetDeviceId] to become owner *and*
+  /// carries the whole queue+position to hand it right in the claim
+  /// itself (see [OwnershipClaim.queueTrackIds]'s doc for why this
+  /// is one round trip, not claim-then-separately-transfer-the-queue).
+  /// Waits for ack/reject/time out (5s — longer than the pre-atomicity
+  /// version's 3s, since the target now has to actually load and start
+  /// the queue before it can ack, not just reply). Returns `false`
+  /// without touching anything if there's no live link to that device,
+  /// sync is off, or the target declines/doesn't answer in time —
+  /// callers must not touch local playback unless this returns `true`
+  /// (see `playback_target_picker_sheet.dart`): a `false` here
+  /// guarantees the target never actually started playing anything, so
+  /// there's nothing to roll back.
+  Future<bool> claimForDevice(
+    String targetDeviceId, {
+    required List<String> queueTrackIds,
+    required int queueIndex,
+    required int positionMs,
+  }) async {
     if (!_syncEnabled) return false;
     final link = _links[targetDeviceId];
     if (link == null) return false;
@@ -110,6 +130,9 @@ class PlaybackOwnershipCoordinator {
     final claim = OwnershipClaim.now(
       deviceId: targetDeviceId,
       reason: ClaimReason.manualHandoff,
+      queueTrackIds: queueTrackIds,
+      queueIndex: queueIndex,
+      positionMs: positionMs,
     );
     final completer = Completer<bool>();
     late StreamSubscription<OwnershipMessage> sub;
@@ -125,7 +148,7 @@ class PlaybackOwnershipCoordinator {
 
     link.send(claim);
     final accepted = await completer.future.timeout(
-      const Duration(seconds: 3),
+      const Duration(seconds: 5),
       onTimeout: () => false,
     );
     await sub.cancel();
@@ -166,9 +189,17 @@ class PlaybackOwnershipCoordinator {
     } else if (!wasEnabled && enabled) {
       // Peers already online never re-fire PeerFound just because sync
       // turned on — reconcile explicitly against what's already known.
-      for (final peer in _onlinePeers.values.toList()) {
-        unawaited(_maybeDial(peer));
-      }
+      _reconcileLinks();
+    }
+  }
+
+  /// Retries [_maybeDial] for every peer we currently believe is
+  /// online but don't have a link to — see the periodic timer in the
+  /// constructor and the sync-just-turned-on case above, its two
+  /// callers.
+  void _reconcileLinks() {
+    for (final peer in _onlinePeers.values.toList()) {
+      if (!_links.containsKey(peer.deviceId)) unawaited(_maybeDial(peer));
     }
   }
 
@@ -212,9 +243,9 @@ class PlaybackOwnershipCoordinator {
 
   void _handleMessage(PlaybackOwnershipLink link, OwnershipMessage message) {
     switch (message) {
-      case OwnershipClaim(:final deviceId, :final claimId):
+      case OwnershipClaim(:final deviceId):
         if (deviceId == selfDeviceId) {
-          _handleTargetedClaim(link, claimId);
+          unawaited(_handleTargetedClaim(link, message));
         } else {
           _handleIncomingSelfClaim(message);
         }
@@ -229,27 +260,48 @@ class PlaybackOwnershipCoordinator {
     }
   }
 
-  void _handleTargetedClaim(PlaybackOwnershipLink link, String claimId) {
+  /// Only ever sends [OwnershipClaimAck] *after* successfully loading
+  /// and starting [claim]'s queue — see [OwnershipClaim.queueTrackIds]'s
+  /// doc for why the ack itself needs to mean "actually playing now",
+  /// not "agreed to try". Rejects (never partially applies) if the
+  /// queue is empty, sync is off, or the requested start track isn't
+  /// resolvable here — same "resolve ids -> tracks this device
+  /// actually has, re-find the start by id since dropping unavailable
+  /// ones shifts indices" logic `RemoteControlServer._apply` already
+  /// applies to `RemoteLoadAndPlay` (ADR 0030), duplicated rather than
+  /// shared since that lives in a different service with its own
+  /// dependencies.
+  Future<void> _handleTargetedClaim(PlaybackOwnershipLink link, OwnershipClaim claim) async {
     if (!_syncEnabled) {
-      link.send(
-        OwnershipClaimReject(claimId: claimId, reason: 'sync_disabled'),
-      );
+      link.send(OwnershipClaimReject(claimId: claim.claimId, reason: 'sync_disabled'));
       return;
     }
-    link.send(OwnershipClaimAck(claimId: claimId));
-    _setOwner(
-      selfDeviceId,
-      claim: OwnershipClaim(
-        deviceId: selfDeviceId,
-        claimId: claimId,
-        reason: ClaimReason.manualHandoff,
-      ),
+    if (claim.queueTrackIds.isEmpty || claim.queueIndex < 0 || claim.queueIndex >= claim.queueTrackIds.length) {
+      link.send(OwnershipClaimReject(claimId: claim.claimId, reason: 'empty_queue'));
+      return;
+    }
+
+    final startId = claim.queueTrackIds[claim.queueIndex];
+    final tracks = <Track>[];
+    for (final id in claim.queueTrackIds) {
+      final track = await _tracksRepository.byId(id);
+      if (track != null && track.isAvailableLocally) tracks.add(track);
+    }
+    final resolvedIndex = tracks.indexWhere((t) => t.id == startId);
+    if (resolvedIndex < 0) {
+      link.send(OwnershipClaimReject(claimId: claim.claimId, reason: 'track_not_available'));
+      return;
+    }
+
+    await _playerService.setQueue(
+      tracks,
+      startIndex: resolvedIndex,
+      autoPlay: true,
+      seekTo: Duration(milliseconds: claim.positionMs),
     );
-    // Whoever just handed off to me is implicitly allowed to remote
-    // -control me afterward, regardless of the separate "allow remote
-    // control" toggle (ADR 0030) — this explicit ack *is* the consent.
-    // See `RemoteControlServer`'s additive accept path.
-    _lastHandoffInitiator = link.remoteDeviceId;
+
+    link.send(OwnershipClaimAck(claimId: claim.claimId));
+    _setOwner(selfDeviceId, claim: claim);
     _gossipOwner(exclude: link.remoteDeviceId);
   }
 
@@ -303,6 +355,7 @@ class PlaybackOwnershipCoordinator {
   }
 
   Future<void> dispose() async {
+    _reconcileTimer?.cancel();
     await _discoverySub.cancel();
     await _acceptedSub.cancel();
     await _syncEnabledSub.cancel();

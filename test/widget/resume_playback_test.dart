@@ -8,7 +8,6 @@ import 'package:audiloc/data/repositories/profile_settings_repository.dart';
 import 'package:audiloc/data/repositories/tracks_repository.dart';
 import 'package:audiloc/features/player/providers/player_providers.dart';
 import 'package:audiloc/features/player/widgets/resume_playback_prompt.dart';
-import 'package:audiloc/l10n/l10n.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -35,7 +34,7 @@ class _RestoreHarnessState extends ConsumerState<_RestoreHarness> {
     super.initState();
     ref.listenManual(playbackStateProvider, (previous, next) {
       final state = next.value;
-      if (state != null) handleIncomingPlaybackState(context, ref, state);
+      if (state != null) handleIncomingPlaybackState(ref, state);
     }, fireImmediately: true);
   }
 
@@ -97,15 +96,12 @@ void main() {
   });
 
   testWidgets(
-      'tapping "Продолжить" on the resume snackbar seeks to the saved position and '
-      'starts playing immediately — regression: it previously always restarted from 0, '
-      'and required a second manual tap on play',
-      (tester) async {
+      'a different device\'s row is left alone entirely when something is already loaded '
+      'locally — no prompt, nothing overwritten (the old "Продолжить" snackbar was removed '
+      'at the user\'s request once the live ownership protocol, docs/adr/0033, made it '
+      'redundant)', (tester) async {
     await tester.runAsync(() async {
       await TracksRepository(db.crdt).upsert(track);
-      // A different device's row — with something already loaded locally
-      // (below), this is exactly the "ask first" branch, not the silent
-      // cold-start one covered by the test above.
       await PlaybackStateRepository(db.crdt).save(const PlaybackState(
         trackId: 't1',
         positionMs: 65000,
@@ -113,11 +109,6 @@ void main() {
         deviceId: 'other-device',
         deviceName: 'Телефон',
       ));
-      // The row's deviceId ('other-device') isn't self, so
-      // handleIncomingPlaybackState now gates on the unified sync
-      // setting before it even resolves the queue — on here since this
-      // test is specifically about the "ask first" path, not about the
-      // setting itself.
       await ProfileSettingsRepository(db.crdt).setSyncPlaybackEnabled(true);
       playerService.emitTrack(const Track(id: 'already-playing', path: '/b.mp3', title: 'Other'));
 
@@ -130,43 +121,24 @@ void main() {
 
       await tester.pumpWidget(UncontrolledProviderScope(
         container: container,
-        child: MaterialApp(
-          locale: const Locale('ru'),
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
-          supportedLocales: AppLocalizations.supportedLocales,
-          home: const Scaffold(body: _RestoreHarness()),
-        ),
+        child: const MaterialApp(home: _RestoreHarness()),
       ));
 
       for (var i = 0; i < 30; i++) {
         await Future<void>.delayed(const Duration(milliseconds: 10));
         await tester.pump();
-        if (find.text('Продолжить').evaluate().isNotEmpty) break;
       }
-      expect(find.text('Продолжить'), findsOneWidget);
-      // Just showing the snackbar must not have applied anything yet.
+
+      expect(find.text('Продолжить'), findsNothing);
+      // The already-loaded track is untouched — nothing from the
+      // incoming row was ever applied.
       expect(playerService.lastQueue, isEmpty);
-
-      // Let the snackbar's entrance animation finish — tapping mid-slide-in
-      // hits nothing (flutter_test's hit-test warning) and the action
-      // never fires.
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Продолжить'));
-      for (var i = 0; i < 30; i++) {
-        await Future<void>.delayed(const Duration(milliseconds: 10));
-        await tester.pump();
-        if (playerService.lastQueue.isNotEmpty) break;
-      }
-
-      expect(playerService.lastQueue.map((t) => t.id), ['t1']);
-      expect(playerService.position, const Duration(milliseconds: 65000));
-      expect(playerService.isPlaying, isTrue);
     });
   });
 
   testWidgets(
       'a state from a different device is ignored entirely when the sync toggle is off — '
-      'no snackbar, nothing applied', (tester) async {
+      'nothing applied', (tester) async {
     await tester.runAsync(() async {
       await TracksRepository(db.crdt).upsert(track);
       await PlaybackStateRepository(db.crdt).save(const PlaybackState(
@@ -189,12 +161,7 @@ void main() {
 
       await tester.pumpWidget(UncontrolledProviderScope(
         container: container,
-        child: MaterialApp(
-          locale: const Locale('ru'),
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
-          supportedLocales: AppLocalizations.supportedLocales,
-          home: const Scaffold(body: _RestoreHarness()),
-        ),
+        child: const MaterialApp(home: _RestoreHarness()),
       ));
 
       for (var i = 0; i < 15; i++) {
@@ -202,7 +169,6 @@ void main() {
         await tester.pump();
       }
 
-      expect(find.text('Продолжить'), findsNothing);
       expect(playerService.lastQueue, isEmpty);
     });
   });

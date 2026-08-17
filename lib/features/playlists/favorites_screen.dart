@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/providers.dart';
 import '../../core/theme/app_colors.dart';
 import '../../l10n/l10n.dart';
 import '../library/providers/library_providers.dart';
 import '../library/widgets/track_tile.dart';
 import '../player/models/queue_source.dart';
+import '../player/providers/active_playback_controller.dart';
 import '../player/providers/player_providers.dart';
 
 /// "Избранное" — a live view over `favorites`, not a maintained
@@ -58,7 +58,7 @@ class FavoritesScreen extends ConsumerWidget {
                   track: track,
                   onTap: () {
                     ref.read(queueSourceProvider.notifier).state = const FavoritesQueueSource();
-                    ref.read(playerServiceProvider).setQueue(tracks, startIndex: index);
+                    ref.read(activePlaybackControllerProvider).playQueue(tracks, startIndex: index);
                   },
                 );
               },

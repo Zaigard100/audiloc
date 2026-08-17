@@ -9,6 +9,7 @@ import '../../l10n/l10n.dart';
 import '../library/providers/library_providers.dart';
 import '../library/widgets/track_tile.dart';
 import '../player/models/queue_source.dart';
+import '../player/providers/active_playback_controller.dart';
 import '../player/providers/player_providers.dart';
 import 'providers/playlists_providers.dart';
 
@@ -51,8 +52,8 @@ class PlaylistDetailScreen extends ConsumerWidget {
                     onTap: () {
                       ref.read(queueSourceProvider.notifier).state = PlaylistQueueSource(playlistId, name);
                       ref
-                          .read(playerServiceProvider)
-                          .setQueue(items.map((e) => e.track).toList(), startIndex: index);
+                          .read(activePlaybackControllerProvider)
+                          .playQueue(items.map((e) => e.track).toList(), startIndex: index);
                     },
                     trailing: IconButton(
                       icon: const Icon(Icons.remove_circle_outline),

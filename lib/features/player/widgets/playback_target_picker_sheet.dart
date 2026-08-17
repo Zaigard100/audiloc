@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/providers.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../data/models/track.dart';
 import '../../../l10n/l10n.dart';
 import '../../devices/providers/devices_providers.dart';
 import '../../devices/providers/remote_control_providers.dart';
@@ -44,14 +45,17 @@ class _PlaybackTargetPickerSheet extends ConsumerWidget {
             child: Text(l10n.playbackTargetPickerTitle, style: Theme.of(context).textTheme.titleMedium),
           ),
           ListTile(
-            leading: const Icon(Icons.smartphone),
+            // Not Icons.smartphone — see full_player_screen.dart's cast
+            // icon comment for why some icons don't survive release
+            // icon tree-shaking; Icons.devices is already proven safe.
+            leading: const Icon(Icons.devices),
             title: Text(l10n.playbackTargetThisDevice),
             trailing: target is LocalPlaybackTarget ? const Icon(Icons.check) : null,
             onTap: target is LocalPlaybackTarget ? null : () => _pullBack(context, ref),
           ),
           for (final device in candidates)
             ListTile(
-              leading: const Icon(Icons.speaker_outlined),
+              leading: const Icon(Icons.devices_other),
               title: Text(device.name),
               trailing: target is RemotePlaybackTarget && target.deviceId == device.id
                   ? const Icon(Icons.check)
@@ -73,13 +77,19 @@ class _PlaybackTargetPickerSheet extends ConsumerWidget {
     );
   }
 
-  /// Captures this device's current queue+position, asks [deviceId] to
-  /// become owner, and — only once that's confirmed *and* a
-  /// remote-control connection to it is actually accepted — sends it
-  /// the queue and pauses locally. Local playback is never touched
-  /// unless every step above succeeds, so a rejected/timed-out/offline
-  /// target never leaves this device stranded mid-handoff. See
-  /// docs/adr/0033-playback-ownership-and-handoff.md.
+  /// Captures this device's current queue+position and sends it *in
+  /// the same claim* that asks [deviceId] to become owner — one round
+  /// trip, atomic: [PlaybackOwnershipCoordinator.claimForDevice] only
+  /// ever returns `true` once the target has *already* successfully
+  /// loaded and started that exact queue (see
+  /// [PlaybackOwnershipCoordinator.claimForDevice]'s doc). So by the
+  /// time this pauses locally, the target is guaranteed to actually be
+  /// playing — no separate "did the queue-transfer half also succeed"
+  /// step that could fail independently and leave both devices
+  /// disagreeing about who's playing (one paused-but-not-really,
+  /// one "owner" but with nothing loaded). A rejected/timed-out/offline
+  /// target leaves this device's local playback untouched entirely.
+  /// See docs/adr/0033-playback-ownership-and-handoff.md.
   Future<void> _handOff(BuildContext context, WidgetRef ref, String deviceId, String deviceName) async {
     final navigator = Navigator.of(context);
     final messenger = ScaffoldMessenger.of(context);
@@ -99,41 +109,31 @@ class _PlaybackTargetPickerSheet extends ConsumerWidget {
     }
     final position = playerService.position;
 
-    final claimed = await ref.read(playbackOwnershipCoordinatorProvider).claimForDevice(deviceId);
+    final claimed = await ref.read(playbackOwnershipCoordinatorProvider).claimForDevice(
+          deviceId,
+          queueTrackIds: tracks.map((t) => t.id).toList(),
+          queueIndex: index,
+          positionMs: position.inMilliseconds,
+        );
     if (!claimed) {
       navigator.pop();
       messenger.showSnackBar(SnackBar(content: Text(l10n.playbackTargetHandoffFailed(deviceName))));
       return;
     }
 
-    // The target just became owner — the additive accept path in
-    // RemoteControlServer (ADR 0033) now lets this device's own
-    // remote-control connection through regardless of the "allow
-    // remote control" toggle, but the connection itself still needs a
-    // moment to actually establish.
-    final connected = await _awaitRemoteControlAccepted(ref, deviceId);
-    if (!connected) {
-      navigator.pop();
-      messenger.showSnackBar(SnackBar(content: Text(l10n.playbackTargetHandoffFailed(deviceName))));
-      return;
-    }
-
-    ref.read(remoteControlControllerProvider(deviceId)).loadAndPlay(
-          tracks.map((t) => t.id).toList(),
-          index,
-          position,
-        );
+    // The target is confirmed actually playing this queue already
+    // (that's what `claimed == true` means now) — safe to pause here.
     await playerService.pause();
     navigator.pop();
   }
 
   /// "Это устройство" — always a reactive, unacknowledged claim (see
   /// [PlaybackOwnershipCoordinator.claimSelf]'s doc), since there's no
-  /// third party to ack. Restores only the single current track, not
-  /// the remote device's whole queue — `RemoteState` doesn't carry a
-  /// queue today (a scoped-down v1, see
-  /// docs/adr/0033-playback-ownership-and-handoff.md's "Файлы" section
-  /// for the follow-up this leaves open).
+  /// third party to ack. Restores the remote device's *whole* queue
+  /// (`RemoteState.queueTrackIds`), not just the single current track —
+  /// a single-track queue would leave this device's own next/previous
+  /// with nothing to move to, the same regression ADR 0030 already
+  /// fixed once for the forward handoff direction.
   Future<void> _pullBack(BuildContext context, WidgetRef ref) async {
     final navigator = Navigator.of(context);
     final target = ref.read(activePlaybackTargetProvider).value;
@@ -144,42 +144,33 @@ class _PlaybackTargetPickerSheet extends ConsumerWidget {
     final state = ref.read(remoteControlConnectionProvider(target.deviceId)).value?.state;
     ref.read(playbackOwnershipCoordinatorProvider).claimSelf();
 
-    final trackId = state?.trackId;
-    if (trackId != null) {
-      final track = await ref.read(tracksRepositoryProvider).byId(trackId);
-      if (track != null && track.isAvailableLocally) {
+    if (state != null && state.queueTrackIds.isNotEmpty) {
+      // Same "resolve ids -> tracks this device actually has, re-find
+      // the start track by id (not position, since dropping unavailable
+      // tracks can shift indices)" logic `RemoteControlServer._apply`
+      // already applies to `RemoteLoadAndPlay` — duplicated rather than
+      // shared, since that lives in a plain Dart service with no
+      // `WidgetRef`/`tracksRepositoryProvider` access.
+      final tracksRepository = ref.read(tracksRepositoryProvider);
+      final startId =
+          state.queueIndex >= 0 && state.queueIndex < state.queueTrackIds.length
+              ? state.queueTrackIds[state.queueIndex]
+              : state.trackId;
+      final tracks = <Track>[];
+      for (final id in state.queueTrackIds) {
+        final track = await tracksRepository.byId(id);
+        if (track != null && track.isAvailableLocally) tracks.add(track);
+      }
+      final resolvedIndex = tracks.indexWhere((t) => t.id == startId);
+      if (resolvedIndex >= 0) {
         await ref.read(playerServiceProvider).setQueue(
-          [track],
+          tracks,
+          startIndex: resolvedIndex,
           autoPlay: true,
-          seekTo: Duration(milliseconds: state!.positionMs),
+          seekTo: Duration(milliseconds: state.positionMs),
         );
       }
     }
     navigator.pop();
   }
-}
-
-/// `remoteControlConnectionProvider` is `.autoDispose` — a bare
-/// `ref.read()` wouldn't keep it alive long enough to actually reach
-/// `accepted`. `listenManual` (same pattern as `awaitFirstValue`,
-/// `queue_resolution.dart`) keeps it alive for exactly as long as this
-/// waits, no longer.
-Future<bool> _awaitRemoteControlAccepted(
-  WidgetRef ref,
-  String deviceId, {
-  Duration timeout = const Duration(seconds: 3),
-}) async {
-  final completer = Completer<bool>();
-  final sub = ref.listenManual(remoteControlConnectionProvider(deviceId), (previous, next) {
-    final status = next.value?.status;
-    if (completer.isCompleted) return;
-    if (status == RemoteControlStatus.accepted) {
-      completer.complete(true);
-    } else if (status == RemoteControlStatus.rejected) {
-      completer.complete(false);
-    }
-  }, fireImmediately: true);
-  final result = await completer.future.timeout(timeout, onTimeout: () => false);
-  sub.close();
-  return result;
 }

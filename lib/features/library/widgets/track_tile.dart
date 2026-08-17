@@ -8,7 +8,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/models/track.dart';
 import '../../../l10n/l10n.dart';
-import '../../player/providers/player_providers.dart';
+import '../../player/providers/active_playback_controller.dart';
 import '../providers/library_providers.dart';
 
 class TrackTile extends ConsumerWidget {
@@ -36,8 +36,22 @@ class TrackTile extends ConsumerWidget {
     // playlist, search results) gave no visual clue which one the mini
     // player was actually on — easy to lose track of, especially in a
     // long list.
-    final isCurrent = ref.watch(currentTrackProvider).value?.id == track.id;
-    final isPlaying = isCurrent && (ref.watch(isPlayingProvider).value ?? false);
+    // Ownership-aware (docs/adr/0033-playback-ownership-and-handoff.md) —
+    // "now playing" follows whichever device actually owns playback, not
+    // just this device's own local player, so the highlight/toggle stay
+    // correct while another device is the active target.
+    final isCurrent = ref.watch(activePlaybackCurrentTrackProvider).value?.id == track.id;
+    // Always watch `activePlaybackIsPlayingProvider`, never
+    // `isCurrent && ref.watch(...)` — that `&&` would short-circuit the
+    // watch away entirely on every build where this row isn't current,
+    // so the underlying `isPlayingProvider`'s broadcast-stream
+    // subscription only gets (lazily) established the first time this
+    // row *becomes* current. Any "now playing" event that already fired
+    // before that exact moment is then permanently missed — broadcast
+    // `StreamController`s never replay past events to a new listener —
+    // leaving the row stuck showing "paused" until the next unrelated
+    // play/pause toggle happens to fire again.
+    final isPlaying = ref.watch(activePlaybackIsPlayingProvider) && isCurrent;
 
     final tile = ListTile(
       // Tapping the tile that's already loaded re-runs the caller's
@@ -46,7 +60,7 @@ class TrackTile extends ConsumerWidget {
       // this is visibly the "now playing" row. Toggle play/pause instead
       // for that one case; tapping any other row still starts it fresh,
       // same as before.
-      onTap: isCurrent ? () => ref.read(playerServiceProvider).playOrPause() : onTap,
+      onTap: isCurrent ? () => ref.read(activePlaybackControllerProvider).playOrPause() : onTap,
       onLongPress: onLongPress,
       tileColor: isCurrent ? AppTheme.accent.withValues(alpha: 0.08) : null,
       leading: Stack(

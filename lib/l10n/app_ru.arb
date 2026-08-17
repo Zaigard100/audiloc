@@ -13,10 +13,6 @@
   "commonDecline": "Отклонить",
   "commonAllow": "Разрешить",
 
-  "resumePlaybackBody": "Хотите продолжить с «{trackTitle}», {time}, {device}?",
-  "@resumePlaybackBody": {"placeholders": {"trackTitle": {"type": "String"}, "time": {"type": "String"}, "device": {"type": "String"}}},
-  "resumePlaybackContinue": "Продолжить",
-
   "settingsPlayback": "Воспроизведение",
   "settingsKeyboardShortcuts": "Управление с клавиатуры",
   "settingsKeyboardShortcutsSubtitle": "Пробел — пауза, стрелки — перемотка, медиаклавиши",
@@ -30,8 +26,6 @@
   "settingsSaveLocalSessionSubtitle": "Только на этом устройстве, никуда не отправляется. Запоминает последний трек и позицию и продолжает с них при следующем запуске",
   "settingsSyncPlaybackState": "Синхронизировать состояние воспроизведения",
   "settingsSyncPlaybackStateSubtitle": "Экспериментально, может работать нестабильно. Действует сразу на всех устройствах этого профиля: включив здесь, вы включаете и отправку, и приём позиции воспроизведения между ними",
-  "settingsKeepAliveInBackground": "Работать в фоне",
-  "settingsKeepAliveInBackgroundSubtitle": "Только на этом устройстве. Приложение продолжит синхронизироваться и принимать удалённое управление, даже когда экран выключен или окно свёрнуто",
 
   "playbackTargetPickerTitle": "Воспроизвести на устройстве",
   "playbackTargetThisDevice": "Это устройство",

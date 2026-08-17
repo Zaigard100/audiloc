@@ -6,6 +6,7 @@ import 'package:audiloc/data/models/device.dart';
 import 'package:audiloc/data/models/track.dart';
 import 'package:audiloc/data/repositories/devices_repository.dart';
 import 'package:audiloc/data/repositories/profile_settings_repository.dart';
+import 'package:audiloc/data/repositories/tracks_repository.dart';
 import 'package:audiloc/services/playback/player_service.dart';
 import 'package:audiloc/services/playback_ownership/playback_ownership_coordinator.dart';
 import 'package:audiloc/services/playback_ownership/playback_ownership_server.dart';
@@ -64,6 +65,8 @@ class _RecordingPlayerService implements PlayerService {
   @override
   Duration get position => Duration.zero;
   @override
+  List<Track> get queue => const [];
+  @override
   bool get isShuffleEnabled => false;
   @override
   PlaybackRepeatMode get repeatMode => PlaybackRepeatMode.all;
@@ -115,6 +118,7 @@ class _Node {
   late AudilocDatabase db;
   late DevicesRepository devicesRepository;
   late ProfileSettingsRepository profileSettingsRepository;
+  late TracksRepository tracksRepository;
   late _RecordingPlayerService player;
   late PlaybackOwnershipServer server;
   late PlaybackOwnershipCoordinator coordinator;
@@ -131,6 +135,7 @@ class _Node {
     db = await AudilocDatabase.openInMemory();
     devicesRepository = DevicesRepository(db.crdt);
     profileSettingsRepository = ProfileSettingsRepository(db.crdt);
+    tracksRepository = TracksRepository(db.crdt);
     player = _RecordingPlayerService();
     discovery = _FakeDiscoveryService();
     server = PlaybackOwnershipServer(
@@ -146,11 +151,20 @@ class _Node {
       devicesRepository: devicesRepository,
       profileSettingsRepository: profileSettingsRepository,
       playerService: player,
+      tracksRepository: tracksRepository,
       server: server,
       port: _testOwnershipPort,
     );
     await coordinator.start();
   }
+
+  /// A claim's target only acks once it's resolved the queue against its
+  /// *own* `TracksRepository` (see `_handleTargetedClaim`) — in
+  /// production that row arrives via ordinary metadata sync before any
+  /// handoff is possible, but this test never wires the two nodes' DBs
+  /// together, so tests exercising a successful handoff must seed the
+  /// target's copy directly.
+  Future<void> putTrack(String id) => tracksRepository.upsert(Track(id: id, path: '/fake/$id.flac'));
 
   /// Pairs [other] and marks it found — the two calls a real mDNS
   /// discovery + pairing flow would together produce, condensed for the
@@ -258,12 +272,33 @@ void main() {
 
   test('a manual handoff waits for the target to accept before either side updates', () async {
     await connectBothWays();
+    await b.putTrack('t1');
 
-    final accepted = await a.coordinator.claimForDevice(b.id);
+    final accepted = await a.coordinator.claimForDevice(
+      b.id,
+      queueTrackIds: ['t1'],
+      queueIndex: 0,
+      positionMs: 1234,
+    );
 
     expect(accepted, isTrue);
     expect(a.coordinator.currentOwner, b.id);
     await _waitUntil(() => b.coordinator.currentOwner == b.id);
+  });
+
+  test('a manual handoff to a target missing the track is rejected', () async {
+    await connectBothWays();
+
+    final accepted = await a.coordinator.claimForDevice(
+      b.id,
+      queueTrackIds: ['does-not-exist'],
+      queueIndex: 0,
+      positionMs: 0,
+    );
+
+    expect(accepted, isFalse);
+    expect(a.coordinator.currentOwner, isNull);
+    expect(b.coordinator.currentOwner, isNull);
   });
 
   test(
@@ -275,14 +310,24 @@ void main() {
       // moment, same as a real toggle flip would need to propagate.
       await _waitUntil(() => !b.coordinator.linkedDeviceIds.contains(a.id));
 
-      final accepted = await a.coordinator.claimForDevice(b.id);
+      final accepted = await a.coordinator.claimForDevice(
+        b.id,
+        queueTrackIds: ['t1'],
+        queueIndex: 0,
+        positionMs: 0,
+      );
 
       expect(accepted, isFalse);
     },
   );
 
   test('claiming a device with no live link fails immediately without touching ownership', () async {
-    final accepted = await a.coordinator.claimForDevice('nobody-here');
+    final accepted = await a.coordinator.claimForDevice(
+      'nobody-here',
+      queueTrackIds: ['t1'],
+      queueIndex: 0,
+      positionMs: 0,
+    );
     expect(accepted, isFalse);
     expect(a.coordinator.currentOwner, isNull);
   });

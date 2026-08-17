@@ -13,10 +13,6 @@
   "commonDecline": "Decline",
   "commonAllow": "Allow",
 
-  "resumePlaybackBody": "Continue with “{trackTitle}”, {time}, {device}?",
-  "@resumePlaybackBody": {"placeholders": {"trackTitle": {"type": "String"}, "time": {"type": "String"}, "device": {"type": "String"}}},
-  "resumePlaybackContinue": "Continue",
-
   "settingsPlayback": "Playback",
   "settingsKeyboardShortcuts": "Keyboard control",
   "settingsKeyboardShortcutsSubtitle": "Space — pause, arrows — seek, media keys",
@@ -30,8 +26,6 @@
   "settingsSaveLocalSessionSubtitle": "This device only, never sent anywhere. Remembers the last track and position and continues from them next launch",
   "settingsSyncPlaybackState": "Sync playback state",
   "settingsSyncPlaybackStateSubtitle": "Experimental, may be unstable. Applies to every device on this profile at once: turning it on here turns on both sending and receiving playback position between them",
-  "settingsKeepAliveInBackground": "Run in background",
-  "settingsKeepAliveInBackgroundSubtitle": "This device only. The app keeps syncing and accepting remote control even while the screen is off or the window is minimized",
 
   "playbackTargetPickerTitle": "Play on device",
   "playbackTargetThisDevice": "This device",

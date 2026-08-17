@@ -36,7 +36,6 @@ class SettingsScreen extends ConsumerWidget {
           const _AllowRemoteControlToggle(),
           const _SaveLocalSessionToggle(),
           const _SyncPlaybackStateToggle(),
-          const _KeepAliveInBackgroundToggle(),
           const Divider(height: 1),
           ListTile(
             leading: const Icon(Icons.info_outline),
@@ -370,31 +369,6 @@ class _SyncPlaybackStateToggle extends ConsumerWidget {
       subtitle: Text(l10n.settingsSyncPlaybackStateSubtitle),
       value: enabled,
       onChanged: (value) => ref.read(profileSettingsRepositoryProvider).setSyncPlaybackEnabled(value),
-    );
-  }
-}
-
-/// Only rendered while [_SyncPlaybackStateToggle] is on — background
-/// operation only matters if there's something to keep syncing/remote
-/// -controlling while the app isn't in the foreground. Device-level (not
-/// CRDT), off by default — see
-/// docs/adr/0032-unified-profile-sync-and-background-mode.md.
-class _KeepAliveInBackgroundToggle extends ConsumerWidget {
-  const _KeepAliveInBackgroundToggle();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final syncEnabled = ref.watch(profileSyncEnabledProvider).value ?? false;
-    if (!syncEnabled) return const SizedBox.shrink();
-
-    final l10n = context.l10n;
-    final enabled = ref.watch(currentKeepAliveInBackgroundProvider);
-    return SwitchListTile(
-      secondary: const Icon(Icons.all_inclusive_outlined),
-      title: Text(l10n.settingsKeepAliveInBackground),
-      subtitle: Text(l10n.settingsKeepAliveInBackgroundSubtitle),
-      value: enabled,
-      onChanged: (value) => ref.read(changeKeepAliveInBackgroundProvider)(value),
     );
   }
 }

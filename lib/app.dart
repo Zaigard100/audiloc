@@ -93,14 +93,6 @@ class _AudilocAppState extends State<AudilocApp> with WidgetsBindingObserver {
   /// lives in CRDT, not here — see [ProfileSettingsRepository]).
   bool _saveLocalSession = true;
 
-  /// Persisted via [_settingsStore], off by default, device-level (not
-  /// CRDT — whether *this* device stays alive in the background is its
-  /// own OS-level capability, not something one device can decide for
-  /// another). Only shown in Settings while the profile-wide sync
-  /// toggle is on — see
-  /// docs/adr/0032-unified-profile-sync-and-background-mode.md.
-  bool _keepAliveInBackground = false;
-
   /// Set when [_bootstrap] or [_openProfile] throws — without this, an
   /// exception anywhere in that startup chain (a port still held by a
   /// process that hasn't released it yet, a transient filesystem error,
@@ -248,7 +240,6 @@ class _AudilocAppState extends State<AudilocApp> with WidgetsBindingObserver {
       final savedPlaybackShortcuts = await settingsStore.playbackShortcutsSettings();
       final savedAllowRemoteControl = await settingsStore.allowRemoteControl();
       final savedSaveLocalSession = await settingsStore.saveLocalSession();
-      final savedKeepAliveInBackground = await settingsStore.keepAliveInBackground();
       if (!mounted) return;
       setState(() {
         _profilesStore = store;
@@ -258,7 +249,6 @@ class _AudilocAppState extends State<AudilocApp> with WidgetsBindingObserver {
         _playbackShortcutsSettings = savedPlaybackShortcuts;
         _allowRemoteControl = savedAllowRemoteControl;
         _saveLocalSession = savedSaveLocalSession;
-        _keepAliveInBackground = savedKeepAliveInBackground;
       });
 
       // A genuinely fresh install (nothing to migrate either) — ask for a
@@ -364,17 +354,6 @@ class _AudilocAppState extends State<AudilocApp> with WidgetsBindingObserver {
     setState(() => _saveLocalSession = value);
   }
 
-  /// Bound to the "работать в фоне" toggle in Settings, shown only while
-  /// the profile-wide sync toggle is on — same pattern as
-  /// [_changeAllowRemoteControl]. See
-  /// docs/adr/0032-unified-profile-sync-and-background-mode.md.
-  Future<void> _changeKeepAliveInBackground(bool value) async {
-    await _settingsStore!.setKeepAliveInBackground(value);
-    _session?.container.read(currentKeepAliveInBackgroundProvider.notifier).state = value;
-    if (!mounted) return;
-    setState(() => _keepAliveInBackground = value);
-  }
-
   /// Bound to "Стереть все данные" in Settings, after its own double
   /// confirmation (docs/adr/0028-settings-screen-and-theming.md) — the
   /// caller is a widget inside the very [ProviderContainer] this closes,
@@ -411,7 +390,6 @@ class _AudilocAppState extends State<AudilocApp> with WidgetsBindingObserver {
       _pendingProfileId = null;
       _allowRemoteControl = false;
       _saveLocalSession = true;
-      _keepAliveInBackground = false;
     });
     await _bootstrap();
   }
@@ -515,8 +493,6 @@ class _AudilocAppState extends State<AudilocApp> with WidgetsBindingObserver {
         initialPlaybackShortcutsSettings: _playbackShortcutsSettings,
         changeAllowRemoteControl: _changeAllowRemoteControl,
         initialAllowRemoteControl: _allowRemoteControl,
-        changeKeepAliveInBackground: _changeKeepAliveInBackground,
-        initialKeepAliveInBackground: _keepAliveInBackground,
         changeSaveLocalSession: _changeSaveLocalSession,
         initialSaveLocalSession: _saveLocalSession,
       );

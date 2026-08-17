@@ -158,18 +158,6 @@ abstract class AppLocalizations {
   /// **'Разрешить'**
   String get commonAllow;
 
-  /// No description provided for @resumePlaybackBody.
-  ///
-  /// In ru, this message translates to:
-  /// **'Хотите продолжить с «{trackTitle}», {time}, {device}?'**
-  String resumePlaybackBody(String trackTitle, String time, String device);
-
-  /// No description provided for @resumePlaybackContinue.
-  ///
-  /// In ru, this message translates to:
-  /// **'Продолжить'**
-  String get resumePlaybackContinue;
-
   /// No description provided for @settingsPlayback.
   ///
   /// In ru, this message translates to:
@@ -235,18 +223,6 @@ abstract class AppLocalizations {
   /// In ru, this message translates to:
   /// **'Экспериментально, может работать нестабильно. Действует сразу на всех устройствах этого профиля: включив здесь, вы включаете и отправку, и приём позиции воспроизведения между ними'**
   String get settingsSyncPlaybackStateSubtitle;
-
-  /// No description provided for @settingsKeepAliveInBackground.
-  ///
-  /// In ru, this message translates to:
-  /// **'Работать в фоне'**
-  String get settingsKeepAliveInBackground;
-
-  /// No description provided for @settingsKeepAliveInBackgroundSubtitle.
-  ///
-  /// In ru, this message translates to:
-  /// **'Только на этом устройстве. Приложение продолжит синхронизироваться и принимать удалённое управление, даже когда экран выключен или окно свёрнуто'**
-  String get settingsKeepAliveInBackgroundSubtitle;
 
   /// No description provided for @playbackTargetPickerTitle.
   ///
